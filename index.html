@@ -615,15 +615,17 @@ let fbDB = null;
 const genGameId = () => Math.random().toString(36).slice(2,8).toUpperCase();
 const fbInit = () => {
   if (fbDB) return true;
-  const cfg = (typeof window!=="undefined") && window.__FB_CONFIG__;
-  if (!cfg) return false;
   try {
-    const fb = window.firebase;
-    if (!fb || !fb.database) return false;
+    const cfg = (typeof window!=="undefined") && window.__FB_CONFIG__;
+    if (!cfg) { console.warn("[FB] No config"); return false; }
+    const fb = (typeof window!=="undefined") && window.firebase;
+    if (!fb) { console.warn("[FB] No SDK"); return false; }
+    if (typeof fb.database !== "function") { console.warn("[FB] No database module"); return false; }
     if (!fb.apps || !fb.apps.length) fb.initializeApp(cfg);
     fbDB = fb.database();
+    console.log("[FB] initialized OK");
     return true;
-  } catch(e) { console.error("fbInit:", e); return false; }
+  } catch(e) { console.error("[FB] init error:", e); return false; }
 };
 const fbPush = (id, data) => {
   if (!fbDB || !id) return;
@@ -691,19 +693,32 @@ function App() {
   };
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
   const startViewing = (id)=>{
-    if(!fbInit()){showToast("Firebase未設定");return;}
-    const uid=id.trim().toUpperCase();
-    if(uid.length!==6){showToast("6桁のコードを入力してください");return;}
-    // 即座にsubscribe開始（stateの更新を待たない）
-    const ref = fbDB.ref("games/"+uid);
-    ref.on("value", s => {
-      if(s&&s.exists()){
-        const data=s.val();
-        setStorage(prev=>({...prev, currentGame:{...data, _ts:undefined}}));
-      }
-    });
-    setSyncGameId(uid); setSyncMode("viewer");
-    showToast("接続中: "+uid);
+    try {
+      const uid = (id||'').trim().toUpperCase();
+      if(uid.length!==6){showToast("6桁のコードを入力してください");return;}
+      if(!fbInit()){showToast("Firebase未設定");return;}
+      if(!fbDB){showToast("DB接続失敗");return;}
+      const ref = fbDB.ref("games/"+uid);
+      ref.on("value", s => {
+        try {
+          if(s && s.exists()){
+            const data = s.val();
+            delete data._ts;
+            // 既存のcurrentGameフィールドを保持しつつ上書き（クラッシュ防止）
+            setStorage(prev=>({
+              ...prev,
+              currentGame: data
+            }));
+          }
+        } catch(e){ console.error("[FB] receive error:",e); }
+      });
+      setSyncGameId(uid);
+      setSyncMode("viewer");
+      showToast("接続中: "+uid);
+    } catch(e) {
+      console.error("[FB] startViewing error:",e);
+      showToast("接続エラー: "+e.message);
+    }
   };
   const stopViewing = ()=>{
     if(syncGameId && fbDB) {

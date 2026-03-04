@@ -690,33 +690,34 @@ function App() {
   };
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
   const startViewing = (id)=>{
-    try {
-      const uid = (id||'').trim().toUpperCase();
-      if(uid.length!==6){showToast("6桁のコードを入力してください");return;}
-      if(!fbInit()){showToast("Firebase未設定");return;}
-      if(!fbDB){showToast("DB接続失敗");return;}
-      const ref = fbDB.ref("games/"+uid);
-      ref.on("value", s => {
-        try {
-          if(s && s.exists()){
-            const raw = s.val();
-            // _tsを除いた純粋なgameデータのみ取り出す
-            const data = Object.assign({}, raw);
-            delete data._ts;
-            // setTimeoutで次のtickに遅延させてReactの更新サイクルと衝突しないようにする
-            setTimeout(()=>{
-              setStorage(prev=>({...prev, currentGame: data}));
-            }, 0);
-          }
-        } catch(e){ console.error("[FB] receive error:",e); }
-      });
-      setSyncGameId(uid);
-      setSyncMode("viewer");
-      showToast("接続中: "+uid);
-    } catch(e) {
-      console.error("[FB] startViewing error:",e);
-      showToast("接続エラー: "+e.message);
-    }
+    const uid = (id||'').trim().toUpperCase();
+    if(uid.length!==6){ showToast("6桁のコードを入力してください"); return; }
+    // まず画面を観戦モードに切り替え（Firebaseより先に）
+    setSyncGameId(uid);
+    setSyncMode("viewer");
+    showToast("接続中: "+uid);
+    // 100ms後にFirebase接続（画面描画完了後）
+    setTimeout(()=>{
+      try {
+        if(!fbInit()){ showToast("Firebase未設定"); return; }
+        if(!fbDB){ showToast("DB接続失敗"); return; }
+        fbDB.ref("games/"+uid).on("value", function(s){
+          try {
+            if(!s || !s.exists()) return;
+            var raw = s.val();
+            var data = {};
+            var keys = Object.keys(raw);
+            for(var i=0;i<keys.length;i++){
+              if(keys[i]!=="_ts") data[keys[i]]=raw[keys[i]];
+            }
+            setStorage(function(prev){ return Object.assign({},prev,{currentGame:data}); });
+          } catch(err){ console.error("[FB] recv:",err); }
+        });
+      } catch(e){
+        console.error("[FB] connect error:",e);
+        showToast("接続エラー");
+      }
+    }, 100);
   };
   const stopViewing = ()=>{
     if(syncGameId && fbDB) {

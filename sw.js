@@ -1,4 +1,4 @@
-const CACHE = 'scorebook-v29';
+const CACHE = 'scorebook-v30';
 const ASSETS = [
   './',
   './index.html',

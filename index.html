@@ -323,8 +323,10 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
         if (initBatterScored) {
           // HR等: 打者得点
           list.push({ name: batterName, from: "batter", to: "scored" });
+        } else if (batterOut) {
+          // GO/K/FO/SAC/SF/DP等: 打者アウト、リストに追加しない（アウト扱い）
         }
-        // batterOut または その他: リストに追加しない（アウト扱い）
+        // それ以外(E/FC/BB等出塁): postBasesに打者が入っているはずなので上のループで処理済み
       }
     }
     return list;
@@ -2680,7 +2682,7 @@ function App() {
                   preBases: game.bases,
                   postBases: modal.autoNewOuts>=3?[null,null,null]:modal.autoNewBases,
                   batterName: _optionalChain([mPlayer, 'optionalAccess', _63 => _63.name])||"打者",
-                  batterScored: modal.batterScored||false,
+                  batterScored: modal.pendingCode==="HR" ? true : false,
                   batterOut: ["K","KL","GO","FO","FF","SAC","SF","DP"].includes(modal.pendingCode),
                   outs: modal.autoNewOuts,
                   onConfirm: (adjBases,scoredNames,adjOuts)=>{

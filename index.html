@@ -642,6 +642,25 @@ const fbUnsub = (id) => { if(fbDB&&id) try{fbDB.ref("games/"+id).off("value");}c
 const SKEY = "bb_v6";
 const lsLoad = () => { try{return JSON.parse(localStorage.getItem(SKEY))||{};}catch (e2){return{};} };
 const lsSave = (d) => { try{localStorage.setItem(SKEY,JSON.stringify(d));}catch (e3){} };
+function ViewerInput(props) {
+  var onStart = props.onStart;
+  var _vs = useState('');
+  var v = _vs[0]; var sv = _vs[1];
+  return React.createElement('div', {style:{display:'flex',gap:8,alignItems:'center'}},
+    React.createElement('input', {
+      value: v,
+      onChange: function(e){ sv(e.target.value.toUpperCase().slice(0,6)); },
+      placeholder: 'A3B7Z9',
+      maxLength: 6,
+      style: {background:'#0a1628',border:'1px solid #334155',borderRadius:8,color:'#e2e8f0',padding:'8px 12px',fontSize:20,fontFamily:'monospace',letterSpacing:4,textAlign:'center',width:160}
+    }),
+    React.createElement('button', {
+      onClick: function(){ onStart(v); },
+      disabled: v.length !== 6,
+      style: {background:v.length===6?'#3b82f6':'#1e3a5f',color:'#fff',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,cursor:v.length===6?'pointer':'not-allowed'}
+    }, '👁 観戦開始')
+  );
+}
 function App() {
   const [storage, setStorage] = useState(()=>{
     const s=lsLoad();

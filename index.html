@@ -154,8 +154,9 @@ function applyResult(code, bases, outs, batterName) {
       b=[BN,n1,n2]; batterOn=0; break;
     }
     case "FC": {
-      // フィールダーチョイス: 打者1塁出塁、全ランナーはそのまま（調整モーダルでアウトにするランナーを選ぶ）
-      b=[BN,n1,n2]; batterOn=0; break;
+      // フィールダーチョイス: 打者1塁出塁、ランナーは1つずつ進塁（調整モーダルでアウトにするランナーを選ぶ）
+      // 1塁に打者、既存ランナーは1つ前に進めて3塁が空く形（調整で修正可）
+      b=[BN, n1||null, n2||null]; batterOn=0; break;
     }
     case "SAC": {
       // 犠打: 打者アウト、ランナーは進塁調整モーダルで決定
@@ -294,17 +295,21 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
         list.push({ name, from: i, to: "out" });
         return;
       }
-      let to = "out";
-      if (postBases[i] === name) to = i;
-      else {
+      let to = "out"; // デフォルトはアウト（勝手にscoredにしない）
+      if (postBases[i] === name) {
+        to = i; // 同じ塁にいる
+      } else {
+        // 他の塁を探す
         for (let j = 0; j < 3; j++) {
           if (postBases[j] === name) { to = j; break; }
         }
-        if (to === "out") to = "scored";
+        // postBasesに見つからない場合: デフォルトout（scoredにしない）
+        // ユーザーが調整モーダルで手動でscoredに変更できる
       }
       list.push({ name, from: i, to });
     });
     
+    // 打者の処理
     for (let j = 0; j < 3; j++) {
       if (postBases[j] === batterName) {
         list.push({ name: batterName, from: "batter", to: j });
@@ -318,16 +323,8 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
         if (initBatterScored) {
           // HR等: 打者得点
           list.push({ name: batterName, from: "batter", to: "scored" });
-        } else if (batterOut) {
-          // GO/K/FO等アウトのコード: 打者はアウト、絶対にscoredにしない
-          // (リストに追加しない = アウト扱い)
-        } else {
-          // その他: 塁が変化していたらscored（本来はありえないが念のため）
-          const basesChanged = !preBases.every((v,i) => v === postBases[i]);
-          if (basesChanged && postBases.some(v=>v===batterName)) {
-            list.push({ name: batterName, from: "batter", to: "scored" });
-          }
         }
+        // batterOut または その他: リストに追加しない（アウト扱い）
       }
     }
     return list;

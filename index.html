@@ -699,13 +699,14 @@ function App() {
       ref.on("value", s => {
         try {
           if(s && s.exists()){
-            const data = s.val();
+            const raw = s.val();
+            // _tsを除いた純粋なgameデータのみ取り出す
+            const data = Object.assign({}, raw);
             delete data._ts;
-            // 既存のcurrentGameフィールドを保持しつつ上書き（クラッシュ防止）
-            setStorage(prev=>({
-              ...prev,
-              currentGame: data
-            }));
+            // setTimeoutで次のtickに遅延させてReactの更新サイクルと衝突しないようにする
+            setTimeout(()=>{
+              setStorage(prev=>({...prev, currentGame: data}));
+            }, 0);
           }
         } catch(e){ console.error("[FB] receive error:",e); }
       });

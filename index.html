@@ -135,38 +135,35 @@ function applyResult(code, bases, outs, batterName) {
       batterOn=0; break;
     }
     case "GO": {
+      // ゴロ: 打者アウト、ランナーは進塁調整モーダルで決定
       newOuts=outs+1;
-      if(n3){ scoredNames=[n3]; runs=1; }
       b=[null,n1,n2]; batterOn=-1; break;
     }
     case "FO": case "FF": {
+      // フライ/ファウルフライ: 打者アウト、ランナーはそのまま（タッチアップは調整モーダルで）
       newOuts=outs+1; b=[n1,n2,n3]; batterOn=-1; break;
     }
     case "DP": {
+      // 併殺: 2アウト、1塁走者と打者アウト
       newOuts=Math.min(outs+2,3);
-      
-      if(n1){ b=[null,n2,n3]; }
-      else   { b=[null,n2,n3]; }
+      b=[null,n2,n3];
       batterOn=-1; break;
     }
     case "E": {
-      if(n3){ scoredNames=[n3]; runs=1; }
+      // エラー: 打者出塁、ランナーは進塁調整モーダルで決定
       b=[BN,n1,n2]; batterOn=0; break;
     }
     case "FC": {
-      
-      if(n3){       b=[BN,n1,n2]; }
-      else if(n2){  b=[BN,n1,null]; }
-      else if(n1){  b=[BN,null,null]; }
-      else{         b=[BN,null,null]; }
-      batterOn=0; break;
+      // フィールダーチョイス: 打者1塁出塁、全ランナーはそのまま（調整モーダルでアウトにするランナーを選ぶ）
+      b=[BN,n1,n2]; batterOn=0; break;
     }
     case "SAC": {
+      // 犠打: 打者アウト、ランナーは進塁調整モーダルで決定
       newOuts=outs+1;
-      if(n3){ scoredNames=[n3]; runs=1; }
       b=[null,n1,n2]; batterOn=-1; break;
     }
     case "SF": {
+      // 犠飛: 打者アウト、3塁ランナー得点（犠飛は必ず3塁ランナー得点）
       newOuts=outs+1;
       if(n3){ scoredNames=[n3]; runs=1; }
       b=[n1,n2,null]; batterOn=-1; break;
@@ -285,7 +282,7 @@ function MiniDiamond({ bases, size=56 }) {
 }
 const BASE_LABELS = ["1塁","2塁","3塁","ホームイン🏠","アウト❌"];
 const BASE_COLORS = ["#fbbf24","#22c55e","#f87171","#f97316","#94a3b8"];
-function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: initBatterScored, outs, onConfirm, onCancel }) {
+function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel }) {
   
   const buildRunners = () => {
     const list = [];
@@ -294,7 +291,6 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
     preBases.forEach((name, i) => {
       if (!name) return;
       if (isInningOver) {
-        
         list.push({ name, from: i, to: "out" });
         return;
       }
@@ -319,16 +315,18 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
     const batterAlreadyAdded = list.some(r => r.name === batterName && r.from === "batter");
     if (!batterAlreadyAdded) {
       if (!preBases.includes(batterName)) {
-        
         if (initBatterScored) {
+          // HR等: 打者得点
           list.push({ name: batterName, from: "batter", to: "scored" });
+        } else if (batterOut) {
+          // GO/K/FO等アウトのコード: 打者はアウト、絶対にscoredにしない
+          // (リストに追加しない = アウト扱い)
         } else {
-          
+          // その他: 塁が変化していたらscored（本来はありえないが念のため）
           const basesChanged = !preBases.every((v,i) => v === postBases[i]);
-          if (basesChanged) {
+          if (basesChanged && postBases.some(v=>v===batterName)) {
             list.push({ name: batterName, from: "batter", to: "scored" });
           }
-          
         }
       }
     }
@@ -2686,6 +2684,7 @@ function App() {
                   postBases: modal.autoNewOuts>=3?[null,null,null]:modal.autoNewBases,
                   batterName: _optionalChain([mPlayer, 'optionalAccess', _63 => _63.name])||"打者",
                   batterScored: modal.batterScored||false,
+                  batterOut: ["K","KL","GO","FO","FF","SAC","SF","DP"].includes(modal.pendingCode),
                   outs: modal.autoNewOuts,
                   onConfirm: (adjBases,scoredNames,adjOuts)=>{
                     commitAtBat(modal.team,modal.pidx,modal.inning,

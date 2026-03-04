@@ -2112,13 +2112,7 @@ function App() {
     React.createElement("div",{style:{fontSize:14,fontWeight:700,color:"#7dd3fc",marginBottom:12}},"👁 観戦する"),
     syncMode==="off"?React.createElement("div",null,
       React.createElement("div",{style:{fontSize:12,color:"#94a3b8",marginBottom:12}},"6桁のコードを入力してください。"),
-      React.createElement(function ViewerInput(){
-        const [v,sv]=useState("");
-        return React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
-          React.createElement("input",{value:v,onChange:e=>sv(e.target.value.toUpperCase().slice(0,6)),placeholder:"A3B7Z9",maxLength:6,style:{background:"#0a1628",border:"1px solid #334155",borderRadius:8,color:"#e2e8f0",padding:"8px 12px",fontSize:20,fontFamily:"monospace",letterSpacing:4,textAlign:"center",width:160}}),
-          React.createElement("button",{onClick:()=>startViewing(v),disabled:v.length!==6,style:{background:v.length===6?"#3b82f6":"#1e3a5f",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,cursor:v.length===6?"pointer":"not-allowed"}},"👁 観戦開始")
-        );
-      })
+      React.createElement(ViewerInput, {onStart: startViewing})
     ):syncMode==="viewer"?React.createElement("div",null,
       React.createElement("div",{style:{fontSize:12,color:"#93c5fd",marginBottom:8}},"観戦中 ✓ コード: ",React.createElement("span",{style:{fontWeight:700,fontFamily:"monospace",letterSpacing:3}},syncGameId)),
       React.createElement("button",{onClick:stopViewing,style:{background:"#475569",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,cursor:"pointer"}},"■ 観戦終了")

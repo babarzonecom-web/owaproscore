@@ -336,6 +336,7 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
 
   const [runners, setRunners] = useState(buildRunners);
   const [adjOuts, setAdjOuts] = useState(outs);
+  const debugInfo = 'batterOut='+batterOut+' scored='+initBatterScored+' batter='+batterName;
 
   
   const cycleRunner = (idx) => {
@@ -371,7 +372,7 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
         
         , runners.length > 0 ? (
           React.createElement('div', { style: {marginBottom:16},}
-            , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "選手の行き先")
+            , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "選手の行き先"), React.createElement("div",{style:{fontSize:10,color:"#f87171",marginBottom:4}}, debugInfo)
             , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:6},}
               , runners.map((r, i) => (
                 React.createElement('div', { key: i, style: {display:"flex",alignItems:"center",gap:8,

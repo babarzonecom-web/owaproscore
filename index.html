@@ -323,20 +323,22 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
     if (!batterAlreadyAdded) {
       if (!preBases.includes(batterName)) {
         if (initBatterScored) {
-          // HR等: 打者得点
           list.push({ name: batterName, from: "batter", to: "scored" });
         } else if (batterOut) {
-          // GO/K/FO/SAC/SF/DP等: 打者アウト、リストに追加しない（アウト扱い）
+          // アウトなので追加しない
         }
-        // それ以外(E/FC/BB等出塁): postBasesに打者が入っているはずなので上のループで処理済み
       }
+    }
+    // batterOutなのに打者がscoredになっていたら強制的に除外
+    if (batterOut) {
+      return list.filter(r => !(r.from === "batter" && r.to === "scored"));
     }
     return list;
   };
 
   const [runners, setRunners] = useState(buildRunners);
   const [adjOuts, setAdjOuts] = useState(outs);
-  const debugInfo = 'batterOut='+batterOut+' scored='+initBatterScored+' batter='+batterName;
+  const debugInfo = 'code='+batterOut+' scored='+initBatterScored+' batter='+batterName;
 
   
   const cycleRunner = (idx) => {

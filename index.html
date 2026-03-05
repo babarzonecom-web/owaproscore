@@ -286,6 +286,8 @@ const BASE_COLORS = ["#fbbf24","#22c55e","#f87171","#f97316","#94a3b8"];
 function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel }) {
   
   const buildRunners = () => {
+    console.log('[DEBUG] buildRunners batterOut='+batterOut+' initBatterScored='+initBatterScored+' batterName='+batterName);
+    console.log('[DEBUG] preBases='+JSON.stringify(preBases)+' postBases='+JSON.stringify(postBases));
     const list = [];
     const isInningOver = postBases.every(v => !v) && !initBatterScored && preBases.some(v=>v);
     
@@ -709,34 +711,25 @@ function App() {
   };
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
   const startViewing = (id)=>{
-    const uid = (id||'').trim().toUpperCase();
-    if(uid.length!==6){ showToast("6桁のコードを入力してください"); return; }
-    // まず画面を観戦モードに切り替え（Firebaseより先に）
-    setSyncGameId(uid);
-    setSyncMode("viewer");
-    showToast("接続中: "+uid);
-    // 100ms後にFirebase接続（画面描画完了後）
-    setTimeout(()=>{
-      try {
-        if(!fbInit()){ showToast("Firebase未設定"); return; }
-        if(!fbDB){ showToast("DB接続失敗"); return; }
-        fbDB.ref("games/"+uid).on("value", function(s){
-          try {
-            if(!s || !s.exists()) return;
-            var raw = s.val();
-            var data = {};
-            var keys = Object.keys(raw);
-            for(var i=0;i<keys.length;i++){
-              if(keys[i]!=="_ts") data[keys[i]]=raw[keys[i]];
-            }
-            setStorage(function(prev){ return Object.assign({},prev,{currentGame:data}); });
-          } catch(err){ console.error("[FB] recv:",err); }
-        });
-      } catch(e){
-        console.error("[FB] connect error:",e);
-        showToast("接続エラー");
-      }
-    }, 100);
+    try {
+      var uid = (id||'').trim().toUpperCase();
+      if(uid.length!==6){ showToast("6桁のコードを入力してください"); return; }
+      if(!fbInit()){ showToast("Firebase未設定"); return; }
+      // subscribeを先に設定
+      fbDB.ref("games/"+uid).on("value", function(snap){
+        try {
+          if(!snap||!snap.exists()) return;
+          var d = snap.val();
+          if(!d || typeof d !== 'object') return;
+          delete d._ts;
+          setStorage(function(p){ return Object.assign({},p,{currentGame:d}); });
+        } catch(e2){ console.error('[FB] recv error:',e2); }
+      });
+      // モード切替
+      setSyncGameId(uid);
+      setSyncMode("viewer");
+      showToast("観戦開始: "+uid);
+    } catch(e){ console.error('[FB] startViewing error:',e); showToast("エラー: "+e.message); }
   };
   const stopViewing = ()=>{
     if(syncGameId && fbDB) {

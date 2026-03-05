@@ -154,8 +154,8 @@ function applyResult(code, bases, outs, batterName) {
       b=[BN,n1,n2]; batterOn=0; break;
     }
     case "FC": {
-      // フィールダーチョイス: 打者1塁出塁、ランナーは1つずつ進塁（調整モーダルでアウトにするランナーを選ぶ）
-      // 1塁に打者、既存ランナーは1つ前に進めて3塁が空く形（調整で修正可）
+      // フィールダーズチョイス: 打者必ず1塁出塁、アウトカウント増えない
+      // ランナーは1つずつ進塁（調整モーダルで変更可能）
       b=[BN, n1||null, n2||null]; batterOn=0; break;
     }
     case "SAC": {
@@ -285,60 +285,53 @@ const BASE_LABELS = ["1塁","2塁","3塁","ホームイン🏠","アウト❌"];
 const BASE_COLORS = ["#fbbf24","#22c55e","#f87171","#f97316","#94a3b8"];
 function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel }) {
   
+  // postBasesで見つからないランナーのデフォルト先
+  // H1/H2/H3/E等はscored、GO/FO等はout
+  const defaultToScored = ["H1","H2","H3","HR","E","BB","HBP","KW","FC"].includes(batterOut === false ? "H1" : "GO");
+  // batterOutフラグを使って判定
+  const runnerDefaultTo = batterOut ? "out" : "scored";
+
   const buildRunners = () => {
-    console.log('[DEBUG] buildRunners batterOut='+batterOut+' initBatterScored='+initBatterScored+' batterName='+batterName);
-    console.log('[DEBUG] preBases='+JSON.stringify(preBases)+' postBases='+JSON.stringify(postBases));
     const list = [];
-    const isInningOver = postBases.every(v => !v) && !initBatterScored && preBases.some(v=>v);
-    
+
+    // 既存ランナーの処理
     preBases.forEach((name, i) => {
       if (!name) return;
-      if (isInningOver) {
-        list.push({ name, from: i, to: "out" });
-        return;
+      // postBasesで同じ名前を探す
+      let to = null;
+      for (let j = 0; j < 3; j++) {
+        if (postBases[j] === name) { to = j; break; }
       }
-      let to = "out"; // デフォルトはアウト（勝手にscoredにしない）
-      if (postBases[i] === name) {
-        to = i; // 同じ塁にいる
-      } else {
-        // 他の塁を探す
-        for (let j = 0; j < 3; j++) {
-          if (postBases[j] === name) { to = j; break; }
-        }
-        // postBasesに見つからない場合: デフォルトout（scoredにしない）
-        // ユーザーが調整モーダルで手動でscoredに変更できる
-      }
+      // 見つからない場合: batterOutならout、そうでなければscored
+      if (to === null) to = runnerDefaultTo;
       list.push({ name, from: i, to });
     });
-    
+
     // 打者の処理
-    for (let j = 0; j < 3; j++) {
-      if (postBases[j] === batterName) {
-        list.push({ name: batterName, from: "batter", to: j });
-        break;
-      }
-    }
-    
-    const batterAlreadyAdded = list.some(r => r.name === batterName && r.from === "batter");
-    if (!batterAlreadyAdded) {
-      if (!preBases.includes(batterName)) {
-        if (initBatterScored) {
-          list.push({ name: batterName, from: "batter", to: "scored" });
-        } else if (batterOut) {
-          // アウトなので追加しない
+    if (initBatterScored) {
+      // HR: 打者得点
+      list.push({ name: batterName, from: "batter", to: "scored" });
+    } else if (batterOut) {
+      // アウトコード: 打者はデフォルトアウトだが変更可能（例: ゴロでランナーアウト→打者1塁のケース）
+      list.push({ name: batterName, from: "batter", to: "out" });
+    } else {
+      // 出塁: postBasesから打者の塁を探す
+      let found = false;
+      for (let j = 0; j < 3; j++) {
+        if (postBases[j] === batterName) {
+          list.push({ name: batterName, from: "batter", to: j });
+          found = true; break;
         }
       }
+      if (!found) list.push({ name: batterName, from: "batter", to: 0 });
     }
-    // batterOutなのに打者がscoredになっていたら強制的に除外
-    if (batterOut) {
-      return list.filter(r => !(r.from === "batter" && r.to === "scored"));
-    }
+
     return list;
   };
 
   const [runners, setRunners] = useState(buildRunners);
   const [adjOuts, setAdjOuts] = useState(outs);
-  const debugInfo = 'code='+batterOut+' scored='+initBatterScored+' batter='+batterName;
+
 
   
   const cycleRunner = (idx) => {
@@ -374,7 +367,7 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
         
         , runners.length > 0 ? (
           React.createElement('div', { style: {marginBottom:16},}
-            , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "選手の行き先"), React.createElement("div",{style:{fontSize:10,color:"#f87171",marginBottom:4}}, debugInfo)
+            , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "選手の行き先")
             , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:6},}
               , runners.map((r, i) => (
                 React.createElement('div', { key: i, style: {display:"flex",alignItems:"center",gap:8,
@@ -439,9 +432,7 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
         
         , React.createElement('div', { style: {marginBottom:18},}
           , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "アウトカウント（打席後）"
-
-            , React.createElement('span', { style: {fontSize:10,color:"#475569",fontWeight:400,marginLeft:6},}, "※アウトの選手は上で「アウト❌」を選んでください"
-
+            , React.createElement('span', { style: {fontSize:10,color:"#475569",fontWeight:400,marginLeft:6},}, "※打者が出塁した場合は1つ減らしてください"
             )
           )
           , React.createElement('div', { style: {display:"flex",gap:8,justifyContent:"center"},}
@@ -571,7 +562,7 @@ const computePitcherStats = (g) => {
 
     
     
-    const OUT_CODES = new Set(["K","KL","GO","FO","FF","SAC","SF","FC"]);
+    const OUT_CODES = new Set(["K","KL","GO","FO","FF","SAC","SF"]);
     allAtBats.forEach(ab=>{
       let activePIdx = log[0].pitcherIdx;
       for(let i=0;i<log.length;i++){

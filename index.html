@@ -706,10 +706,18 @@ function App() {
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
   const startViewing = (id)=>{
     try {
+      showToast("Step1: 開始");
       var uid = (id||'').trim().toUpperCase();
       if(uid.length!==6){ showToast("6桁のコードを入力してください"); return; }
-      if(!fbInit()){ showToast("Firebase未設定"); return; }
-      // subscribeを先に設定
+      showToast("Step2: Firebase初期化中");
+      var cfg = window.__FB_CONFIG__;
+      if(!cfg){ showToast("エラー: Firebase設定なし"); return; }
+      var fb = window.firebase;
+      if(!fb){ showToast("エラー: Firebase SDKなし"); return; }
+      showToast("Step3: DB接続中");
+      if(!fb.apps || !fb.apps.length) fb.initializeApp(cfg);
+      if(!fbDB) fbDB = fb.database();
+      showToast("Step4: Subscribe中");
       fbDB.ref("games/"+uid).on("value", function(snap){
         try {
           if(!snap||!snap.exists()) return;
@@ -717,13 +725,14 @@ function App() {
           if(!d || typeof d !== 'object') return;
           delete d._ts;
           setStorage(function(p){ return Object.assign({},p,{currentGame:d}); });
-        } catch(e2){ console.error('[FB] recv error:',e2); }
+        } catch(e2){ showToast("受信エラー: "+e2.message); }
       });
-      // モード切替
+      showToast("Step5: モード切替");
       setSyncGameId(uid);
       setSyncMode("viewer");
       showToast("観戦開始: "+uid);
-    } catch(e){ console.error('[FB] startViewing error:',e); showToast("エラー: "+e.message); }
+    } catch(e){ showToast("エラー: "+e.message); }
+  };ng error:',e); showToast("エラー: "+e.message); }
   };
   const stopViewing = ()=>{
     if(syncGameId && fbDB) {

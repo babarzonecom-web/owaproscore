@@ -635,9 +635,22 @@ const fbSubscribe = (id, cb) => {
 };
 const fbUnsub = (id) => { if(fbDB&&id) try{fbDB.ref("games/"+id).off("value");}catch(e){} };
 
-const SKEY = "bb_v6";
-const lsLoad = () => { try{return JSON.parse(localStorage.getItem(SKEY))||{};}catch (e2){return{};} };
-const lsSave = (d) => { try{localStorage.setItem(SKEY,JSON.stringify(d));}catch (e3){} };
+const SKEY = "bb_v7";
+const lsLoad = () => { 
+  try {
+    const raw = localStorage.getItem(SKEY);
+    if (!raw) return {};
+    if (raw.length > 500000) { localStorage.removeItem(SKEY); return {}; } // 500KB超はクリア
+    return JSON.parse(raw) || {};
+  } catch(e2) { return {}; }
+};
+const lsSave = (d) => { 
+  try {
+    const s = JSON.stringify(d);
+    if (s.length > 500000) return; // 500KB超は保存しない
+    localStorage.setItem(SKEY, s);
+  } catch(e3) {}
+};
 function App() {
   const [storage, setStorage] = useState(()=>{
     const s=lsLoad();

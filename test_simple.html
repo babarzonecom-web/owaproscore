@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>テスト</title>
+<style>
+body { background: #0a1628; color: white; font-size: 24px; padding: 40px; }
+button { font-size: 20px; padding: 20px; margin: 10px; display: block; }
+</style>
+</head>
+<body>
+<div id="msg">読み込み中...</div>
+<button onclick="document.getElementById('msg').textContent='ボタン押せた！'">テストボタン</button>
+
+<script>
+document.getElementById('msg').textContent = 'JS動作OK';
+</script>
+</body>
+</html>

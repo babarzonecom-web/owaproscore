@@ -1,3 +1,11 @@
+window.onerror = function(msg, src, line, col, err) {
+  document.body.innerHTML = '<div style="color:white;padding:20px;font-size:16px;background:#0a1628;min-height:100vh"><h2>エラー発生</h2><p>' + msg + '</p><p>行: ' + line + '</p><p>' + (err ? err.stack : '') + '</p></div>';
+  return true;
+};
+window.addEventListener('unhandledrejection', function(e) {
+  document.body.innerHTML = '<div style="color:white;padding:20px;font-size:16px;background:#0a1628;min-height:100vh"><h2>Promise エラー</h2><p>' + e.reason + '</p></div>';
+});
+
 
 const { useState, useEffect, useCallback } = React;
  function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }

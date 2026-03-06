@@ -589,7 +589,8 @@ const fbInit = () => {
 const fbPush = (id, data) => {
   if (!fbDB || !id) return;
   try {
-    fbDB.ref("games/"+id).set({...data, _ts: Date.now()});
+    var payload = Object.assign({}, data, {_ts: Date.now()});
+    fbDB.ref("games/"+id).set(payload);
     console.log("[FB] pushed to games/"+id, new Date().toLocaleTimeString());
   } catch(e) { console.error("[FB] push error:", e); }
 };
@@ -645,8 +646,10 @@ function App() {
   useEffect(()=>lsSave(storage),[storage]);
 
   useEffect(()=>{
-    if(isHost && syncGameId && fbDB) {
+    if(isHost && syncGameId) {
+      if(!fbInit()){ showToast("Firebase未設定"); return; }
       fbPush(syncGameId, storage.currentGame);
+      console.log("[HOST] push triggered, syncGameId="+syncGameId);
     }
   },[storage, isHost, syncGameId]);
 

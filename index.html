@@ -679,6 +679,18 @@ function App() {
 
   useEffect(()=>lsSave(storage),[storage]);
 
+  // 観戦モードになったらスコアタブに切り替え
+  useEffect(()=>{
+    if(isViewer) setTab("score");
+  },[isViewer]);
+
+  // viewerGameが更新されたらstorageに反映
+  useEffect(()=>{
+    if(isViewer && viewerGame) {
+      setStorage(function(p){ return Object.assign({},p,{currentGame:viewerGame}); });
+    }
+  },[viewerGame]);
+
   useEffect(()=>{
     if(isHost && syncGameId) {
       if(!fbInit()){ showToast("Firebase未設定"); return; }
@@ -944,12 +956,13 @@ function App() {
   },[mutGame]);
 
   
-  const openNew     = (team,pidx,inning) => { setSelDir(null); setModal({team,pidx,inning,step:"result"}); };
-  const openSB      = (team,pidx)        => setModal({team,pidx,step:"sb"});
-  const openEdit    = (team,pidx,inning) => { setSelDir(null); setModal({team,pidx,inning,step:"edit_list"}); };
-  const openSpecial = (team)             => setModal({team,step:"special"});
+  const openNew     = (team,pidx,inning) => { if(isViewer) return; setSelDir(null); setModal({team,pidx,inning,step:"result"}); };
+  const openSB      = (team,pidx)        => { if(isViewer) return; setModal({team,pidx,step:"sb"}); };
+  const openEdit    = (team,pidx,inning) => { if(isViewer) return; setSelDir(null); setModal({team,pidx,inning,step:"edit_list"}); };
+  const openSpecial = (team)             => { if(isViewer) return; setModal({team,step:"special"}); };
   
   const openCurrentBatter = (team,inning) => {
+    if(isViewer) return;
     const batterKey = team+"BatterIdx";
     const idx = game[batterKey]||0;
     setSelDir(null);
@@ -1283,37 +1296,7 @@ function App() {
   const mTeamLabel = modal ? (modal.team==="home"?game.homeTeam:game.awayTeam) : "";
 
   
-  // 観戦モード: シンプルな表示のみ（重いUIを描画しない）
-  if (isViewer) {
-    var vg = viewerGame || game;
-    var inning = vg ? (vg.inning||1) : 1;
-    var topBot = vg ? (vg.topBot||'表') : '表';
-    var vouts = vg ? (vg.outs||0) : 0;
-    var bases = vg ? (vg.bases||[null,null,null]) : [null,null,null];
-    var awayScore = vg && vg.awayScore ? calcTotal(vg.awayScore) : 0;
-    var homeScore = vg && vg.homeScore ? calcTotal(vg.homeScore) : 0;
-    var awayName = vg ? (vg.awayTeam||'アウェイ') : 'アウェイ';
-    var homeName = vg ? (vg.homeTeam||'ホーム') : 'ホーム';
-    return React.createElement('div', {style:{background:'#080f1e',minHeight:'100vh',color:'white',padding:16,fontFamily:'sans-serif'}},
-      React.createElement('div', {style:{textAlign:'center',marginBottom:16}},
-        React.createElement('div', {style:{fontSize:12,color:'#93c5fd',marginBottom:8}}, '👁 観戦中: '+syncGameId),
-        React.createElement('button', {onClick:stopViewing, style:{background:'#475569',color:'white',border:'none',borderRadius:8,padding:'6px 14px',fontSize:12,cursor:'pointer'}}, '■ 観戦終了')
-      ),
-      React.createElement('div', {style:{background:'#0f1e35',borderRadius:12,padding:16,marginBottom:12,textAlign:'center'}},
-        React.createElement('div', {style:{fontSize:14,color:'#94a3b8',marginBottom:8}}, awayName+' vs '+homeName),
-        React.createElement('div', {style:{fontSize:48,fontWeight:900,letterSpacing:8}}, awayScore+' - '+homeScore),
-        React.createElement('div', {style:{fontSize:14,color:'#7dd3fc',marginTop:8}}, inning+'回'+topBot+' '+vouts+'アウト')
-      ),
-      React.createElement('div', {style:{background:'#0f1e35',borderRadius:12,padding:16,textAlign:'center'}},
-        React.createElement('div', {style:{fontSize:12,color:'#94a3b8',marginBottom:8}}, 'ランナー'),
-        React.createElement('div', {style:{fontSize:16}},
-          (bases[2]?'🔴':'⚪')+'三塁 '+
-          (bases[1]?'🔴':'⚪')+'二塁 '+
-          (bases[0]?'🔴':'⚪')+'一塁'
-        )
-      )
-    );
-  }
+  // 観戦モード: フルUIで表示（編集操作は無効）
 
   return (
     React.createElement('div', { style: S.root,}
@@ -1452,7 +1435,11 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , [["score","📊 スコア"],["lineup","👕 打順"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"],["sync","📡 配信"]].map(([id,l])=>(
+        , isViewer ? React.createElement('div', {style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 12px',width:'100%'}},
+            React.createElement('div', {style:{fontSize:12,color:'#93c5fd',fontWeight:700}}, '👁 観戦中: '+syncGameId),
+            React.createElement('button', {onClick:stopViewing, style:{background:'#475569',color:'white',border:'none',borderRadius:6,padding:'4px 10px',fontSize:11,cursor:'pointer'}}, '終了')
+          )
+        : [["score","📊 スコア"],["lineup","👕 打順"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"],["sync","📡 配信"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
             borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",

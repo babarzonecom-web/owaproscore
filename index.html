@@ -1131,9 +1131,7 @@ function App() {
 
   
   const exportExcel = useCallback((targetGame) => {
-    const doExport = () => {
-      const XLSX = window.XLSX;
-      if(!XLSX){ alert("Excel機能の読み込みに失敗しました。"); return; }
+    const doExport = (XLSX) => {
     const g = targetGame || game;
     const aStats = computeStats(g.awayLineup);
     const hStats = computeStats(g.homeLineup);
@@ -1225,15 +1223,14 @@ function App() {
       XLSX.utils.book_append_sheet(wb, wsDef, "守備交代");
     }
     XLSX.writeFile(wb, fname);
-    }; // end doExport
-
+    };
     if(window.XLSX) {
-      doExport();
+      doExport(window.XLSX);
     } else {
       var s = document.createElement('script');
       s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
-      s.onload = doExport;
-      s.onerror = function(){ alert("Excel機能の読み込みに失敗しました。"); };
+      s.onload = function(){ doExport(window.XLSX); };
+      s.onerror = function(){ alert('Excel機能の読み込みに失敗しました。'); };
       document.head.appendChild(s);
     }
   }, [game]);

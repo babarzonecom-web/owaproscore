@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<style>body{background:#0a1628;color:white;padding:10px;font-size:16px;margin:0;}</style>
+</head>
+<body>
+<div id="root" style="margin-top:10px"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script>
+window.__FB_CONFIG__ = {
+  apiKey:"AIzaSyDZLsctyGaNzf9amSmM7Mscyk2mmssF_jI",
+  authDomain:"owaprobaseball.firebaseapp.com",
+  databaseURL:"https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"owaprobaseball",storageBucket:"owaprobaseball.firebasestorage.app",
+  messagingSenderId:"37318728572",appId:"1:37318728572:web:930f71d8985f46f29ba2f9"
+};
+</script>
+<script>
+
+
+const { useState, useEffect, useCallback } = React;
+ function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }
+
+const INNINGS = [1,2,3,4,5,6,7,8,9];
+const DEFAULT_PLAYERS = 9;
+
+const RESULTS = [
+  { code:"H1",  label:"単打",    color:"#4ade80", short:"1B"  },
+  { code:"H2",  label:"二塁打",  color:"#22c55e", short:"2B"  },
+  { code:"H3",  label:"三塁打",  color:"#16a34a", short:"3B"  },
+  { code:"HR",  label:"本塁打",  color:"#f87171", short:"HR"  },
+  { code:"K",   label:"三振（空振り）", color:"#94a3b8", short:"K"   },
+  { code:"KL",  label:"三振（見逃し）", color:"#64748b", short:"KL"  },
+  { code:"KW",  label:"振り逃げ",       color:"#22d3ee", short:"KW"  },
+  { code:"BB",  label:"四球",    color:"#60a5fa", short:"BB"  },
+  { code:"HBP", label:"死球",    color:"#a78bfa", short:"HBP" },
+  { code:"GO",  label:"ゴロ",    color:"#fbbf24", short:"GO"  },
+  { code:"FO",  label:"フライ",  color:"#fb923c", short:"FO"  },
+  { code:"DP",  label:"ゲッツー",color:"#f43f5e", short:"DP"  },
+  { code:"E",   label:"エラー",  color:"#38bdf8", short:"E"   },
+  { code:"FC",  label:"野選",    color:"#a3e635", short:"FC"  },
+  { code:"FF",  label:"邪飛",    color:"#f97316", short:"FF"  },
+  { code:"SAC", label:"犠打",    color:"#c084fc", short:"SAC" },
+  { code:"SF",  label:"犠飛",    color:"#f472b6", short:"SF"  },
+];
+const DIR_CODES  = new Set(["H1","H2","H3","HR","GO","FO","FF","DP","E","FC","SAC","SF"]);
+const HIT_CODES  = new Set(["H1","H2","H3","HR"]);
+const NOAB_CODES = new Set(["BB","HBP","SAC","SF"]);
+const rOf = (code) => RESULTS.find(r => r.code === code);
+const SPECIAL_PLAYS = [
+  { code:"WP", label:"ワイルドピッチ", short:"WP", color:"#f97316", desc:"暴投 / 投手の責任" },
+  { code:"PB", label:"パスボール",     short:"PB", color:"#38bdf8", desc:"捕逸 / 捕手の責任" },
+  { code:"BK", label:"ボーク",         short:"BK", color:"#a78bfa", desc:"投手の反則投球"   },
+];
+
+const ZONES = [
+  { id:"P",  label:"投", cx:100, cy:118, r:13 },
+  { id:"C",  label:"捕", cx:100, cy:155, r:12 },
+  { id:"1B", label:"一", cx:145, cy:115, r:13 },
+  { id:"2B", label:"二", cx:118, cy:90,  r:13 },
+  { id:"SS", label:"遊", cx:82,  cy:90,  r:13 },
+  { id:"3B", label:"三", cx:55,  cy:115, r:13 },
+  { id:"LF", label:"左", cx:52,  cy:46,  r:18 },
+  { id:"CF", label:"中", cx:100, cy:32,  r:18 },
+  { id:"RF", label:"右", cx:148, cy:46,  r:18 },
+];
+function applyResult(code, bases, outs, batterName) {
+  
+  const n1=bases[0], n2=bases[1], n3=bases[2];
+  const BN = batterName || "打者";
+  let b = [null,null,null];
+  let runs = 0;
+  let scoredNames = []; 
+  let newOuts = outs;
+  let batterOn = -1; 
+
+  switch(code){
+    case "HR": {
+      scoredNames = [...[n1,n2,n3].filter(Boolean), BN];
+      runs = scoredNames.length;
+      b = [null,null,null]; batterOn=-1; break;
+    }
+    case "H3": {
+      scoredNames = [n1,n2,n3].filter(Boolean);
+      runs = scoredNames.length;
+      b = [null,null,BN]; batterOn=2; break;
+    }
+    case "H2": {
+      scoredNames = [n2,n3].filter(Boolean);
+      runs = scoredNames.length;
+      b = [null,BN,n1||null]; batterOn=1; break;
+    }
+    case "H1": {
+      if(n3){ scoredNames=[n3]; runs=1; }
+      b = [BN, n1||null, n2||null]; batterOn=0; break;
+    }
+    case "BB": case "HBP": {
+      if(!n1){
+        b=[BN,n2,n3];
+      } else if(!n2){
+        b=[BN,n1,n3];
+      } else if(!n3){
+        b=[BN,n1,n2];
+      } else {
+        
+        scoredNames=[n3]; runs=1;
+        b=[BN,n1,n2];
+      }
+      batterOn=0; break;
+    }
+    case "K": case "KL": {
+      newOuts=outs+1; b=[n1,n2,n3]; batterOn=-1; break;
+    }
+    case "KW": {
+      
+      if(!n1){       b=[BN,n2,n3]; }
+      else if(!n2){  b=[BN,n1,n3]; }
+      else if(!n3){  b=[BN,n1,n2]; }
+      else { scoredNames=[n3]; runs=1; b=[BN,n1,n2]; } 
+      batterOn=0; break;
+    }
+    case "GO": {
+      // ゴロ: 打者アウト、ランナーは進塁調整モーダルで決定
+      newOuts=outs+1;
+      b=[null,n1,n2]; batterOn=-1; break;
+    }
+    case "FO": case "FF": {
+      // フライ/ファウルフライ: 打者アウト、ランナーはそのまま（タッチアップは調整モーダルで）
+      newOuts=outs+1; b=[n1,n2,n3]; batterOn=-1; break;
+    }
+    case "DP": {
+      // 併殺: 2アウト、1塁走者と打者アウト
+      newOuts=Math.min(outs+2,3);
+      b=[null,n2,n3];
+      batterOn=-1; break;
+    }
+    case "E": {
+      // エラー: 打者出塁、ランナーは進塁調整モーダルで決定
+      b=[BN,n1,n2]; batterOn=0; break;
+    }
+    case "FC": {
+      // フィールダーズチョイス: 打者必ず1塁出塁、アウトカウント増えない
+      // ランナーは1つずつ進塁（調整モーダルで変更可能）
+      b=[BN, n1||null, n2||null]; batterOn=0; break;
+    }
+    case "SAC": {
+      // 犠打: 打者アウト、ランナーは進塁調整モーダルで決定
+      newOuts=outs+1;
+      b=[null,n1,n2]; batterOn=-1; break;
+    }
+    case "SF": {
+      // 犠飛: 打者アウト、3塁ランナー得点（犠飛は必ず3塁ランナー得点）
+      newOuts=outs+1;
+      if(n3){ scoredNames=[n3]; runs=1; }
+      b=[n1,n2,null]; batterOn=-1; break;
+    }
+    default: b=[n1,n2,n3]; break;
+  }
+
+  if(newOuts>=3){ b=[null,null,null]; scoredNames=[]; runs=0; }
+  
+  const batterScored = scoredNames.includes(BN);
+  return { newBases:b, runs, newOuts, batterOn, scoredNames, batterScored };
+}
+function FieldDiagram({ selected, onSelect }) {
+  const hx=100, hy=162, outR=138;
+  const b1=[hx+45,hy-45], b2=[hx,hy-75], b3=[hx-45,hy-45];
+  return (
+    React.createElement('svg', { viewBox: "0 0 200 170"   , style: {width:"100%",maxWidth:260,display:"block",margin:"0 auto"},}
+      , React.createElement('defs', null
+        , React.createElement('radialGradient', { id: "fg1", cx: "50%", cy: "100%", r: "90%",}
+          , React.createElement('stop', { offset: "0%", stopColor: "#1a4a1a",}), React.createElement('stop', { offset: "100%", stopColor: "#0d2e0d",})
+        )
+        , React.createElement('radialGradient', { id: "fd1", cx: "50%", cy: "80%", r: "50%",}
+          , React.createElement('stop', { offset: "0%", stopColor: "#5c3a1e",}), React.createElement('stop', { offset: "100%", stopColor: "#3d2510",})
+        )
+        , React.createElement('marker', { id: "farr", markerWidth: "6", markerHeight: "6", refX: "3", refY: "3", orient: "auto",}
+          , React.createElement('path', { d: "M0,0 L6,3 L0,6 Z"   , fill: "#fbbf24",})
+        )
+      )
+      , React.createElement('path', { d: `M${hx},${hy} L${hx-outR*0.72},${hy-outR*0.72} A${outR},${outR} 0 0,1 ${hx+outR*0.72},${hy-outR*0.72} Z`,
+        fill: "url(#fg1)", stroke: "#2d6a2d", strokeWidth: 0.5,})
+      , React.createElement('path', { d: `M${hx},${hy} L${b3[0]},${b3[1]} L${b2[0]},${b2[1]} L${b1[0]},${b1[1]} Z`,
+        fill: "url(#fd1)", stroke: "#7a5c3a", strokeWidth: 0.5,})
+      , React.createElement('line', { x1: hx, y1: hy, x2: hx-outR*0.72, y2: hy-outR*0.72, stroke: "#ffffff33", strokeWidth: 0.8, strokeDasharray: "3,2",})
+      , React.createElement('line', { x1: hx, y1: hy, x2: hx+outR*0.72, y2: hy-outR*0.72, stroke: "#ffffff33", strokeWidth: 0.8, strokeDasharray: "3,2",})
+      , [[b1,b2],[b2,b3],[b3,[hx,hy]],[[hx,hy],b1]].map(([a,bb],i)=>(
+        React.createElement('line', { key: i, x1: a[0], y1: a[1], x2: bb[0], y2: bb[1], stroke: "#ffffff22", strokeWidth: 0.6,})
+      ))
+      , React.createElement('circle', { cx: hx, cy: hy-45, r: 6, fill: "#5c3a1e", stroke: "#7a5c3a", strokeWidth: 0.5,})
+      , [b1,b2,b3].map(([bx,by],i)=>(
+        React.createElement('rect', { key: i, x: bx-4, y: by-4, width: 8, height: 8, fill: "#f5f5dc", rx: 1,
+          transform: `rotate(45,${bx},${by})`,})
+      ))
+      , React.createElement('polygon', { points: `${hx},${hy-6} ${hx+5},${hy-2} ${hx+5},${hy+3} ${hx-5},${hy+3} ${hx-5},${hy-2}`, fill: "#f5f5dc",})
+      , selected && (()=>{
+        const z=ZONES.find(z=>z.id===selected); if(!z) return null;
+        const dx=z.cx-hx, dy=z.cy-hy, d=Math.sqrt(dx*dx+dy*dy), nx=dx/d, ny=dy/d;
+        return React.createElement('line', { x1: hx+nx*18, y1: hy+ny*18, x2: hx+nx*(d-z.r-2), y2: hy+ny*(d-z.r-2),
+          stroke: "#fbbf24", strokeWidth: 2.5, strokeLinecap: "round", markerEnd: "url(#farr)",});
+      })()
+      , ZONES.map(z=>{
+        const sel=selected===z.id;
+        return (
+          React.createElement('g', { key: z.id, onClick: ()=>onSelect(z.id), style: {cursor:"pointer"},}
+            , React.createElement('circle', { cx: z.cx, cy: z.cy, r: z.r, fill: sel?"#fbbf2488":"#00000055",
+              stroke: sel?"#fbbf24":"#ffffff55", strokeWidth: sel?2:1,})
+            , React.createElement('text', { x: z.cx, y: z.cy+1, textAnchor: "middle", dominantBaseline: "middle",
+              fill: sel?"#fbbf24":"#ffffffcc", fontSize: z.r>15?9:8,
+              fontWeight: sel?"bold":"normal", fontFamily: "'Noto Sans JP',sans-serif"  ,
+              style: {pointerEvents:"none"},}, z.label)
+          )
+        );
+      })
+    )
+  );
+}
+function MiniDiamond({ bases, size=56 }) {
+  
+  const V = 100;
+  const cx = 50, cy = 52;
+  const arm = 33; 
+  const sq  = 9;  
+
+  const b2   = [cx,        cy - arm]; 
+  const b1   = [cx + arm,  cy      ]; 
+  const home = [cx,        cy + arm]; 
+  const b3   = [cx - arm,  cy      ]; 
+
+  const pts = `${b2[0]},${b2[1]} ${b1[0]},${b1[1]} ${home[0]},${home[1]} ${b3[0]},${b3[1]}`;
+
+  return (
+    React.createElement('svg', { width: size, height: size, viewBox: `0 0 ${V} ${V}`, style: {display:"block",overflow:"visible"},}
+      
+      , React.createElement('polygon', { points: pts, fill: "none", stroke: "#334155", strokeWidth: 2,})
+      
+      , React.createElement('circle', { cx: home[0], cy: home[1], r: sq * 0.85, fill: "#3b82f6",})
+      
+      , React.createElement('rect', { x: b1[0]-sq, y: b1[1]-sq, width: sq*2, height: sq*2, rx: 1.5,
+        fill: bases[0]?"#fbbf24":"#0d1f35", stroke: bases[0]?"#fbbf24":"#334155", strokeWidth: 1.5,
+        transform: `rotate(45,${b1[0]},${b1[1]})`,})
+      
+      , React.createElement('rect', { x: b2[0]-sq, y: b2[1]-sq, width: sq*2, height: sq*2, rx: 1.5,
+        fill: bases[1]?"#fbbf24":"#0d1f35", stroke: bases[1]?"#fbbf24":"#334155", strokeWidth: 1.5,
+        transform: `rotate(45,${b2[0]},${b2[1]})`,})
+      
+      , React.createElement('rect', { x: b3[0]-sq, y: b3[1]-sq, width: sq*2, height: sq*2, rx: 1.5,
+        fill: bases[2]?"#fbbf24":"#0d1f35", stroke: bases[2]?"#fbbf24":"#334155", strokeWidth: 1.5,
+        transform: `rotate(45,${b3[0]},${b3[1]})`,})
+      
+      , [[b1,0,8,-12],[b2,1,0,-14],[b3,2,-8,-12]].map(([[bx,by],idx,dx,dy])=>{
+        const runner = bases[idx];
+        if(!runner) return null;
+        const name = typeof runner==="string" ? runner : "●";
+        const shortName = name.length>4 ? name.slice(0,4) : name;
+        return (
+          React.createElement('g', { key: idx,}
+            , React.createElement('circle', { cx: bx, cy: by, r: sq*0.55, fill: "#fbbf24", opacity: 0.9,})
+            , React.createElement('text', { x: bx+dx*0.4, y: by+dy*0.6, textAnchor: "middle",
+              fontSize: 5.5, fill: "#0a1628", fontWeight: "bold", dy: "0.35em",}
+              , shortName
+            )
+          )
+        );
+      })
+    )
+  );
+}
+const BASE_LABELS = ["1塁","2塁","3塁","ホームイン🏠","アウト❌"];
+const BASE_COLORS = ["#fbbf24","#22c55e","#f87171","#f97316","#94a3b8"];
+function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel }) {
+  
+  // postBasesで見つからないランナーのデフォルト先
+  // H1/H2/H3/E等はscored、GO/FO等はout
+  const defaultToScored = ["H1","H2","H3","HR","E","BB","HBP","KW","FC"].includes(batterOut === false ? "H1" : "GO");
+  // batterOutフラグを使って判定
+  const runnerDefaultTo = batterOut ? "out" : "scored";
+
+  const buildRunners = () => {
+    const list = [];
+
+    // 既存ランナーの処理
+    preBases.forEach((name, i) => {
+      if (!name) return;
+      // postBasesで同じ名前を探す
+      let to = null;
+      for (let j = 0; j < 3; j++) {
+        if (postBases[j] === name) { to = j; break; }
+      }
+      // 見つからない場合: batterOutならout、そうでなければscored
+      if (to === null) to = runnerDefaultTo;
+      list.push({ name, from: i, to });
+    });
+
+    // 打者の処理
+    if (initBatterScored) {
+      // HR: 打者得点
+      list.push({ name: batterName, from: "batter", to: "scored" });
+    } else if (batterOut) {
+      // アウトコード: 打者はデフォルトアウトだが変更可能（例: ゴロでランナーアウト→打者1塁のケース）
+      list.push({ name: batterName, from: "batter", to: "out" });
+    } else {
+      // 出塁: postBasesから打者の塁を探す
+      let found = false;
+      for (let j = 0; j < 3; j++) {
+        if (postBases[j] === batterName) {
+          list.push({ name: batterName, from: "batter", to: j });
+          found = true; break;
+        }
+      }
+      if (!found) list.push({ name: batterName, from: "batter", to: 0 });
+    }
+
+    return list;
+  };
+
+  const [runners, setRunners] = useState(buildRunners);
+  const [adjOuts, setAdjOuts] = useState(outs);
+
+
+  
+  const cycleRunner = (idx) => {
+    setRunners(rs => rs.map((r, i) => {
+      if (i !== idx) return r;
+      const cycle = [0, 1, 2, "scored", "out"];
+      const cur = cycle.indexOf(r.to);
+      const next = cycle[(cur + 1) % cycle.length];
+      return { ...r, to: next };
+    }));
+  };
+
+  
+  const adjBases = [null, null, null];
+  runners.forEach(r => {
+    if (typeof r.to === "number") adjBases[r.to] = r.name;
+  });
+  const scoredNames = runners.filter(r => r.to === "scored").map(r => r.name);
+  const adjRuns = scoredNames.length;
+
+  const fromLabel = (from) => from === "batter" ? "打者" : BASE_LABELS[from];
+  const toLabel   = (to)   => typeof to === "number" ? BASE_LABELS[to] : (to === "scored" ? "得点🏠" : "アウト❌");
+  const toColor   = (to)   => typeof to === "number" ? BASE_COLORS[to] : (to === "scored" ? "#f97316" : "#64748b");
+
+  return (
+    React.createElement('div', { style: S.overlay, onClick: onCancel,}
+      , React.createElement('div', { style: {...S.mBox, maxWidth:380, maxHeight:"92vh", overflowY:"auto"}, onClick: e=>e.stopPropagation(),}
+        , React.createElement('div', { style: {...S.mt, marginBottom:4},}, "⚙️ 進塁を手動調整" )
+        , React.createElement('div', { style: {fontSize:11,color:"#94a3b8",marginBottom:14},}, "各選手の行き先をタップして変更できます"
+
+        )
+
+        
+        , runners.length > 0 ? (
+          React.createElement('div', { style: {marginBottom:16},}
+            , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "選手の行き先")
+            , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:6},}
+              , runners.map((r, i) => (
+                React.createElement('div', { key: i, style: {display:"flex",alignItems:"center",gap:8,
+                  background:"#0a1628",borderRadius:8,padding:"8px 10px",
+                  border:"1px solid #1e3a5f"},}
+                  
+                  , React.createElement('div', { style: {flex:1,minWidth:0},}
+                    , React.createElement('div', { style: {fontSize:13,fontWeight:700,color:"#e2e8f0",
+                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},}
+                      , r.name
+                    )
+                    , React.createElement('div', { style: {fontSize:10,color:"#475569"},}
+                      , fromLabel(r.from), " から"
+                    )
+                  )
+                  
+                  , React.createElement('span', { style: {color:"#334155",fontSize:14},}, "→")
+                  
+                  , React.createElement('button', { onClick: () => cycleRunner(i),
+                    style: {padding:"6px 12px",borderRadius:8,cursor:"pointer",
+                      fontWeight:700,fontSize:12,minWidth:84,textAlign:"center",
+                      background: `${toColor(r.to)}22`,
+                      border: `1.5px solid ${toColor(r.to)}`,
+                      color: toColor(r.to),
+                      touchAction:"manipulation"},}
+                    , toLabel(r.to)
+                  )
+                )
+              ))
+            )
+            , React.createElement('div', { style: {fontSize:10,color:"#334155",marginTop:6,textAlign:"center"},}, "行き先をタップすると 1塁→2塁→3塁→得点→アウト と切り替わります"
+
+            )
+          )
+        ) : (
+          React.createElement('div', { style: {fontSize:12,color:"#475569",marginBottom:16,textAlign:"center",padding:"12px 0"},}, "塁上にランナーなし・打者アウト"
+
+          )
+        )
+
+        
+        , React.createElement('div', { style: {background:"#0a1628",borderRadius:8,padding:"10px 14px",
+          marginBottom:14,border:"1px solid #1e4570",display:"flex",gap:16,alignItems:"center"},}
+          , React.createElement('div', { style: {textAlign:"center"},}
+            , React.createElement('div', { style: {fontSize:10,color:"#64748b",marginBottom:2},}, "得点")
+            , React.createElement('div', { style: {fontSize:32,fontWeight:900,
+              color:adjRuns>0?"#f97316":"#475569",lineHeight:1},}, adjRuns)
+          )
+          , React.createElement('div', { style: {flex:1},}
+            , scoredNames.length>0 ? scoredNames.map((n,i)=>(
+              React.createElement('div', { key: i, style: {fontSize:12,color:"#fbbf24",fontWeight:700},}, "🏠 " , n)
+            )) : (
+              React.createElement('div', { style: {fontSize:12,color:"#334155"},}, "得点なし")
+            )
+          )
+          , React.createElement('div', { style: {textAlign:"center"},}
+            , React.createElement('div', { style: {fontSize:10,color:"#64748b",marginBottom:2},}, "塁上")
+            , React.createElement(MiniDiamond, { bases: adjBases, size: 52,})
+          )
+        )
+
+        
+        , React.createElement('div', { style: {marginBottom:18},}
+          , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "アウトカウント（打席後）"
+            , React.createElement('span', { style: {fontSize:10,color:"#475569",fontWeight:400,marginLeft:6},}, "※打者が出塁した場合は1つ減らしてください"
+            )
+          )
+          , React.createElement('div', { style: {display:"flex",gap:8,justifyContent:"center"},}
+            , [0,1,2,3].map(n=>(
+              React.createElement('button', { key: n, onClick: ()=>setAdjOuts(n), style: {
+                width:48,height:38,borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15,
+                background:adjOuts===n?"#dc2626":"#1e3a5f",
+                border:`2px solid ${adjOuts===n?"#dc2626":"#2a6496"}`,color:"#fff",
+                touchAction:"manipulation",
+              },}, n)
+            ))
+          )
+        )
+
+        , React.createElement('button', { onClick: ()=>onConfirm(adjBases, scoredNames, adjOuts),
+          style: {...sBt("#16a34a"),width:"100%",padding:"11px",fontSize:14,fontWeight:700,marginBottom:6},}, "✅ "
+           , adjRuns>0?`${adjRuns}点 — `:"", "この内容で記録する"
+        )
+        , React.createElement('button', { onClick: onCancel, style: S.cBtn,}, "キャンセル")
+      )
+    )
+  );
+}
+const norm   = (e) => (typeof e==="object"&&e!==null)?e:{code:e};
+const eShort = (e) => { const n=norm(e); return (_optionalChain([rOf, 'call', _2 => _2(n.code), 'optionalAccess', _3 => _3.short])||n.code)+(n.dir?`(${n.dir})`:""); };
+const eRuns  = (list) => list.reduce((s,e)=>s+(norm(e).runs||0),0);
+const toList = (ab,inn) => Array.isArray(ab[inn])?ab[inn]:(ab[inn]?[ab[inn]]:[]);
+
+const makePlayer  = (i) => ({ id:i, name:`選手${i}`, pos:String(i<=9?i:"代"), atBats:{}, rbi:0, sb:0, cs:0 });
+const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:0,
+  
+  autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0,
+  manualOverride:false, 
+});
+const makeLineup  = (n=DEFAULT_PLAYERS) => Array.from({length:n},(_,i)=>makePlayer(i+1));
+const makePitchers= () => Array.from({length:5},(_,i)=>makePitcher(i+1));
+const emptyScore  = () => Object.fromEntries(INNINGS.map(i=>[i,""]));
+const calcTotal   = (s) => Object.values(s).reduce((a,v)=>a+(parseInt(v)||0),0);
+
+const recomputeScores = (g) => {
+  const aScore={...g.awayScore}, hScore={...g.homeScore};
+  INNINGS.forEach(inn=>{
+    let ar=0,hr=0;
+    g.awayLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ ar+=norm(e).runs||0; }));
+    g.homeLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ hr+=norm(e).runs||0; }));
+    aScore[inn]=ar; hScore[inn]=hr;
+  });
+  return {awayScore:aScore, homeScore:hScore};
+};
+
+const computeStats = (players) => players.map(p=>{
+  let ab=0,h=0,hr=0,bb=0,hbp=0,k=0,tb=0,r=0,sac=0,sf=0;
+  Object.values(p.atBats).flat().forEach(e=>{
+    const ne=norm(e); const code=ne.code; if(!code) return;
+    if(!NOAB_CODES.has(code)) ab++;
+    if(HIT_CODES.has(code)){h++;tb+=code==="H1"?1:code==="H2"?2:code==="H3"?3:4;}
+    if(code==="HR") hr++;
+    if(code==="BB") bb++;
+    if(code==="HBP") hbp++;
+    if(code==="K"||code==="KL"||code==="KW") k++;
+    if(code==="SAC") sac++;
+    if(code==="SF")  sf++;
+    if(ne.scored) r++;
+  });
+  const pa = ab + bb + hbp + sac + sf;
+  return {...p,_pa:pa,_ab:ab,_h:h,_hr:hr,_bb:bb,_hbp:hbp,_k:k,_tb:tb,_r:r,_avg:ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---"};
+});
+const computePitcherStats = (g) => {
+  const result = { away:[], home:[] };
+
+  ["away","home"].forEach(defTeam=>{
+    const offTeam = defTeam==="away" ? "home" : "away";
+    const pitchers = g[defTeam+"Pitchers"];
+    const pitcherLog = g[defTeam+"PitcherLog"]||[];
+    const lineup = g[offTeam+"Lineup"];
+
+    
+    
+    
+    const currentPIdx = g[defTeam+"PitcherIdx"]||0;
+
+    
+    const allAtBats = []; 
+    INNINGS.forEach(inn=>{
+      ["top","bottom"].forEach(half=>{
+        
+        const battingTeam = half==="top" ? "away" : "home";
+        if(battingTeam !== offTeam) return;
+        lineup.forEach((p,pi)=>{
+          toList(p.atBats,inn).forEach((e,ei)=>{
+            allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:norm(e)});
+          });
+        });
+      });
+    });
+
+    
+    const stats = pitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, _outsGot:0}));
+
+    
+    
+    const log = pitcherLog.length>0 ? pitcherLog : [{pitcherIdx:0, fromInning:1, fromHalf:"top", outsAtStart:0}];
+
+    allAtBats.forEach(ab=>{
+      
+      
+      let activePIdx = log[0].pitcherIdx;
+      for(let i=0;i<log.length;i++){
+        const l = log[i];
+        const lInn = l.fromInning, lHalf = l.fromHalf;
+        const abInn = ab.inning, abHalf = ab.half;
+        
+        const logTime = lInn*2 + (lHalf==="top"?0:1);
+        const abTime  = abInn*2 + (abHalf==="top"?0:1);
+        if(logTime <= abTime) activePIdx = l.pitcherIdx;
+      }
+
+      const ps = stats[activePIdx];
+      if(!ps) return;
+      const code = ab.entry.code;
+      if(HIT_CODES.has(code)) ps.autoH++;
+      if(code==="BB") ps.autoBb++;
+      if(code==="K"||code==="KL"||code==="KW") ps.autoK++;
+      
+      ps.autoEr += ab.entry.runs||0;
+    });
+
+    
+    
+    const OUT_CODES = new Set(["K","KL","GO","FO","FF","SAC","SF"]);
+    allAtBats.forEach(ab=>{
+      let activePIdx = log[0].pitcherIdx;
+      for(let i=0;i<log.length;i++){
+        const l = log[i];
+        const logTime = l.fromInning*2+(l.fromHalf==="top"?0:1);
+        const abTime  = ab.inning*2+(ab.half==="top"?0:1);
+        if(logTime<=abTime) activePIdx = l.pitcherIdx;
+      }
+      const ps = stats[activePIdx];
+      if(!ps) return;
+      const code = ab.entry.code;
+      if(OUT_CODES.has(code)) ps._outsGot += 1;
+      if(code==="DP") ps._outsGot += 1; 
+    });
+
+    stats.forEach(ps=>{
+      ps.autoIp = Math.floor(ps._outsGot/3)*10 + (ps._outsGot%3); 
+    });
+
+    result[defTeam] = stats;
+  });
+  return result;
+};
+
+const newGame = () => ({
+  id:Date.now(),
+  date:new Date().toISOString().split("T")[0],
+  venue:"", awayTeam:"ビジターチーム", homeTeam:"ホームチーム",
+  awayScore:emptyScore(), homeScore:emptyScore(),
+  awayLineup:makeLineup(), homeLineup:makeLineup(),
+  awayPitchers:makePitchers(), homePitchers:makePitchers(),
+  defenseLog:[], 
+  outs:0, bases:[null,null,null], inning:1, half:"top", log:[], runs:[], 
+  finished:false, endReason:"", endInning:null, endNote:"",
+  awayBatterIdx:0, homeBatterIdx:0, 
+  awayPitcherIdx:0, homePitcherIdx:0, 
+  
+  awayPitcherLog:[], homePitcherLog:[],
+});
+
+// Firebase helpers
+let fbDB = null;
+const genGameId = () => Math.random().toString(36).slice(2,8).toUpperCase();
+const fbInit = () => {
+  if (fbDB) return true;
+  try {
+    const cfg = (typeof window!=="undefined") && window.__FB_CONFIG__;
+    if (!cfg) { console.warn("[FB] No config"); return false; }
+    const fb = (typeof window!=="undefined") && window.firebase;
+    if (!fb) { console.warn("[FB] No SDK"); return false; }
+    if (typeof fb.database !== "function") { console.warn("[FB] No database module"); return false; }
+    if (!fb.apps || !fb.apps.length) fb.initializeApp(cfg);
+    fbDB = fb.database();
+    console.log("[FB] initialized OK");
+    return true;
+  } catch(e) { console.error("[FB] init error:", e); return false; }
+};
+const fbPush = (id, data) => {
+  if (!fbDB || !id) return;
+  try {
+    var payload = Object.assign({}, data, {_ts: Date.now()});
+    fbDB.ref("games/"+id).set(payload);
+    console.log("[FB] pushed to games/"+id, new Date().toLocaleTimeString());
+  } catch(e) { console.error("[FB] push error:", e); }
+};
+const fbSubscribe = (id, cb) => {
+  if (!fbDB || !id) return ()=>{};
+  const ref = fbDB.ref("games/"+id);
+  ref.on("value", s => { if(s&&s.exists()) cb(s.val()); });
+  return () => ref.off("value");
+};
+const fbUnsub = (id) => { if(fbDB&&id) try{fbDB.ref("games/"+id).off("value");}catch(e){} };
+
+const SKEY = "bb_v7";
+const lsLoad = () => { 
+  try {
+    const raw = localStorage.getItem(SKEY);
+    if (!raw) return {};
+    if (raw.length > 500000) { localStorage.removeItem(SKEY); return {}; } // 500KB超はクリア
+    return JSON.parse(raw) || {};
+  } catch(e2) { return {}; }
+};
+const lsSave = (d) => { 
+  try {
+    const s = JSON.stringify(d);
+    if (s.length > 500000) return; // 500KB超は保存しない
+    localStorage.setItem(SKEY, s);
+  } catch(e3) {}
+};
+function App() {
+  const [storage, setStorage] = useState(()=>{
+    const s=lsLoad();
+    if(!s.currentGame) s.currentGame=newGame();
+    if(!s.history)     s.history=[];
+    if(!s.undoStack)   s.undoStack=[];
+    if(!s.teams)       s.teams=[];   
+    return s;
+  });
+  const [tab,   setTab]   = useState("score");
+  const [syncMode,   setSyncMode]   = useState("off");
+  const [syncGameId, setSyncGameId] = useState("");
+  const [viewerCode, setViewerCode] = useState("");
+  const isViewer = syncMode==="viewer";
+  const isHost   = syncMode==="host";
+  const [modal, setModal] = useState(null);
+  
+  const [selDir, setSelDir] = useState(null);
+  const [toast,  setToast]  = useState("");
+
+  const game      = storage.currentGame;
+  const history   = storage.history||[];
+  const undoStack = storage.undoStack||[];
+  const teams     = storage.teams||[];
+
+  useEffect(()=>lsSave(storage),[storage]);
+
+  useEffect(()=>{
+    if(isHost && syncGameId) {
+      if(!fbInit()){ showToast("Firebase未設定"); return; }
+      fbPush(syncGameId, storage.currentGame);
+      console.log("[HOST] push triggered, syncGameId="+syncGameId);
+    }
+  },[storage, isHost, syncGameId]);
+
+  // viewer subscribeはstartViewing内で直接実行するためここでは不要
+  useEffect(()=>{
+    if(!isViewer || !syncGameId) return;
+  },[isViewer, syncGameId]);
+
+  const showToast = (msg)=>{setToast(msg);setTimeout(()=>setToast(""),2600);};
+
+  const startHosting = ()=>{
+    if(!fbInit()){showToast("Firebase未設定");return;}
+    const id=genGameId();
+    setSyncGameId(id); setSyncMode("host");
+    fbPush(id, storage.currentGame);
+    showToast("配信開始！コード: "+id);
+  };
+  const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
+  const startViewing = (id)=>{
+    try {
+      showToast("Step1: 開始");
+      var uid = (id||'').trim().toUpperCase();
+      if(uid.length!==6){ showToast("6桁のコードを入力してください"); return; }
+      showToast("Step2: Firebase初期化中");
+      var cfg = window.__FB_CONFIG__;
+      if(!cfg){ showToast("エラー: Firebase設定なし"); return; }
+      var fb = window.firebase;
+      if(!fb){ showToast("エラー: Firebase SDKなし"); return; }
+      showToast("Step3: DB接続中");
+      if(!fb.apps || !fb.apps.length) fb.initializeApp(cfg);
+      if(!fbDB) fbDB = fb.database();
+      showToast("Step4: Subscribe中");
+      fbDB.ref("games/"+uid).on("value", function(snap){
+        try {
+          if(!snap||!snap.exists()) return;
+          var d = snap.val();
+          if(!d || typeof d !== 'object') return;
+          delete d._ts;
+          setStorage(function(p){ return Object.assign({},p,{currentGame:d}); });
+        } catch(e2){ showToast("受信エラー: "+e2.message); }
+      });
+      showToast("Step5: モード切替");
+      setSyncGameId(uid);
+      setSyncMode("viewer");
+      showToast("観戦開始: "+uid);
+    } catch(e){ showToast("エラー: "+e.message); }
+  };
+  const stopViewing = ()=>{
+    if(syncGameId && fbDB) {
+      try { fbDB.ref("games/"+syncGameId).off("value"); } catch(e){}
+    }
+    setSyncMode("off"); setSyncGameId(""); showToast("観戦終了");
+  };
+
+  
+  const mutGame = useCallback((fn)=>{
+    setStorage(s=>{
+      
+      const snap = JSON.parse(JSON.stringify(s.currentGame));
+      const newGame = fn(s.currentGame);
+      const newUndoStack = [snap, ...(s.undoStack||[])].slice(0,5);
+      return {...s, currentGame:newGame, undoStack:newUndoStack};
+    });
+  },[]);
+
+  
+  const undoPlay = useCallback(()=>{
+    setStorage(s=>{
+      const stack = s.undoStack||[];
+      if(stack.length===0){
+        setToast("これ以上戻せません"); setTimeout(()=>setToast(""),2600);
+        return s;
+      }
+      const [last, ...rest] = stack;
+      setToast("↩ 1つ前に戻しました"); setTimeout(()=>setToast(""),2600);
+      return {...s, currentGame:last, undoStack:rest};
+    });
+  },[]);
+
+  const awayTotal = calcTotal(game.awayScore);
+  const homeTotal = calcTotal(game.homeScore);
+
+  
+  const RBI_CODES = new Set(["H1","H2","H3","HR","BB","HBP","SAC","SF"]);
+  const commitAtBat = useCallback((team, pidx, inning, code, dir, scoredNames, newBases, newOuts, errorPos)=>{
+    const runs = (scoredNames||[]).length;
+    const batterName = (() => { try { return _optionalChain([game, 'access', _4 => _4[team+"Lineup"], 'access', _5 => _5[pidx], 'optionalAccess', _6 => _6.name])||""; } catch(e){return "";} })();
+    const batterScored = (scoredNames||[]).includes(batterName);
+    const entry = {code, ...(dir?{dir}:{}), runs, ...(batterScored?{scored:true}:{}), ...(errorPos?{errorPos}:{})};
+    let nextPidx = -1;
+    mutGame(g=>{
+      const lk=team+"Lineup";
+      const rbiAdd = (RBI_CODES.has(code) && (runs||0)>0) ? (runs||0) : 0;
+      const lineup=g[lk].map((p,i)=>{
+        if(i!==pidx) return p;
+        const prev=toList(p.atBats,inning);
+        return {...p, atBats:{...p.atBats,[inning]:[...prev,entry]}, rbi:(p.rbi||0)+rbiAdd};
+      });
+      
+      let defLineupUpdate = {};
+      if(code==="E" && errorPos){
+        const defTeam = team==="away"?"home":"away";
+        const defLk = defTeam+"Lineup";
+        const defLineup = g[defLk].map(p => {
+          
+          if(p.pos===errorPos) return {...p, e:(p.e||0)+1};
+          return p;
+        });
+        defLineupUpdate = {[defLk]:defLineup};
+      }
+      const changeOccurs = newOuts>=3;
+      const tmp={...g, [lk]:lineup, ...defLineupUpdate,
+        bases: newBases!==undefined ? newBases : g.bases,
+        outs:  newOuts!==undefined  ? (changeOccurs?0:newOuts) : g.outs,
+        inning: changeOccurs ? (g.half==="top"?g.inning:Math.min(g.inning+1,15)) : g.inning,
+        half:   changeOccurs ? (g.half==="top"?"bottom":"top") : g.half,
+      };
+      const batterKey = team+"BatterIdx";
+      const lineupLen = lineup.length;
+      nextPidx = (pidx+1) % lineupLen;
+      const scores=recomputeScores(tmp);
+      const zl=ZONES.find(z=>z.id===dir);
+      const log=[{
+        ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+        msg:`【${g[team+"Team"]}】${lineup[pidx].name} → ${_optionalChain([rOf, 'call', _7 => _7(code), 'optionalAccess', _8 => _8.label])||code}${zl?`(${zl.label})`:""}${(runs||0)>0?` [${runs}点]`:""}（${inning}回）`
+      },...g.log.slice(0,99)];
+      return {...tmp,...scores,log,[batterKey]:nextPidx};
+    });
+    setSelDir(null);
+    
+    const wasChange = newOuts>=3;
+    if(wasChange){
+      setModal(null);
+      showToast(`チェンジ！ ${_optionalChain([rOf, 'call', _9 => _9(code), 'optionalAccess', _10 => _10.label])||code} 記録`);
+    } else {
+      showToast(`${_optionalChain([rOf, 'call', _11 => _11(code), 'optionalAccess', _12 => _12.label])||code}${(runs||0)>0?` +${runs}点`:""} ✅`);
+      
+      setTimeout(()=>{
+        setModal({team, pidx:nextPidx, inning, step:"result"});
+      }, 350);
+    }
+  },[mutGame]);
+
+  
+  const overwriteEntry = useCallback((team,pidx,inning,eidx,code,dir,runs)=>{
+    const entry={code,...(dir?{dir}:{}),runs:runs||0};
+    mutGame(g=>{
+      const lk=team+"Lineup";
+      const lineup=g[lk].map((p,i)=>{
+        if(i!==pidx) return p;
+        const list=[...toList(p.atBats,inning)]; list[eidx]=entry;
+        return {...p,atBats:{...p.atBats,[inning]:list}};
+      });
+      const tmp={...g,[lk]:lineup};
+      const scores=recomputeScores(tmp);
+      const zl=ZONES.find(z=>z.id===dir);
+      const log=[{
+        ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+        msg:`【修正】${lineup[pidx].name} ${inning}回 → ${_optionalChain([rOf, 'call', _13 => _13(code), 'optionalAccess', _14 => _14.label])||code}${zl?`(${zl.label})`:""}${(runs||0)>0?` [${runs}点]`:""}`
+      },...g.log.slice(0,99)];
+      return {...tmp,...scores,log};
+    });
+    setModal(null); setSelDir(null);
+    showToast("修正しました");
+  },[mutGame]);
+
+  
+  const deleteEntry = useCallback((team,pidx,inning,eidx)=>{
+    mutGame(g=>{
+      const lk=team+"Lineup";
+      const lineup=g[lk].map((p,i)=>{
+        if(i!==pidx) return p;
+        const list=[...toList(p.atBats,inning)]; list.splice(eidx,1);
+        return {...p,atBats:{...p.atBats,[inning]:list}};
+      });
+      return {...g,[lk]:lineup,...recomputeScores({...g,[lk]:lineup})};
+    });
+    setModal(null); showToast("削除しました");
+  },[mutGame]);
+
+  
+  const recordSB = useCallback((team,pidx,type,runner)=>{
+    
+    mutGame(g=>{
+      const lk=team+"Lineup";
+      const lineup=g[lk].map((p,i)=>{
+        if(i!==pidx) return p;
+        return type==="SB"?{...p,sb:(p.sb||0)+1}:{...p,cs:(p.cs||0)+1};
+      });
+
+      
+      let newBases = [...g.bases];
+      let scoreAdd = 0;
+      if(runner){
+        if(type==="SB"){
+          newBases[runner.bi] = null; 
+          if(runner.bi === 2){
+            
+            scoreAdd = 1;
+          } else {
+            newBases[runner.bi+1] = runner.name; 
+          }
+        } else {
+          
+          newBases[runner.bi] = null;
+        }
+      }
+
+      
+      const inning = g.inning;
+      let newScore = {...g[team+"Score"]};
+      if(scoreAdd>0){
+        newScore[inning] = (parseInt(newScore[inning])||0) + scoreAdd;
+      }
+      const scores = recomputeScores({...g, [lk]:lineup, [team+"Score"]:newScore});
+
+      const baseLabel = runner ? ["1→2塁","2→3塁","3塁→本塁"][runner.bi] : "";
+      const log=[{
+        ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+        msg:`【${g[team+"Team"]}】${_optionalChain([runner, 'optionalAccess', _15 => _15.name])||lineup[pidx].name} → ${type==="SB"?`盗塁成功(${baseLabel})`:"盗塁刺"}${scoreAdd>0?" [1点]":""}`
+      },...g.log.slice(0,99)];
+
+      const outs = type==="CS" ? Math.min(g.outs+1,3) : g.outs;
+      const changeOccurs = outs>=3;
+      return {...g,[lk]:lineup,...scores,
+        bases:newBases, outs:changeOccurs?0:outs,
+        inning:changeOccurs?(g.half==="top"?g.inning:Math.min(g.inning+1,15)):g.inning,
+        half:changeOccurs?(g.half==="top"?"bottom":"top"):g.half,
+        log};
+    });
+    setModal(null);
+    showToast(type==="SB"?"盗塁✅":"盗塁刺❌");
+  },[mutGame]);
+
+  
+  const recordSpecialPlay = useCallback((team, code, advanceBases, runs)=>{
+    const sp = SPECIAL_PLAYS.find(p=>p.code===code);
+    mutGame(g=>{
+      const newBases = advanceBases !== undefined ? advanceBases : g.bases;
+      const newScore = recomputeScores({...g,
+        [team+"Lineup"]: g[team+"Lineup"].map((p,i)=>{
+          
+          return p;
+        })
+      });
+      
+      const scoreKey = team+"Score";
+      const inn = g.inning;
+      const prevRuns = parseInt(g[scoreKey][inn])||0;
+      const scores = runs>0 ? {...g[scoreKey],[inn]:prevRuns+runs} : g[scoreKey];
+      const log=[{
+        ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+        msg:`【${g[team+"Team"]}】${_optionalChain([sp, 'optionalAccess', _16 => _16.label])||code}${runs>0?` [${runs}点]`:""}`
+      },...g.log.slice(0,99)];
+      return {...g,
+        [scoreKey]:scores,
+        bases:newBases,
+        log,
+      };
+    });
+    setModal(null);
+    showToast(`${_optionalChain([sp, 'optionalAccess', _17 => _17.label])||code}記録`);
+  },[mutGame]);
+
+  
+  const openNew     = (team,pidx,inning) => { setSelDir(null); setModal({team,pidx,inning,step:"result"}); };
+  const openSB      = (team,pidx)        => setModal({team,pidx,step:"sb"});
+  const openEdit    = (team,pidx,inning) => { setSelDir(null); setModal({team,pidx,inning,step:"edit_list"}); };
+  const openSpecial = (team)             => setModal({team,step:"special"});
+  
+  const openCurrentBatter = (team,inning) => {
+    const batterKey = team+"BatterIdx";
+    const idx = game[batterKey]||0;
+    setSelDir(null);
+    setModal({team, pidx:idx, inning, step:"result"});
+  };
+
+  
+  const onPickResult = (code) => {
+    const { newBases, runs, newOuts, batterScored, scoredNames } = applyResult(code, game.bases, game.outs, _optionalChain([mPlayer, 'optionalAccess', _18 => _18.name]));
+    const base = {autoNewBases:newBases, autoRuns:runs, autoNewOuts:newOuts, batterScored, autoScoredNames:scoredNames};
+    if (code === "E") {
+      
+      setSelDir(null);
+      setModal(m=>({...m, step:"direction", pendingCode:code, ...base, afterDir:"error_pos"}));
+    } else if (DIR_CODES.has(code)) {
+      setSelDir(null);
+      setModal(m=>({...m, step:"direction", pendingCode:code, ...base}));
+    } else {
+      setModal(m=>({...m, step:"adjust", pendingCode:code, pendingDir:null, ...base}));
+    }
+  };
+
+  const onPickResultForEdit = (code) => {
+    if(DIR_CODES.has(code)){ setSelDir(null); setModal(m=>({...m,step:"direction_edit",pendingCode:code})); }
+    else setModal(m=>({...m,step:"adjust_edit",pendingCode:code,pendingDir:null,autoRuns:0,autoNewBases:game.bases,autoNewOuts:game.outs}));
+  };
+
+  const onConfirmDir = () => {
+    const code = modal.pendingCode;
+    const { newBases, runs, newOuts, batterScored, scoredNames } = applyResult(code, game.bases, game.outs, _optionalChain([mPlayer, 'optionalAccess', _19 => _19.name]));
+    const nextStep = modal.afterDir || "adjust";
+    setModal(m=>({...m, step:nextStep, pendingDir:selDir||null,
+      autoNewBases:newBases, autoRuns:runs, autoNewOuts:newOuts, batterScored, autoScoredNames:scoredNames,
+      afterDir:undefined}));
+    setSelDir(null);
+  };
+  const onConfirmDirEdit = () => {
+    setModal(m=>({...m,step:"adjust_edit",pendingDir:selDir||null,autoRuns:0,autoNewBases:game.bases,autoNewOuts:game.outs}));
+    setSelDir(null);
+  };
+
+  
+  const changeInning=()=>{
+    mutGame(g=>{
+      
+      if(g.half==="top") return{...g,half:"bottom",outs:0,bases:[null,null,null]};
+      return{...g,inning:Math.min(g.inning+1,15),half:"top",outs:0,bases:[null,null,null]};
+    });
+    showToast("チェンジ！");
+  };
+  const addOut=()=>mutGame(g=>{
+    const outs=(g.outs+1)%4;
+    return{...g,outs,bases:outs===0?[null,null,null]:g.bases};
+  });
+  const toggleBase=(i)=>mutGame(g=>{
+    const b=[...g.bases];
+    b[i]=b[i]?null:"ランナー"; 
+    return{...g,bases:b};
+  });
+
+  
+  const makeTeamId = () => Date.now().toString(36);
+  const saveTeam = (team) => {
+    setStorage(s => {
+      const existing = (s.teams||[]).findIndex(t=>t.id===team.id);
+      const teams = existing>=0
+        ? s.teams.map(t=>t.id===team.id?team:t)
+        : [...(s.teams||[]), {...team, id:makeTeamId()}];
+      return {...s, teams};
+    });
+    showToast(`「${team.name}」を保存しました`);
+  };
+  const deleteTeam = (id) => {
+    setModal({step:"confirm_delete_team", targetTeamId:id});
+  };
+  
+  const applyTeamToLineup = (side, team) => {
+    mutGame(g=>{
+      const lk = side+"Lineup";
+      const members = team.members||[];
+      const newLineup = members.map((m,i)=>({
+        ...makePlayer(i+1),
+        name: typeof m==="string" ? m : (m.name||`選手${i+1}`),
+        pos: typeof m==="object" && m.pos ? m.pos : String(i+1),
+      }));
+      while(newLineup.length < DEFAULT_PLAYERS){
+        newLineup.push(makePlayer(newLineup.length+1));
+      }
+      const updated = {...g, [lk]:newLineup, [side+"Team"]:team.name};
+      return syncPitcherFromLineup(updated, side);
+    });
+    showToast(`${team.name} のスタメンをセットしました`);
+  };
+
+  
+  const syncPitcherFromLineup = (g, side) => {
+    const pitcher = g[side+"Lineup"].find(p=>p.pos==="投");
+    if(!pitcher) return g;
+    const pitchers = [...g[side+"Pitchers"]];
+    const currentPIdx = g[side+"PitcherIdx"]||0;
+    const currentPitcher = pitchers[currentPIdx];
+    
+    if(_optionalChain([currentPitcher, 'optionalAccess', _20 => _20.name]) === pitcher.name) return g;
+    
+    const existIdx = pitchers.findIndex(p=>p.name===pitcher.name);
+    if(existIdx >= 0){
+      
+      return {...g, [side+"PitcherIdx"]: existIdx};
+    }
+    
+    const newPitcher = {...makePitcher(pitchers.length+1), name: pitcher.name};
+    const newPitchers = [...pitchers, newPitcher];
+    const newPIdx = newPitchers.length-1;
+    const logKey = side+"PitcherLog";
+    const newPitcherLog = [...(g[logKey]||[]), {
+      pitcherIdx: newPIdx,
+      fromInning: g.inning,
+      fromHalf: g.half,
+      outsAtStart: g.outs,
+    }];
+    return {...g,
+      [side+"Pitchers"]: newPitchers,
+      [side+"PitcherIdx"]: newPIdx,
+      [logKey]: newPitcherLog,
+    };
+  };
+
+  
+  const substitutePlayer = useCallback((team, outIdx, newName, newPos, reason)=>{
+    mutGame(g=>{
+      const lk = team+"Lineup";
+      const outPlayer = g[lk][outIdx];
+      const lineup = g[lk].map((p,i)=>{
+        if(i!==outIdx) return p;
+        return {...p, name:newName, pos:newPos, subbed:true};
+      });
+      const ts = new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"});
+      
+      const log=[{
+        ts,
+        msg:`【${g[team+"Team"]}】守備交代: ${outPlayer.name}(${outPlayer.pos||"-"}) → ${newName}(${newPos||"-"})${reason?` [${reason}]`:""} (${g.inning}回${g.half==="top"?"表":"裏"})`
+      },...g.log.slice(0,99)];
+      
+      const defEntry = {
+        inning:g.inning, half:g.half, team,
+        outName:outPlayer.name, outPos:outPlayer.pos||"",
+        inName:newName, inPos:newPos||"",
+        reason:reason||"", ts,
+      };
+      const defenseLog = [...(g.defenseLog||[]), defEntry];
+      const updated = {...g,[lk]:lineup,log,defenseLog};
+      return syncPitcherFromLineup(updated, team);
+    });
+  },[mutGame]);
+
+  const changePitcher = useCallback((defTeam, newPitcherIdx)=>{
+    mutGame(g=>{
+      const logKey = defTeam+"PitcherLog";
+      const offHalf = defTeam==="away" ? "bottom" : "top"; 
+      const entry = {
+        pitcherIdx: newPitcherIdx,
+        fromInning: g.inning,
+        fromHalf: g.half,
+        outsAtStart: g.outs,
+      };
+      const newLog = [...(g[logKey]||[]), entry];
+      const log=[{
+        ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+        msg:`【${g[defTeam+"Team"]}】投手交代: ${_optionalChain([g, 'access', _21 => _21[defTeam+"Pitchers"], 'access', _22 => _22[newPitcherIdx], 'optionalAccess', _23 => _23.name])||"新投手"} 登板（${g.inning}回${g.half==="top"?"表":"裏"}）`
+      },...g.log.slice(0,99)];
+      return {...g,[defTeam+"PitcherIdx"]:newPitcherIdx,[logKey]:newLog,log};
+    });
+  },[mutGame]);
+
+  
+  const exportExcel = useCallback((targetGame) => {
+    const XLSX = window.XLSX;
+    if(!XLSX){ alert("Excel機能を読み込み中です。少し待ってから再度お試しください。"); return; }
+    const g = targetGame || game;
+    const aStats = computeStats(g.awayLineup);
+    const hStats = computeStats(g.homeLineup);
+    const pStats = computePitcherStats(g);
+    const wb = XLSX.utils.book_new();
+    const title = `${g.awayTeam} vs ${g.homeTeam} (${g.date})`;
+
+    
+    const batHeader = ["チーム","#","選手名","打席","打数","安打","二塁打","三塁打","本塁打","打点","四球","死球","三振","失策","盗塁","盗刺","得点","打率"];
+    const batRows = [batHeader];
+    [[g.awayTeam, aStats],[g.homeTeam, hStats]].forEach(([teamName, stats])=>{
+      let totals = {pa:0,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,e:0,sb:0,cs:0,r:0};
+      stats.forEach((p,i)=>{
+        
+        let h2=0,h3=0;
+        Object.values(p.atBats).flat().forEach(e=>{
+          const code = (typeof e==="object"&&e!==null)?e.code:e;
+          if(code==="H2") h2++;
+          if(code==="H3") h3++;
+        });
+        batRows.push([teamName,i+1,p.name,p._pa||0,p._ab,p._h,h2,h3,p._hr,p.rbi||0,p._bb,p._hbp||0,p._k,p.e||0,p.sb||0,p.cs||0,p._r||0,p._avg]);
+        totals.ab+=p._ab; totals.h+=p._h; totals.h2+=h2; totals.h3+=h3; totals.hr+=p._hr;
+        totals.rbi+=p.rbi||0; totals.bb+=p._bb; totals.hbp+=(p._hbp||0); totals.k+=p._k; totals.e+=p.e||0;
+        totals.sb+=p.sb||0; totals.cs+=p.cs||0; totals.r+=(p._r||0); totals.pa+=(p._pa||0);
+      });
+      const avg = totals.ab>0?(totals.h/totals.ab).toFixed(3).replace(/^0/,""):".---";
+      batRows.push([teamName+"合計","","",totals.pa,totals.ab,totals.h,totals.h2,totals.h3,totals.hr,totals.rbi,totals.bb,totals.hbp,totals.k,totals.e,totals.sb,totals.cs,totals.r,avg]);
+      batRows.push([]);
+    });
+    const wsBat = XLSX.utils.aoa_to_sheet(batRows);
+    wsBat["!cols"] = [10,4,10,5,5,6,6,6,5,5,5,5,5,5,7].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, wsBat, "打撃成績");
+
+    
+    const pitHeader = ["チーム","投手名","投球回","被安打","自責点","四球","三振","防御率"];
+    const pitRows = [pitHeader];
+    [[g.awayTeam,"away"],[g.homeTeam,"home"]].forEach(([teamName,side])=>{
+      const pitchers = g[side+"Pitchers"];
+      const autoStats = pStats[side]||[];
+      pitchers.forEach((p,i)=>{
+        const auto = autoStats[i]||{autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0};
+        const isOverride = p.manualOverride;
+        const ip  = isOverride ? p.ip   : auto.autoIp;
+        const h   = isOverride ? p.h    : auto.autoH;
+        const er  = isOverride ? p.er   : auto.autoEr;
+        const bb  = isOverride ? p.bb   : auto.autoBb;
+        const k   = isOverride ? p.k    : auto.autoK;
+        
+        const ipNum = Math.floor(ip/10) + (ip%10)/3;
+        const era = ipNum>0 ? (er*9/ipNum).toFixed(2) : "---";
+        const ipDisp = `${Math.floor(ip/10)}.${ip%10}`;
+        pitRows.push([teamName,p.name,ipDisp,h,er,bb,k,era]);
+      });
+      pitRows.push([]);
+    });
+    const wsPit = XLSX.utils.aoa_to_sheet(pitRows);
+    wsPit["!cols"] = [10,10,7,7,7,5,5,7].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, wsPit, "投手成績");
+
+    
+    const scoreHeader = ["チーム","1","2","3","4","5","6","7","8","9","計"];
+    const scoreRows = [scoreHeader];
+    [["away",g.awayTeam],["home",g.homeTeam]].forEach(([side,name])=>{
+      const row = [name];
+      INNINGS.forEach(i=>row.push(parseInt(g[side+"Score"][i])||0));
+      row.push(calcTotal(g[side+"Score"]));
+      scoreRows.push(row);
+    });
+    const wsScore = XLSX.utils.aoa_to_sheet(scoreRows);
+    XLSX.utils.book_append_sheet(wb, wsScore, "スコアボード");
+
+    const fname = `スコアブック_${g.awayTeam}_vs_${g.homeTeam}_${g.date}.xlsx`.replace(/[\/\:*?"<>|]/g,"_");
+    
+    if((g.defenseLog||[]).length>0){
+      const defHeader = ["イニング","表裏","チーム","退く選手","守備位置","入る選手","守備位置","理由","時刻"];
+      const defRows = [defHeader];
+      (g.defenseLog||[]).forEach(d=>{
+        defRows.push([
+          d.inning,
+          d.half==="top"?"表":"裏",
+          d.team==="away"?g.awayTeam:g.homeTeam,
+          d.outName, d.outPos,
+          d.inName, d.inPos,
+          d.reason||"", d.ts||""
+        ]);
+      });
+      const wsDef = XLSX.utils.aoa_to_sheet(defRows);
+      wsDef["!cols"] = [6,4,10,10,6,10,6,8,6].map(w=>({wch:w}));
+      XLSX.utils.book_append_sheet(wb, wsDef, "守備交代");
+    }
+    XLSX.writeFile(wb, fname);
+  }, [game]);
+
+  
+  const editPlayer  = (t,i,f,v)=>mutGame(g=>{
+    const updated = {...g,[t+"Lineup"]:g[t+"Lineup"].map((p,j)=>j===i?{...p,[f]:v}:p)};
+    
+    if(f==="name"||f==="pos") return syncPitcherFromLineup(updated, t);
+    return updated;
+  });
+  const editPitcher = (t,i,f,v)=>mutGame(g=>({...g,[t+"Pitchers"]:g[t+"Pitchers"].map((p,j)=>j===i?{...p,[f]:isNaN(v)?v:Number(v)}:p)}));
+  const addPlayer   = (t)=>mutGame(g=>{const lk=t+"Lineup";const n=g[lk].length+1;return{...g,[lk]:[...g[lk],makePlayer(n)]};});
+
+  
+  const saveGame=()=>{
+    setStorage(s=>({...s,history:[{...s.currentGame,savedAt:new Date().toLocaleString("ja-JP")},...s.history.slice(0,19)]}));
+    showToast("保存しました");
+  };
+
+  const endGame = useCallback((reason, endInning, endNote)=>{
+    mutGame(g=>({...g, finished:true, endReason:reason, endInning, endNote:endNote||""}));
+    
+    setStorage(s=>{
+      const finished = {...s.currentGame, finished:true, endReason:reason, endInning, endNote:endNote||"",
+        savedAt:new Date().toLocaleString("ja-JP")};
+      return {...s, history:[finished,...s.history.slice(0,19)]};
+    });
+    showToast(reason==="cold"?`コールドゲーム（${endInning}回）`:reason==="mercy"?"コールド成立":"⚾ 試合終了");
+  },[mutGame]);
+
+  const resumeGame = useCallback(()=>{
+    mutGame(g=>({...g, finished:false, endReason:"", endInning:null, endNote:""}));
+    showToast("試合を再開しました");
+  },[mutGame]);
+  const loadGame=(g)=>{
+    setModal({step:"confirm_load", targetGame:g});
+  };
+  const delHistory=(id)=>{
+    setModal({step:"confirm_delete", targetId:id});
+  };
+  const startNew=()=>{
+    setModal({step:"confirm_new"});
+  };
+
+  const aStats=computeStats(game.awayLineup);
+  const hStats=computeStats(game.homeLineup);
+  const pitcherStats=computePitcherStats(game); 
+  const curTeam   = game.half==="top"?"away":"home";
+  const curLabel  = game.half==="top"?game.awayTeam:game.homeTeam;
+  const curLineup = game.half==="top"?game.awayLineup:game.homeLineup;
+
+  const mLineup    = modal ? (modal.team==="home"?game.homeLineup:game.awayLineup) : [];
+  const mPlayer    = modal ? mLineup[modal.pidx] : null;
+  const mTeamLabel = modal ? (modal.team==="home"?game.homeTeam:game.awayTeam) : "";
+
+  
+
+  return React.createElement('div', {style:{color:'white',padding:20,fontSize:20}},
+    'State定義OK - useState数: ' + Object.keys(React).join(',').slice(0,30)
+  );
+}
+
+try {
+  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+} catch(e) {
+  document.getElementById('root').innerHTML = '<div style="color:white;padding:20px"><h2>エラー</h2><pre style="font-size:11px;white-space:pre-wrap">' + (e.stack||e.message) + '</pre></div>';
+}
+
+</script>
+</body>
+</html>

@@ -672,24 +672,12 @@ function App() {
   const [selDir, setSelDir] = useState(null);
   const [toast,  setToast]  = useState("");
 
-  const game      = storage.currentGame;
+  const game      = (isViewer && viewerGame) ? viewerGame : storage.currentGame;
   const history   = storage.history||[];
   const undoStack = storage.undoStack||[];
   const teams     = storage.teams||[];
 
   useEffect(()=>lsSave(storage),[storage]);
-
-  // 観戦モードになったらスコアタブに切り替え
-  useEffect(()=>{
-    if(isViewer) setTab("score");
-  },[isViewer]);
-
-  // viewerGameが更新されたらstorageに反映
-  useEffect(()=>{
-    if(isViewer && viewerGame) {
-      setStorage(function(p){ return Object.assign({},p,{currentGame:viewerGame}); });
-    }
-  },[viewerGame]);
 
   useEffect(()=>{
     if(isHost && syncGameId) {
@@ -735,6 +723,7 @@ function App() {
       });
       setSyncGameId(uid);
       setSyncMode("viewer");
+      setTab("score");
       showToast("観戦開始: "+uid);
     } catch(e){ showToast("エラー: "+e.message); }
   };

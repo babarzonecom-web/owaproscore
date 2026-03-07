@@ -1,37 +1,36 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <meta name="theme-color" content="#0a1628"/>
-  <meta name="mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="apple-mobile-web-app-title" content="スコアブック"/>
-  <title>⚾ スコアブック</title>
-  <link rel="manifest" href="manifest.json"/>
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
-  <style>* {box-sizing:border-box;-webkit-tap-highlight-color:transparent;}body{margin:0;padding:0;background:#080f1e;overscroll-behavior:none;}#root{min-height:100vh;}</style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#0a1628"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="スコアブック"/>
+<title>⚾ スコアブック</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
+<style>*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}body{background:#0a1628;color:white;margin:0;padding:0;font-size:16px;overscroll-behavior:none;}#root{min-height:100vh;}</style>
 </head>
 <body>
-  <div id="root"></div>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-  <script>
-  window.__FB_CONFIG__ = {
-    apiKey: "AIzaSyDZLsctyGaNzf9amSmM7Mscyk2mmssF_jI",
-    authDomain: "owaprobaseball.firebaseapp.com",
-    databaseURL: "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "owaprobaseball",
-    storageBucket: "owaprobaseball.firebasestorage.app",
-    messagingSenderId: "37318728572",
-    appId: "1:37318728572:web:930f71d8985f46f29ba2f9"
-  };
-  </script>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script>
+window.__FB_CONFIG__ = {
+  apiKey:"AIzaSyDZLsctyGaNzf9amSmM7Mscyk2mmssF_jI",
+  authDomain:"owaprobaseball.firebaseapp.com",
+  databaseURL:"https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"owaprobaseball",storageBucket:"owaprobaseball.firebasestorage.app",
+  messagingSenderId:"37318728572",appId:"1:37318728572:web:930f71d8985f46f29ba2f9"
+};
+</script>
+<script>
+
 
 const { useState, useEffect, useCallback } = React;
  function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }
@@ -1222,7 +1221,7 @@ function App() {
       wsDef["!cols"] = [6,4,10,10,6,10,6,8,6].map(w=>({wch:w}));
       XLSX.utils.book_append_sheet(wb, wsDef, "守備交代");
     }
-    XLSX.writeFile(wb, fname);
+      XLSX.writeFile(wb, fname);
     };
     if(window.XLSX) {
       doExport(window.XLSX);
@@ -3507,7 +3506,12 @@ try {
   document.getElementById('root').innerHTML = '<div style="color:white;padding:20px;font-size:14px"><h2>起動エラー</h2><pre style="white-space:pre-wrap;font-size:11px">' + (e.stack||e.message) + '</pre></div>';
 }
   
+
+try {
+  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+} catch(e) {
+  document.getElementById('root').innerHTML = '<div style="color:white;padding:20px"><h2>エラー</h2><pre style="font-size:11px;white-space:pre-wrap;color:#f87171">' + (e.stack||e.message) + '</pre></div>';
+}
 </script>
-  
 </body>
 </html>

@@ -1285,72 +1285,48 @@ function App() {
   
   // 観戦モード: シンプルな表示のみ（重いUIを描画しない）
   if (isViewer) {
-    var vg = viewerGame;
-    if (!vg) return React.createElement('div',{style:{background:'#080f1e',minHeight:'100vh',color:'white',padding:32,textAlign:'center'}},
-      React.createElement('div',{style:{color:'#64748b',marginBottom:16}},'データ受信待ち...'),
-      React.createElement('button',{onClick:stopViewing,style:{background:'#475569',color:'white',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,cursor:'pointer'}},'■ 終了')
-    );
-    var inn = vg.inning||1;
-    var tb  = vg.topBot||'表';
-    var vo  = vg.outs||0;
-    var vb  = vg.bases||[null,null,null];
-    var asc = vg.awayScore||{}; var hsc = vg.homeScore||{};
+    var vg = viewerGame || game;
+    var inning = vg ? (vg.inning||1) : 1;
+    var topBot = vg ? (vg.topBot||'表') : '表';
+    var outs = vg ? (vg.outs||0) : 0;
+    var bases = vg ? (vg.bases||[null,null,null]) : [null,null,null];
     var at=0; var ht=0;
+    var asc=vg&&vg.awayScore||{}; var hsc=vg&&vg.homeScore||{};
     for(var k in asc) at+=parseInt(asc[k])||0;
     for(var k in hsc) ht+=parseInt(hsc[k])||0;
-    var aName = vg.awayTeam||'アウェイ';
-    var hName = vg.homeTeam||'ホーム';
-    var side  = tb==='表'?'away':'home';
-    var pside = side==='away'?'home':'away';
-    var lu    = vg[side+'Lineup']||[];
-    var bi    = vg[side+'BatterIdx']||0;
-    var bat   = lu[bi]||{};
-    var plu   = vg[pside+'Lineup']||[];
-    var pi    = vg[pside+'PitcherIdx']||0;
-    var pit   = plu[pi]||{};
-    var inns  = [1,2,3,4,5,6,7,8,9];
-    var E = function(t,p){var a=[t,p||null];for(var i=2;i<arguments.length;i++)a.push(arguments[i]);return React.createElement.apply(React,a);};
-    var cs = {border:'1px solid #1e3a5f',padding:'3px 5px',textAlign:'center',fontSize:11,minWidth:24};
-    var ch = Object.assign({},cs,{background:'#0a1628',color:'#64748b'});
-    return E('div',{style:{background:'#080f1e',minHeight:'100vh',color:'white',fontFamily:'sans-serif',padding:10}},
-      E('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
-        E('div',{style:{fontSize:11,color:'#93c5fd'}},'👁 '+syncGameId),
-        E('button',{onClick:stopViewing,style:{background:'#475569',color:'white',border:'none',borderRadius:6,padding:'3px 8px',fontSize:11,cursor:'pointer'}},'終了')
+    var aName=vg&&vg.awayTeam||'アウェイ'; var hName=vg&&vg.homeTeam||'ホーム';
+    var side=topBot==='表'?'away':'home';
+    var lu=vg&&vg[side+'Lineup']||[]; var bi=vg&&vg[side+'BatterIdx']||0;
+    var bat=lu[bi]||{}; var batName=(bat.num?bat.num+'番 ':''+(bat.name||'－'));
+    var pside=side==='away'?'home':'away';
+    var plu=vg&&vg[pside+'Lineup']||[]; var pi2=vg&&vg[pside+'PitcherIdx']||0;
+    var pit=plu[pi2]||{}; var pitName=pit.name||'－';
+    return React.createElement('div', {style:{background:'#080f1e',minHeight:'100vh',color:'white',padding:12,fontFamily:'sans-serif'}},
+      React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
+        React.createElement('div', {style:{fontSize:11,color:'#93c5fd'}}, '👁 '+syncGameId),
+        React.createElement('button', {onClick:stopViewing, style:{background:'#475569',color:'white',border:'none',borderRadius:6,padding:'4px 10px',fontSize:11,cursor:'pointer'}}, '終了')
       ),
-      E('div',{style:{background:'#0f1e35',borderRadius:10,padding:10,marginBottom:8,textAlign:'center'}},
-        E('div',{style:{fontSize:11,color:'#94a3b8',marginBottom:4}},aName+' vs '+hName),
-        E('div',{style:{fontSize:42,fontWeight:900,letterSpacing:4}},at+' - '+ht),
-        E('div',{style:{fontSize:12,color:'#7dd3fc',marginTop:4}},inn+'回'+tb+'  '+vo+'アウト')
+      React.createElement('div', {style:{background:'#0f1e35',borderRadius:10,padding:10,marginBottom:8,textAlign:'center'}},
+        React.createElement('div', {style:{fontSize:11,color:'#94a3b8',marginBottom:4}}, aName+' vs '+hName),
+        React.createElement('div', {style:{fontSize:42,fontWeight:900,letterSpacing:4}}, at+' - '+ht),
+        React.createElement('div', {style:{fontSize:12,color:'#7dd3fc',marginTop:4}}, inning+'回'+topBot+'  '+outs+'アウト')
       ),
-      E('div',{style:{background:'#0f1e35',borderRadius:10,padding:8,marginBottom:8}},
-        E('div',{style:{fontSize:11,color:'#64748b',marginBottom:4}},'ランナー'),
-        E('div',{style:{display:'flex',gap:12,fontSize:12}},
-          E('span',{style:{color:vb[0]?'#f87171':'#475569'}},'一塁: '+(vb[0]||'－')),
-          E('span',{style:{color:vb[1]?'#f87171':'#475569'}},'二塁: '+(vb[1]||'－')),
-          E('span',{style:{color:vb[2]?'#f87171':'#475569'}},'三塁: '+(vb[2]||'－'))
+      React.createElement('div', {style:{background:'#0f1e35',borderRadius:10,padding:8,marginBottom:8}},
+        React.createElement('div', {style:{fontSize:10,color:'#64748b',marginBottom:4}}, 'ランナー'),
+        React.createElement('div', {style:{display:'flex',gap:12,fontSize:12}},
+          React.createElement('span', {style:{color:bases[0]?'#f87171':'#475569'}}, '一: '+(bases[0]||'－')),
+          React.createElement('span', {style:{color:bases[1]?'#f87171':'#475569'}}, '二: '+(bases[1]||'－')),
+          React.createElement('span', {style:{color:bases[2]?'#f87171':'#475569'}}, '三: '+(bases[2]||'－'))
         )
       ),
-      E('div',{style:{background:'#0f1e35',borderRadius:10,padding:8,marginBottom:8,display:'flex',gap:8}},
-        E('div',{style:{flex:1}},
-          E('div',{style:{fontSize:10,color:'#64748b',marginBottom:2}},'打者'),
-          E('div',{style:{fontSize:14,fontWeight:700}},(bat.num?bat.num+'番 ':'')+(bat.name||'－'))
+      React.createElement('div', {style:{background:'#0f1e35',borderRadius:10,padding:8,marginBottom:8,display:'flex',gap:8}},
+        React.createElement('div', {style:{flex:1}},
+          React.createElement('div', {style:{fontSize:10,color:'#64748b'}}, '打者'),
+          React.createElement('div', {style:{fontSize:13,fontWeight:700}}, batName)
         ),
-        E('div',{style:{flex:1}},
-          E('div',{style:{fontSize:10,color:'#64748b',marginBottom:2}},'投手'),
-          E('div',{style:{fontSize:14,fontWeight:700}},pit.name||'－')
-        )
-      ),
-      E('div',{style:{background:'#0f1e35',borderRadius:10,padding:8,overflowX:'auto'}},
-        E('div',{style:{fontSize:10,color:'#64748b',marginBottom:4}},'スコアボード'),
-        E('table',{style:{borderCollapse:'collapse',width:'100%'}},
-          E('thead',null,E('tr',null,E('th',{style:Object.assign({},ch,{textAlign:'left',width:50})},''),inns.map(function(n){return E('th',{key:n,style:ch},n);}),E('th',{style:ch},'計'))),
-          E('tbody',null,
-            [[aName,asc],[hName,hsc]].map(function(row){
-              var nm=row[0],sc=row[1],tot=0;
-              for(var k in sc) tot+=parseInt(sc[k])||0;
-              return E('tr',{key:nm},E('td',{style:Object.assign({},cs,{textAlign:'left',fontSize:10,fontWeight:700})},nm),inns.map(function(n){return E('td',{key:n,style:cs},sc[n]!==undefined&&sc[n]!==''?sc[n]:'-');}),E('td',{style:Object.assign({},cs,{fontWeight:900,color:'#7dd3fc'})},tot));
-            })
-          )
+        React.createElement('div', {style:{flex:1}},
+          React.createElement('div', {style:{fontSize:10,color:'#64748b'}}, '投手'),
+          React.createElement('div', {style:{fontSize:13,fontWeight:700}}, pitName)
         )
       )
     );

@@ -726,7 +726,7 @@ function App() {
       });
       showToast("Step5: モード切替");
       setSyncGameId(uid);
-      setSyncMode("viewer");
+      setTimeout(function(){ setSyncMode("viewer"); }, 100);
       showToast("観戦開始: "+uid);
     } catch(e){ showToast("エラー: "+e.message); }
   };

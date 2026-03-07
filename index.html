@@ -286,11 +286,9 @@ function MiniDiamond({ bases, size=56 }) {
 }
 const BASE_LABELS = ["1塁","2塁","3塁","ホームイン🏠","アウト❌"];
 const BASE_COLORS = ["#fbbf24","#22c55e","#f87171","#f97316","#94a3b8"];
-function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel }) {
+function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel }) {
   
   // postBasesで見つからないランナーのデフォルト先
-  // H1/H2/H3/E等はscored、GO/FO等はout
-  const defaultToScored = ["H1","H2","H3","HR","E","BB","HBP","KW","FC"].includes(batterOut === false ? "H1" : "GO");
   // batterOutフラグを使って判定
   const runnerDefaultTo = batterOut ? "out" : "scored";
 
@@ -300,6 +298,11 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
     // 既存ランナーの処理
     preBases.forEach((name, i) => {
       if (!name) return;
+      // preScoredNamesに含まれている場合はデフォルト「scored」
+      if ((preScoredNames||[]).includes(name)) {
+        list.push({ name, from: i, to: "scored" });
+        return;
+      }
       // postBasesで同じ名前を探す
       let to = null;
       for (let j = 0; j < 3; j++) {
@@ -809,9 +812,28 @@ function App() {
       nextPidx = (pidx+1) % lineupLen;
       const scores=recomputeScores(tmp);
       const zl=ZONES.find(z=>z.id===dir);
+      const baseLabel = b => b===0?'一塁':b===1?'二塁':b===2?'三塁':b==='scored'?'得点':b==='out'?'アウト':'?';
+      // ランナー移動サマリー（手動調整分）
+      const preBasesSnap = g.bases || [null,null,null];
+      let runnerNote = '';
+      if(newBases !== undefined) {
+        const moved = [];
+        // 得点したランナー
+        (scoredNames||[]).forEach(n => { if(n !== batterName) moved.push(n+'→得点'); });
+        // 塁上に残ったランナーの移動
+        [0,1,2].forEach(j => {
+          const nb = newBases[j];
+          if(nb && nb !== batterName) {
+            // 元の塁を探す
+            const from = preBasesSnap.indexOf(nb);
+            if(from !== -1 && from !== j) moved.push(nb+'→'+(j===0?'一':j===1?'二':'三')+'塁');
+          }
+        });
+        if(moved.length) runnerNote = ' (' + moved.join(', ') + ')';
+      }
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-        msg:`【${g[team+"Team"]}】${lineup[pidx].name} → ${_optionalChain([rOf, 'call', _7 => _7(code), 'optionalAccess', _8 => _8.label])||code}${zl?`(${zl.label})`:""}${(runs||0)>0?` [${runs}点]`:""}（${inning}回）`
+        msg:`【${g[team+"Team"]}】${lineup[pidx].name} → ${_optionalChain([rOf, 'call', _7 => _7(code), 'optionalAccess', _8 => _8.label])||code}${zl?`(${zl.label})`:""}${(runs||0)>0?` [${runs}点]`:""}${runnerNote}（${inning}回）`
       },...g.log.slice(0,99)];
       return {...tmp,...scores,log,[batterKey]:nextPidx};
     });
@@ -1310,7 +1332,7 @@ function App() {
     var lu    = (vg && vg[side+'Lineup'])  || [];
     var plu   = (vg && vg[pside+'Lineup']) || [];
     var bi    = (vg && vg[side+'BatterIdx'])   || 0;
-    var pi2   = (vg && vg[pside+'PitcherIdx']) || 0;
+    var pi2   = (vg && vg[pside+'pitcherIdx']) || 0;
     var bat   = lu[bi]  || {};
     var pit   = plu[pi2]|| {};
     var batStr = (bat.num ? bat.num+'番 ' : '') + (bat.name || '－');
@@ -2828,6 +2850,7 @@ function App() {
                 , React.createElement(RunnerAdjustModal, {
                   preBases: game.bases,
                   postBases: modal.autoNewBases,
+                  preScoredNames: modal.autoScoredNames||[],
                   batterName: _optionalChain([mPlayer, 'optionalAccess', _63 => _63.name])||"打者",
                   batterScored: modal.pendingCode==="HR" ? true : false,
                   batterOut: ["K","KL","GO","FO","FF","SAC","SF","DP"].includes(modal.pendingCode) || modal.autoNewOuts>=3,

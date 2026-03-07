@@ -703,18 +703,14 @@ function App() {
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
   const startViewing = (id)=>{
     try {
-      showToast("Step1: 開始");
       var uid = (id||'').trim().toUpperCase();
       if(uid.length!==6){ showToast("6桁のコードを入力してください"); return; }
-      showToast("Step2: Firebase初期化中");
       var cfg = window.__FB_CONFIG__;
-      if(!cfg){ showToast("エラー: Firebase設定なし"); return; }
+      if(!cfg){ showToast("Firebase設定なし"); return; }
       var fb = window.firebase;
-      if(!fb){ showToast("エラー: Firebase SDKなし"); return; }
-      showToast("Step3: DB接続中");
+      if(!fb){ showToast("Firebase SDKなし"); return; }
       if(!fb.apps || !fb.apps.length) fb.initializeApp(cfg);
       if(!fbDB) fbDB = fb.database();
-      showToast("Step4: Subscribe中");
       fbDB.ref("games/"+uid).on("value", function(snap){
         try {
           if(!snap||!snap.exists()) return;
@@ -724,9 +720,8 @@ function App() {
           setStorage(function(p){ return Object.assign({},p,{currentGame:d}); });
         } catch(e2){ showToast("受信エラー: "+e2.message); }
       });
-      showToast("Step5: モード切替");
       setSyncGameId(uid);
-      setTimeout(function(){ setSyncMode("viewer"); }, 100);
+      setSyncMode("viewer");
       showToast("観戦開始: "+uid);
     } catch(e){ showToast("エラー: "+e.message); }
   };
@@ -1287,6 +1282,36 @@ function App() {
   const mTeamLabel = modal ? (modal.team==="home"?game.homeTeam:game.awayTeam) : "";
 
   
+  // 観戦モード: シンプルな表示のみ（重いUIを描画しない）
+  if (isViewer) {
+    var vg = game;
+    var inning = vg ? (vg.inning||1) : 1;
+    var topBot = vg ? (vg.topBot||'表') : '表';
+    var outs = vg ? (vg.outs||0) : 0;
+    var bases = vg ? (vg.bases||[null,null,null]) : [null,null,null];
+    var awayScore = 0; var homeScore = 0;
+    if (vg && vg.score) { awayScore = vg.score.away||0; homeScore = vg.score.home||0; }
+    return React.createElement('div', {style:{background:'#080f1e',minHeight:'100vh',color:'white',padding:16,fontFamily:'sans-serif'}},
+      React.createElement('div', {style:{textAlign:'center',marginBottom:16}},
+        React.createElement('div', {style:{fontSize:12,color:'#93c5fd',marginBottom:8}}, '👁 観戦中: '+syncGameId),
+        React.createElement('button', {onClick:stopViewing, style:{background:'#475569',color:'white',border:'none',borderRadius:8,padding:'6px 14px',fontSize:12,cursor:'pointer'}}, '■ 観戦終了')
+      ),
+      React.createElement('div', {style:{background:'#0f1e35',borderRadius:12,padding:16,marginBottom:12,textAlign:'center'}},
+        React.createElement('div', {style:{fontSize:14,color:'#94a3b8',marginBottom:8}}, (vg&&vg.awayTeam)||'アウェイ'+' vs '+(vg&&vg.homeTeam||'ホーム')),
+        React.createElement('div', {style:{fontSize:48,fontWeight:900,letterSpacing:8}}, awayScore+' - '+homeScore),
+        React.createElement('div', {style:{fontSize:14,color:'#7dd3fc',marginTop:8}}, inning+'回'+topBot+' '+outs+'アウト')
+      ),
+      React.createElement('div', {style:{background:'#0f1e35',borderRadius:12,padding:16,textAlign:'center'}},
+        React.createElement('div', {style:{fontSize:12,color:'#94a3b8',marginBottom:8}}, 'ランナー'),
+        React.createElement('div', {style:{fontSize:16}},
+          (bases[2]?'🔴':'⚪')+'三塁 '+
+          (bases[1]?'🔴':'⚪')+'二塁 '+
+          (bases[0]?'🔴':'⚪')+'一塁'
+        )
+      )
+    );
+  }
+
   return (
     React.createElement('div', { style: S.root,}
       , React.createElement('style', null, `

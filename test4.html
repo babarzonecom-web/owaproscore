@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<style>body{background:#0a1628;color:white;padding:10px;font-size:16px;margin:0;}</style>
+</head>
+<body>
+<div id="dbg" style="position:fixed;top:0;left:0;right:0;background:#1e3a5f;padding:8px;font-size:12px;z-index:9999">読込中...</div>
+<div id="root" style="margin-top:40px"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script>
+
+
+const { useState, useEffect, useCallback } = React;
+ function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }
+
+const INNINGS = [1,2,3,4,5,6,7,8,9];
+const DEFAULT_PLAYERS = 9;
+
+const RESULTS = [
+  { code:"H1",  label:"単打",    color:"#4ade80", short:"1B"  },
+  { code:"H2",  label:"二塁打",  color:"#22c55e", short:"2B"  },
+  { code:"H3",  label:"三塁打",  color:"#16a34a", short:"3B"  },
+  { code:"HR",  label:"本塁打",  color:"#f87171", short:"HR"  },
+  { code:"K",   label:"三振（空振り）", color:"#94a3b8", short:"K"   },
+  { code:"KL",  label:"三振（見逃し）", color:"#64748b", short:"KL"  },
+  { code:"KW",  label:"振り逃げ",       color:"#22d3ee", short:"KW"  },
+  { code:"BB",  label:"四球",    color:"#60a5fa", short:"BB"  },
+  { code:"HBP", label:"死球",    color:"#a78bfa", short:"HBP" },
+  { code:"GO",  label:"ゴロ",    color:"#fbbf24", short:"GO"  },
+  { code:"FO",  label:"フライ",  color:"#fb923c", short:"FO"  },
+  { code:"DP",  label:"ゲッツー",color:"#f43f5e", short:"DP"  },
+  { code:"E",   label:"エラー",  color:"#38bdf8", short:"E"   },
+  { code:"FC",  label:"野選",    color:"#a3e635", short:"FC"  },
+  { code:"FF",  label:"邪飛",    color:"#f97316", short:"FF"  },
+  { code:"SAC", label:"犠打",    color:"#c084fc", short:"SAC" },
+  { code:"SF",  label:"犠飛",    color:"#f472b6", short:"SF"  },
+];
+const DIR_CODES  = new Set(["H1","H2","H3","HR","GO","FO","FF","DP","E","FC","SAC","SF"]);
+const HIT_CODES  = new Set(["H1","H2","H3","HR"]);
+const NOAB_CODES = new Set(["BB","HBP","SAC","SF"]);
+const rOf = (code) => RESULTS.find(r => r.code === code);
+const SPECIAL_PLAYS = [
+  { code:"WP", label:"ワイルドピッチ", short:"WP", color:"#f97316", desc:"暴投 / 投手の責任" },
+  { code:"PB", label:"パスボール",     short:"PB", color:"#38bdf8", desc:"捕逸 / 捕手の責任" },
+  { code:"BK", label:"ボーク",         short:"BK", color:"#a78bfa", desc:"投手の反則投球"   },
+];
+
+const ZONES = [
+  { id:"P",  label:"投", cx:100, cy:118, r:13 },
+  { id:"C",  label:"捕", cx:100, cy:155, r:12 },
+  { id:"1B", label:"一", cx:145, cy:115, r:13 },
+  { id:"2B", label:"二", cx:118, cy:90,  r:13 },
+  { id:"SS", label:"遊", cx:82,  cy:90,  r:13 },
+  { id:"3B", label:"三", cx:55,  cy:115, r:13 },
+  { id:"LF", label:"左", cx:52,  cy:46,  r:18 },
+  { id:"CF", label:"中", cx:100, cy:32,  r:18 },
+  { id:"RF", label:"右", cx:148, cy:46,  r:18 },
+];
+function applyResult(code, bases, outs, batterName) {
+  
+  const n1=bases[0], n2=bases[1], n3=bases[2];
+  const BN = batterName || "打者";
+  let b = [null,null,null];
+  let runs = 0;
+  let scoredNames = []; 
+  let newOuts = outs;
+  let batterOn = -1; 
+
+  switch(code){
+    case "HR": {
+      scoredNames = [...[n1,n2,n3].filter(Boolean), BN];
+      runs = scoredNames.length;
+      b = [null,null,null]; batterOn=-1; break;
+    }
+    case "H3": {
+      scoredNames = [n1,n2,n3].filter(Boolean);
+      runs = scoredNames.length;
+      b = [null,null,BN]; batterOn=2; break;
+    }
+    case "H2": {
+      scoredNames = [n2,n3].filter(Boolean);
+      runs = scoredNames.length;
+      b = [null,BN,n1||null]; batterOn=1; break;
+    }
+    case "H1": {
+      if(n3){ scoredNames=[n3]; runs=1; }
+      b = [BN, n1||null, n2||null]; batterOn=0; break;
+    }
+    case "BB": case "HBP": {
+      if(!n1){
+        b=[BN,n2,n3];
+      } else if(!n2){
+        b=[BN,n1,n3];
+      } else if(!n3){
+        b=[BN,n1,n2];
+      } else {
+        
+        scoredNames=[n3]; runs=1;
+        b=[BN,n1,n2];
+      }
+      batterOn=0; break;
+    }
+    case "K": case "KL": {
+      newOuts=outs+1; b=[n1,n2,n3]; batterOn=-1; break;
+    }
+    case "KW": {
+      
+      if(!n1){       b=[BN,n2,n3]; }
+      else if(!n2){  b=[BN,n1,n3]; }
+      else if(!n3){  b=[BN,n1,n2]; }
+      else { scoredNames=[n3]; runs=1; b=[BN,n1,n2]; } 
+      batterOn=0; break;
+    }
+    case "GO": {
+      // ゴロ: 打者アウト、ランナーは進塁調整モーダルで決定
+      newOuts=outs+1;
+      b=[null,n1,n2]; batterOn=-1; break;
+    }
+    case "FO": case "FF": {
+      // フライ/ファウルフライ: 打者アウト、ランナーはそのまま（タッチアップは調整モーダルで）
+      newOuts=outs+1; b=[n1,n2,n3]; batterOn=-1; break;
+    }
+    case "DP": {
+      // 併殺: 2アウト、1塁走者と打者アウト
+      newOuts=Math.min(outs+2,3);
+      b=[null,n2,n3];
+      batterOn=-1; break;
+    }
+    case "E": {
+      // エラー: 打者出塁、ランナーは進塁調整モーダルで決定
+      b=[BN,n1,n2]; batterOn=0; break;
+    }
+    case "FC": {
+      // フィールダーズチョイス: 打者必ず1塁出塁、アウトカウント増えない
+      // ランナーは1つずつ進塁（調整モーダルで変更可能）
+      b=[BN, n1||null, n2||null]; batterOn=0; break;
+    }
+    case "SAC": {
+      // 犠打: 打者アウト、ランナーは進塁調整モーダルで決定
+      newOuts=outs+1;
+      b=[null,n1,n2]; batterOn=-1; break;
+    }
+    case "SF": {
+      // 犠飛: 打者アウト、3塁ランナー得点（犠飛は必ず3塁ランナー得点）
+      newOuts=outs+1;
+      if(n3){ scoredNames=[n3]; runs=1; }
+      b=[n1,n2,null]; batterOn=-1; break;
+    }
+    default: b=[n1,n2,n3]; break;
+  }
+
+  if(newOuts>=3){ b=[null,null,null]; scoredNames=[]; runs=0; }
+  
+  const batterScored = scoredNames.includes(BN);
+  return { newBases:b, runs, newOuts, batterOn, scoredNames, batterScored };
+}
+function FieldDiagram({ selected, onSelect }) {
+  const hx=100, hy=162, outR=138;
+  const b1=[hx+45,hy-45], b2=[hx,hy-75], b3=[hx-45,hy-45];
+  return (
+    React.createElement('svg', { viewBox: "0 0 200 170"   , style: {width:"100%",maxWidth:260,display:"block",margin:"0 auto"},}
+      , React.createElement('defs', null
+        , React.createElement('radialGradient', { id: "fg1", cx: "50%", cy: "100%", r: "90%",}
+          , React.createElement('stop', { offset: "0%", stopColor: "#1a4a1a",}), React.createElement('stop', { offset: "100%", stopColor: "#0d2e0d",})
+        )
+        , React.createElement('radialGradient', { id: "fd1", cx: "50%", cy: "80%", r: "50%",}
+          , React.createElement('stop', { offset: "0%", stopColor: "#5c3a1e",}), React.createElement('stop', { offset: "100%", stopColor: "#3d2510",})
+        )
+        , React.createElement('marker', { id: "farr", markerWidth: "6", markerHeight: "6", refX: "3", refY: "3", orient: "auto",}
+          , React.createElement('path', { d: "M0,0 L6,3 L0,6 Z"   , fill: "#fbbf24",})
+        )
+      )
+      , React.createElement('path', { d: `M${hx},${hy} L${hx-outR*0.72},${hy-outR*0.72} A${outR},${outR} 0 0,1 ${hx+outR*0.72},${hy-outR*0.72} Z`,
+        fill: "url(#fg1)", stroke: "#2d6a2d", strokeWidth: 0.5,})
+      , React.createElement('path', { d: `M${hx},${hy} L${b3[0]},${b3[1]} L${b2[0]},${b2[1]} L${b1[0]},${b1[1]} Z`,
+        fill: "url(#fd1)", stroke: "#7a5c3a", strokeWidth: 0.5,})
+      , React.createElement('line', { x1: hx, y1: hy, x2: hx-outR*0.72, y2: hy-outR*0.72, stroke: "#ffffff33", strokeWidth: 0.8, strokeDasharray: "3,2",})
+      , React.createElement('line', { x1: hx, y1: hy, x2: hx+outR*0.72, y2: hy-outR*0.72, stroke: "#ffffff33", strokeWidth: 0.8, strokeDasharray: "3,2",})
+      , [[b1,b2],[b2,b3],[b3,[hx,hy]],[[hx,hy],b1]].map(([a,bb],i)=>(
+        React.createElement('line', { key: i, x1: a[0], y1: a[1], x2: bb[0], y2: bb[1], stroke: "#ffffff22", strokeWidth: 0.6,})
+      ))
+      , React.createElement('circle', { cx: hx, cy: hy-45, r: 6, fill: "#5c3a1e", stroke: "#7a5c3a", strokeWidth: 0.5,})
+      , [b1,b2,b3].map(([bx,by],i)=>(
+        React.createElement('rect', { key: i, x: bx-4, y: by-4, width: 8, height: 8, fill: "#f5f5dc", rx: 1,
+          transform: `rotate(45,${bx},${by})`,})
+      ))
+      , React.createElement('polygon', { points: `${hx},${hy-6} ${hx+5},${hy-2} ${hx+5},${hy+3} ${hx-5},${hy+3} ${hx-5},${hy-2}`, fill: "#f5f5dc",})
+      , selected && (()=>{
+        const z=ZONES.find(z=>z.id===selected); if(!z) return null;
+        const dx=z.cx-hx, dy=z.cy-hy, d=Math.sqrt(dx*dx+dy*dy), nx=dx/d, ny=dy/d;
+        return React.createElement('line', { x1: hx+nx*18, y1: hy+ny*18, x2: hx+nx*(d-z.r-2), y2: hy+ny*(d-z.r-2),
+          stroke: "#fbbf24", strokeWidth: 2.5, strokeLinecap: "round", markerEnd: "url(#farr)",});
+      })()
+      , ZONES.map(z=>{
+        const sel=selected===z.id;
+        return (
+          React.createElement('g', { key: z.id, onClick: ()=>onSelect(z.id), style: {cursor:"pointer"},}
+            , React.createElement('circle', { cx: z.cx, cy: z.cy, r: z.r, fill: sel?"#fbbf2488":"#00000055",
+              stroke: sel?"#fbbf24":"#ffffff55", strokeWidth: sel?2:1,})
+            , React.createElement('text', { x: z.cx, y: z.cy+1, textAnchor: "middle", dominantBaseline: "middle",
+              fill: sel?"#fbbf24":"#ffffffcc", fontSize: z.r>15?9:8,
+              fontWeight: sel?"bold":"normal", fontFamily: "'Noto Sans JP',sans-serif"  ,
+              style: {pointerEvents:"none"},}, z.label)
+          )
+        );
+      })
+    )
+  );
+}
+function MiniDiamond({ bases, size=56 }) {
+  
+  const V = 100;
+  const cx = 50, cy = 52;
+  const arm = 33; 
+  const sq  = 9;  
+
+  const b2   = [cx,        cy - arm]; 
+  const b1   = [cx + arm,  cy      ]; 
+  const home = [cx,        cy + arm]; 
+  const b3   = [cx - arm,  cy      ]; 
+
+  const pts = `${b2[0]},${b2[1]} ${b1[0]},${b1[1]} ${home[0]},${home[1]} ${b3[0]},${b3[1]}`;
+
+  return (
+    React.createElement('svg', { width: size, height: size, viewBox: `0 0 ${V} ${V}`, style: {display:"block",overflow:"visible"},}
+      
+      , React.createElement('polygon', { points: pts, fill: "none", stroke: "#334155", strokeWidth: 2,})
+      
+      , React.createElement('circle', { cx: home[0], cy: home[1], r: sq * 0.85, fill: "#3b82f6",})
+      
+      , React.createElement('rect', { x: b1[0]-sq, y: b1[1]-sq, width: sq*2, height: sq*2, rx: 1.5,
+        fill: bases[0]?"#fbbf24":"#0d1f35", stroke: bases[0]?"#fbbf24":"#334155", strokeWidth: 1.5,
+        transform: `rotate(45,${b1[0]},${b1[1]})`,})
+      
+      , React.createElement('rect', { x: b2[0]-sq, y: b2[1]-sq, width: sq*2, height: sq*2, rx: 1.5,
+        fill: bases[1]?"#fbbf24":"#0d1f35", stroke: bases[1]?"#fbbf24":"#334155", strokeWidth: 1.5,
+        transform: `rotate(45,${b2[0]},${b2[1]})`,})
+      
+      , React.createElement('rect', { x: b3[0]-sq, y: b3[1]-sq, width: sq*2, height: sq*2, rx: 1.5,
+        fill: bases[2]?"#fbbf24":"#0d1f35", stroke: bases[2]?"#fbbf24":"#334155", strokeWidth: 1.5,
+        transform: `rotate(45,${b3[0]},${b3[1]})`,})
+      
+      , [[b1,0,8,-12],[b2,1,0,-14],[b3,2,-8,-12]].map(([[bx,by],idx,dx,dy])=>{
+        const runner = bases[idx];
+        if(!runner) return null;
+        const name = typeof runner==="string" ? runner : "●";
+        const shortName = name.length>4 ? name.slice(0,4) : name;
+        return (
+          React.createElement('g', { key: idx,}
+            , React.createElement('circle', { cx: bx, cy: by, r: sq*0.55, fill: "#fbbf24", opacity: 0.9,})
+            , React.createElement('text', { x: bx+dx*0.4, y: by+dy*0.6, textAnchor: "middle",
+              fontSize: 5.5, fill: "#0a1628", fontWeight: "bold", dy: "0.35em",}
+              , shortName
+            )
+          )
+        );
+      })
+    )
+  );
+}
+const BASE_LABELS = ["1塁","2塁","3塁","ホームイン🏠","アウト❌"];
+const BASE_COLORS = ["#fbbf24","#22c55e","#f87171","#f97316","#94a3b8"];
+function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel }) {
+  
+  // postBasesで見つからないランナーのデフォルト先
+  // H1/H2/H3/E等はscored、GO/FO等はout
+  const defaultToScored = ["H1","H2","H3","HR","E","BB","HBP","KW","FC"].includes(batterOut === false ? "H1" : "GO");
+  // batterOutフラグを使って判定
+  const runnerDefaultTo = batterOut ? "out" : "scored";
+
+  const buildRunners = () => {
+    const list = [];
+
+    // 既存ランナーの処理
+    preBases.forEach((name, i) => {
+      if (!name) return;
+      // postBasesで同じ名前を探す
+      let to = null;
+      for (let j = 0; j < 3; j++) {
+        if (postBases[j] === name) { to = j; break; }
+      }
+      // 見つからない場合: batterOutならout、そうでなければscored
+      if (to === null) to = runnerDefaultTo;
+      list.push({ name, from: i, to });
+    });
+
+    // 打者の処理
+    if (initBatterScored) {
+      // HR: 打者得点
+      list.push({ name: batterName, from: "batter", to: "scored" });
+    } else if (batterOut) {
+      // アウトコード: 打者はデフォルトアウトだが変更可能（例: ゴロでランナーアウト→打者1塁のケース）
+      list.push({ name: batterName, from: "batter", to: "out" });
+    } else {
+      // 出塁: postBasesから打者の塁を探す
+      let found = false;
+      for (let j = 0; j < 3; j++) {
+        if (postBases[j] === batterName) {
+          list.push({ name: batterName, from: "batter", to: j });
+          found = true; break;
+        }
+      }
+      if (!found) list.push({ name: batterName, from: "batter", to: 0 });
+    }
+
+    return list;
+  };
+
+  const [runners, setRunners] = useState(buildRunners);
+  const [adjOuts, setAdjOuts] = useState(outs);
+
+
+  
+  const cycleRunner = (idx) => {
+    setRunners(rs => rs.map((r, i) => {
+      if (i !== idx) return r;
+      const cycle = [0, 1, 2, "scored", "out"];
+      const cur = cycle.indexOf(r.to);
+      const next = cycle[(cur + 1) % cycle.length];
+      return { ...r, to: next };
+    }));
+  };
+
+  
+  const adjBases = [null, null, null];
+  runners.forEach(r => {
+    if (typeof r.to === "number") adjBases[r.to] = r.name;
+  });
+  const scoredNames = runners.filter(r => r.to === "scored").map(r => r.name);
+  const adjRuns = scoredNames.length;
+
+  const fromLabel = (from) => from === "batter" ? "打者" : BASE_LABELS[from];
+  const toLabel   = (to)   => typeof to === "number" ? BASE_LABELS[to] : (to === "scored" ? "得点🏠" : "アウト❌");
+  const toColor   = (to)   => typeof to === "number" ? BASE_COLORS[to] : (to === "scored" ? "#f97316" : "#64748b");
+
+  return (
+    React.createElement('div', { style: S.overlay, onClick: onCancel,}
+      , React.createElement('div', { style: {...S.mBox, maxWidth:380, maxHeight:"92vh", overflowY:"auto"}, onClick: e=>e.stopPropagation(),}
+        , React.createElement('div', { style: {...S.mt, marginBottom:4},}, "⚙️ 進塁を手動調整" )
+        , React.createElement('div', { style: {fontSize:11,color:"#94a3b8",marginBottom:14},}, "各選手の行き先をタップして変更できます"
+
+        )
+
+        
+        , runners.length > 0 ? (
+          React.createElement('div', { style: {marginBottom:16},}
+            , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "選手の行き先")
+            , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:6},}
+              , runners.map((r, i) => (
+                React.createElement('div', { key: i, style: {display:"flex",alignItems:"center",gap:8,
+                  background:"#0a1628",borderRadius:8,padding:"8px 10px",
+                  border:"1px solid #1e3a5f"},}
+                  
+                  , React.createElement('div', { style: {flex:1,minWidth:0},}
+                    , React.createElement('div', { style: {fontSize:13,fontWeight:700,color:"#e2e8f0",
+                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},}
+                      , r.name
+                    )
+                    , React.createElement('div', { style: {fontSize:10,color:"#475569"},}
+                      , fromLabel(r.from), " から"
+                    )
+                  )
+                  
+                  , React.createElement('span', { style: {color:"#334155",fontSize:14},}, "→")
+                  
+                  , React.createElement('button', { onClick: () => cycleRunner(i),
+                    style: {padding:"6px 12px",borderRadius:8,cursor:"pointer",
+                      fontWeight:700,fontSize:12,minWidth:84,textAlign:"center",
+                      background: `${toColor(r.to)}22`,
+                      border: `1.5px solid ${toColor(r.to)}`,
+                      color: toColor(r.to),
+                      touchAction:"manipulation"},}
+                    , toLabel(r.to)
+                  )
+                )
+              ))
+            )
+            , React.createElement('div', { style: {fontSize:10,color:"#334155",marginTop:6,textAlign:"center"},}, "行き先をタップすると 1塁→2塁→3塁→得点→アウト と切り替わります"
+
+            )
+          )
+        ) : (
+          React.createElement('div', { style: {fontSize:12,color:"#475569",marginBottom:16,textAlign:"center",padding:"12px 0"},}, "塁上にランナーなし・打者アウト"
+
+          )
+        )
+
+        
+        , React.createElement('div', { style: {background:"#0a1628",borderRadius:8,padding:"10px 14px",
+          marginBottom:14,border:"1px solid #1e4570",display:"flex",gap:16,alignItems:"center"},}
+          , React.createElement('div', { style: {textAlign:"center"},}
+            , React.createElement('div', { style: {fontSize:10,color:"#64748b",marginBottom:2},}, "得点")
+            , React.createElement('div', { style: {fontSize:32,fontWeight:900,
+              color:adjRuns>0?"#f97316":"#475569",lineHeight:1},}, adjRuns)
+          )
+          , React.createElement('div', { style: {flex:1},}
+            , scoredNames.length>0 ? scoredNames.map((n,i)=>(
+              React.createElement('div', { key: i, style: {fontSize:12,color:"#fbbf24",fontWeight:700},}, "🏠 " , n)
+            )) : (
+              React.createElement('div', { style: {fontSize:12,color:"#334155"},}, "得点なし")
+            )
+          )
+          , React.createElement('div', { style: {textAlign:"center"},}
+            , React.createElement('div', { style: {fontSize:10,color:"#64748b",marginBottom:2},}, "塁上")
+            , React.createElement(MiniDiamond, { bases: adjBases, size: 52,})
+          )
+        )
+
+        
+        , React.createElement('div', { style: {marginBottom:18},}
+          , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "アウトカウント（打席後）"
+            , React.createElement('span', { style: {fontSize:10,color:"#475569",fontWeight:400,marginLeft:6},}, "※打者が出塁した場合は1つ減らしてください"
+            )
+          )
+          , React.createElement('div', { style: {display:"flex",gap:8,justifyContent:"center"},}
+            , [0,1,2,3].map(n=>(
+              React.createElement('button', { key: n, onClick: ()=>setAdjOuts(n), style: {
+                width:48,height:38,borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15,
+                background:adjOuts===n?"#dc2626":"#1e3a5f",
+                border:`2px solid ${adjOuts===n?"#dc2626":"#2a6496"}`,color:"#fff",
+                touchAction:"manipulation",
+              },}, n)
+            ))
+          )
+        )
+
+        , React.createElement('button', { onClick: ()=>onConfirm(adjBases, scoredNames, adjOuts),
+          style: {...sBt("#16a34a"),width:"100%",padding:"11px",fontSize:14,fontWeight:700,marginBottom:6},}, "✅ "
+           , adjRuns>0?`${adjRuns}点 — `:"", "この内容で記録する"
+        )
+        , React.createElement('button', { onClick: onCancel, style: S.cBtn,}, "キャンセル")
+      )
+    )
+  );
+}
+const norm   = (e) => (typeof e==="object"&&e!==null)?e:{code:e};
+const eShort = (e) => { const n=norm(e); return (_optionalChain([rOf, 'call', _2 => _2(n.code), 'optionalAccess', _3 => _3.short])||n.code)+(n.dir?`(${n.dir})`:""); };
+const eRuns  = (list) => list.reduce((s,e)=>s+(norm(e).runs||0),0);
+const toList = (ab,inn) => Array.isArray(ab[inn])?ab[inn]:(ab[inn]?[ab[inn]]:[]);
+
+const makePlayer  = (i) => ({ id:i, name:`選手${i}`, pos:String(i<=9?i:"代"), atBats:{}, rbi:0, sb:0, cs:0 });
+const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:0,
+  
+  autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0,
+  manualOverride:false, 
+});
+const makeLineup  = (n=DEFAULT_PLAYERS) => Array.from({length:n},(_,i)=>makePlayer(i+1));
+const makePitchers= () => Array.from({length:5},(_,i)=>makePitcher(i+1));
+const emptyScore  = () => Object.fromEntries(INNINGS.map(i=>[i,""]));
+const calcTotal   = (s) => Object.values(s).reduce((a,v)=>a+(parseInt(v)||0),0);
+
+const recomputeScores = (g) => {
+  const aScore={...g.awayScore}, hScore={...g.homeScore};
+  INNINGS.forEach(inn=>{
+    let ar=0,hr=0;
+    g.awayLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ ar+=norm(e).runs||0; }));
+    g.homeLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ hr+=norm(e).runs||0; }));
+    aScore[inn]=ar; hScore[inn]=hr;
+  });
+  return {awayScore:aScore, homeScore:hScore};
+};
+
+const computeStats = (players) => players.map(p=>{
+  let ab=0,h=0,hr=0,bb=0,hbp=0,k=0,tb=0,r=0,sac=0,sf=0;
+  Object.values(p.atBats).flat().forEach(e=>{
+    const ne=norm(e); const code=ne.code; if(!code) return;
+    if(!NOAB_CODES.has(code)) ab++;
+    if(HIT_CODES.has(code)){h++;tb+=code==="H1"?1:code==="H2"?2:code==="H3"?3:4;}
+    if(code==="HR") hr++;
+    if(code==="BB") bb++;
+    if(code==="HBP") hbp++;
+    if(code==="K"||code==="KL"||code==="KW") k++;
+    if(code==="SAC") sac++;
+    if(code==="SF")  sf++;
+    if(ne.scored) r++;
+  });
+  const pa = ab + bb + hbp + sac + sf;
+  return {...p,_pa:pa,_ab:ab,_h:h,_hr:hr,_bb:bb,_hbp:hbp,_k:k,_tb:tb,_r:r,_avg:ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---"};
+});
+const computePitcherStats = (g) => {
+  const result = { away:[], home:[] };
+
+  ["away","home"].forEach(defTeam=>{
+    const offTeam = defTeam==="away" ? "home" : "away";
+    const pitchers = g[defTeam+"Pitchers"];
+    const pitcherLog = g[defTeam+"PitcherLog"]||[];
+    const lineup = g[offTeam+"Lineup"];
+
+    
+    
+    
+    const currentPIdx = g[defTeam+"PitcherIdx"]||0;
+
+    
+    const allAtBats = []; 
+    INNINGS.forEach(inn=>{
+      ["top","bottom"].forEach(half=>{
+        
+        const battingTeam = half==="top" ? "away" : "home";
+        if(battingTeam !== offTeam) return;
+        lineup.forEach((p,pi)=>{
+          toList(p.atBats,inn).forEach((e,ei)=>{
+            allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:norm(e)});
+          });
+        });
+      });
+    });
+
+    
+    const stats = pitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, _outsGot:0}));
+
+    
+    
+    const log = pitcherLog.length>0 ? pitcherLog : [{pitcherIdx:0, fromInning:1, fromHalf:"top", outsAtStart:0}];
+
+    allAtBats.forEach(ab=>{
+      
+      
+      let activePIdx = log[0].pitcherIdx;
+      for(let i=0;i<log.length;i++){
+        const l = log[i];
+        const lInn = l.fromInning, lHalf = l.fromHalf;
+        const abInn = ab.inning, abHalf = ab.half;
+        
+        const logTime = lInn*2 + (lHalf==="top"?0:1);
+        const abTime  = abInn*2 + (abHalf==="top"?0:1);
+        if(logTime <= abTime) activePIdx = l.pitcherIdx;
+      }
+
+      const ps = stats[activePIdx];
+      if(!ps) return;
+      const code = ab.entry.code;
+      if(HIT_CODES.has(code)) ps.autoH++;
+      if(code==="BB") ps.autoBb++;
+      if(code==="K"||code==="KL"||code==="KW") ps.autoK++;
+      
+      ps.autoEr += ab.entry.runs||0;
+    });
+
+    
+    
+    const OUT_CODES = new Set(["K","KL","GO","FO","FF","SAC","SF"]);
+    allAtBats.forEach(ab=>{
+      let activePIdx = log[0].pitcherIdx;
+      for(let i=0;i<log.length;i++){
+        const l = log[i];
+        const logTime = l.fromInning*2+(l.fromHalf==="top"?0:1);
+        const abTime  = ab.inning*2+(ab.half==="top"?0:1);
+        if(logTime<=abTime) activePIdx = l.pitcherIdx;
+      }
+      const ps = stats[activePIdx];
+      if(!ps) return;
+      const code = ab.entry.code;
+      if(OUT_CODES.has(code)) ps._outsGot += 1;
+      if(code==="DP") ps._outsGot += 1; 
+    });
+
+    stats.forEach(ps=>{
+      ps.autoIp = Math.floor(ps._outsGot/3)*10 + (ps._outsGot%3); 
+    });
+
+    result[defTeam] = stats;
+  });
+  return result;
+};
+
+const newGame = () => ({
+  id:Date.now(),
+  date:new Date().toISOString().split("T")[0],
+  venue:"", awayTeam:"ビジターチーム", homeTeam:"ホームチーム",
+  awayScore:emptyScore(), homeScore:emptyScore(),
+  awayLineup:makeLineup(), homeLineup:makeLineup(),
+  awayPitchers:makePitchers(), homePitchers:makePitchers(),
+  defenseLog:[], 
+  outs:0, bases:[null,null,null], inning:1, half:"top", log:[], runs:[], 
+  finished:false, endReason:"", endInning:null, endNote:"",
+  awayBatterIdx:0, homeBatterIdx:0, 
+  awayPitcherIdx:0, homePitcherIdx:0, 
+  
+  awayPitcherLog:[], homePitcherLog:[],
+});
+
+// Firebase helpers
+let fbDB = null;
+const genGameId = () => Math.random().toString(36).slice(2,8).toUpperCase();
+const fbInit = () => {
+  if (fbDB) return true;
+  try {
+    const cfg = (typeof window!=="undefined") && window.__FB_CONFIG__;
+    if (!cfg) { console.warn("[FB] No config"); return false; }
+    const fb = (typeof window!=="undefined") && window.firebase;
+    if (!fb) { console.warn("[FB] No SDK"); return false; }
+    if (typeof fb.database !== "function") { console.warn("[FB] No database module"); return false; }
+    if (!fb.apps || !fb.apps.length) fb.initializeApp(cfg);
+    fbDB = fb.database();
+    console.log("[FB] initialized OK");
+    return true;
+  } catch(e) { console.error("[FB] init error:", e); return false; }
+};
+const fbPush = (id, data) => {
+  if (!fbDB || !id) return;
+  try {
+    var payload = Object.assign({}, data, {_ts: Date.now()});
+    fbDB.ref("games/"+id).set(payload);
+    console.log("[FB] pushed to games/"+id, new Date().toLocaleTimeString());
+  } catch(e) { console.error("[FB] push error:", e); }
+};
+const fbSubscribe = (id, cb) => {
+  if (!fbDB || !id) return ()=>{};
+  const ref = fbDB.ref("games/"+id);
+  ref.on("value", s => { if(s&&s.exists()) cb(s.val()); });
+  return () => ref.off("value");
+};
+const fbUnsub = (id) => { if(fbDB&&id) try{fbDB.ref("games/"+id).off("value");}catch(e){} };
+
+const SKEY = "bb_v7";
+const lsLoad = () => { 
+  try {
+    const raw = localStorage.getItem(SKEY);
+    if (!raw) return {};
+    if (raw.length > 500000) { localStorage.removeItem(SKEY); return {}; } // 500KB超はクリア
+    return JSON.parse(raw) || {};
+  } catch(e2) { return {}; }
+};
+const lsSave = (d) => { 
+  try {
+    const s = JSON.stringify(d);
+    if (s.length > 500000) return; // 500KB超は保存しない
+    localStorage.setItem(SKEY, s);
+  } catch(e3) {}
+};
+
+function App() {
+  const [tab, setTab] = React.useState('score');
+  document.getElementById('dbg').textContent = 'App render OK tab=' + tab;
+  return React.createElement('div', {style:{color:'white',padding:20,fontSize:20}},
+    'アプリ起動成功！',
+    React.createElement('button', {
+      onClick: function(){ setTab('sync'); },
+      style: {display:'block', marginTop:20, padding:10, fontSize:16}
+    }, '配信タブを開く'),
+    React.createElement('div', null, '現在のタブ: ' + tab)
+  );
+}
+
+try {
+  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+  document.getElementById('dbg').textContent = 'ReactDOM OK';
+} catch(e) {
+  document.getElementById('root').innerHTML = '<div style="color:white;padding:20px"><h2>エラー</h2><pre>' + (e.stack||e.message) + '</pre></div>';
+}
+
+</script>
+</body>
+</html>

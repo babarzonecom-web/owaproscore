@@ -1295,7 +1295,9 @@ function App() {
     var outs = vg ? (vg.outs||0) : 0;
     var bases = vg ? (vg.bases||[null,null,null]) : [null,null,null];
     var awayScore = 0; var homeScore = 0;
-    if (vg && vg.score) { awayScore = vg.score.away||0; homeScore = vg.score.home||0; }
+    var asc = (vg && vg.awayScore)||{}; var hsc = (vg && vg.homeScore)||{};
+    for(var k in asc) awayScore += parseInt(asc[k])||0;
+    for(var k in hsc) homeScore += parseInt(hsc[k])||0;
     return React.createElement('div', {style:{background:'#080f1e',minHeight:'100vh',color:'white',padding:16,fontFamily:'sans-serif'}},
       React.createElement('div', {style:{textAlign:'center',marginBottom:16}},
         React.createElement('div', {style:{fontSize:12,color:'#93c5fd',marginBottom:8}}, '👁 観戦中: '+syncGameId),

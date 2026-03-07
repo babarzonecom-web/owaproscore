@@ -664,6 +664,7 @@ function App() {
   const [syncMode,   setSyncMode]   = useState("off");
   const [syncGameId, setSyncGameId] = useState("");
   const [viewerCode, setViewerCode] = useState("");
+  const [viewerGame, setViewerGame] = useState(null);
   const isViewer = syncMode==="viewer";
   const isHost   = syncMode==="host";
   const [modal, setModal] = useState(null);
@@ -717,7 +718,7 @@ function App() {
           var d = snap.val();
           if(!d || typeof d !== 'object') return;
           delete d._ts;
-          setStorage(function(p){ return Object.assign({},p,{currentGame:d}); });
+          setViewerGame(d);
         } catch(e2){ showToast("受信エラー: "+e2.message); }
       });
       setSyncGameId(uid);
@@ -1284,7 +1285,7 @@ function App() {
   
   // 観戦モード: シンプルな表示のみ（重いUIを描画しない）
   if (isViewer) {
-    var vg = game;
+    var vg = viewerGame || game;
     var inning = vg ? (vg.inning||1) : 1;
     var topBot = vg ? (vg.topBot||'表') : '表';
     var outs = vg ? (vg.outs||0) : 0;

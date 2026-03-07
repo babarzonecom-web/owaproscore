@@ -813,12 +813,21 @@ function App() {
     return s;
   });
   const [tab,   setTab]   = useState("score");
-  const [syncMode,   setSyncMode]   = useState("off");
+  const syncModeRef = React.useRef("off");
+  const [isViewing,  setIsViewing]  = useState(false);
+  const [isHosting,  setIsHosting]  = useState(false);
+  const setSyncMode = (v) => {
+    syncModeRef.current = v;
+    if(v==="viewer"){ setIsViewing(true); setIsHosting(false); }
+    else if(v==="host"){ setIsHosting(true); setIsViewing(false); }
+    else { setIsViewing(false); setIsHosting(false); }
+  };
+  const syncMode = syncModeRef.current;
   const [syncGameId, setSyncGameId] = useState("");
   const [viewerCode, setViewerCode] = useState("");
   const [viewerGame, setViewerGame] = useState(null);
-  const isViewer = syncMode==="viewer";
-  const isHost   = syncMode==="host";
+  const isViewer = isViewing;
+  const isHost   = isHosting;
   const [modal, setModal] = useState(null);
   
   const [selDir, setSelDir] = useState(null);
@@ -849,11 +858,11 @@ function App() {
   const startHosting = ()=>{
     if(!fbInit()){showToast("Firebase未設定");return;}
     const id=genGameId();
-    setSyncGameId(id); setSyncMode("host");
+    setSyncGameId(id); setIsHosting(true); syncModeRef.current="host";
     fbPush(id, storage.currentGame);
     showToast("配信開始！コード: "+id);
   };
-  const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
+  const stopHosting = ()=>{ setIsHosting(false); setSyncGameId(""); showToast("配信終了"); };
   const startViewing = (id)=>{
     try {
       var uid = (id||'').trim().toUpperCase();
@@ -874,16 +883,16 @@ function App() {
         } catch(e2){ showToast("受信エラー: "+e2.message); }
       });
       setSyncGameId(uid);
-      setSyncMode("viewer");
       setTab("score");
       showToast("観戦開始: "+uid);
+      setTimeout(function(){ setIsViewing(true); }, 50);
     } catch(e){ showToast("エラー: "+e.message); }
   };
   const stopViewing = ()=>{
     if(syncGameId && fbDB) {
       try { fbDB.ref("games/"+syncGameId).off("value"); } catch(e){}
     }
-    setSyncMode("off"); setSyncGameId(""); showToast("観戦終了");
+    setIsViewing(false); setSyncGameId(""); showToast("観戦終了");
   };
 
   

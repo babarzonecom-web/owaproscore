@@ -679,13 +679,6 @@ function App() {
 
   useEffect(()=>lsSave(storage),[storage]);
 
-  // viewerGameが更新されたらstorageに反映（レンダー後に実行）
-  useEffect(()=>{
-    if(isViewer && viewerGame) {
-      setStorage(function(p){ return Object.assign({},p,{currentGame:viewerGame}); });
-    }
-  },[viewerGame]);
-
   useEffect(()=>{
     if(isHost && syncGameId) {
       if(!fbInit()){ showToast("Firebase未設定"); return; }

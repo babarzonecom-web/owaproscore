@@ -712,25 +712,29 @@ function App() {
       if(!fb){ showToast("Firebase SDKなし"); return; }
       if(!fb.apps || !fb.apps.length) fb.initializeApp(cfg);
       if(!fbDB) fbDB = fb.database();
-      fbDB.ref("games/"+uid).on("value", function(snap){
-        try {
-          if(!snap||!snap.exists()) return;
-          var d = snap.val();
-          if(!d || typeof d !== 'object') return;
-          delete d._ts;
-          setViewerGame(d);
-        } catch(e2){ showToast("受信エラー: "+e2.message); }
-      });
       setSyncGameId(uid);
       setSyncMode("viewer");
       showToast("観戦開始: "+uid);
+      // ポーリングで3秒ごとに取得
+      if(window.__viewerTimer) clearInterval(window.__viewerTimer);
+      window.__viewerTimer = setInterval(function(){
+        fbDB.ref("games/"+uid).once("value").then(function(snap){
+          try {
+            if(!snap||!snap.exists()) return;
+            var d = snap.val();
+            if(!d || typeof d !== 'object') return;
+            delete d._ts;
+            setViewerGame(d);
+          } catch(e2){}
+        }).catch(function(){});
+      }, 3000);
     } catch(e){ showToast("エラー: "+e.message); }
   };
   const stopViewing = ()=>{
     if(syncGameId && fbDB) {
       try { fbDB.ref("games/"+syncGameId).off("value"); } catch(e){}
     }
-    setSyncMode("off"); setSyncGameId(""); showToast("観戦終了");
+    if(window.__viewerTimer){clearInterval(window.__viewerTimer);window.__viewerTimer=null;} setSyncMode("off"); setSyncGameId(""); showToast("観戦終了");
   };
 
   

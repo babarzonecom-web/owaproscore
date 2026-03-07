@@ -679,6 +679,13 @@ function App() {
 
   useEffect(()=>lsSave(storage),[storage]);
 
+  // viewerGameが更新されたらstorageに反映（レンダー後に実行）
+  useEffect(()=>{
+    if(isViewer && viewerGame) {
+      setStorage(function(p){ return Object.assign({},p,{currentGame:viewerGame}); });
+    }
+  },[viewerGame]);
+
   useEffect(()=>{
     if(isHost && syncGameId) {
       if(!fbInit()){ showToast("Firebase未設定"); return; }
@@ -1288,19 +1295,21 @@ function App() {
     var vg = viewerGame || game;
     var inning = vg ? (vg.inning||1) : 1;
     var topBot = vg ? (vg.topBot||'表') : '表';
-    var outs = vg ? (vg.outs||0) : 0;
+    var vouts = vg ? (vg.outs||0) : 0;
     var bases = vg ? (vg.bases||[null,null,null]) : [null,null,null];
-    var awayScore = 0; var homeScore = 0;
-    if (vg && vg.score) { awayScore = vg.score.away||0; homeScore = vg.score.home||0; }
+    var awayScore = vg && vg.awayScore ? calcTotal(vg.awayScore) : 0;
+    var homeScore = vg && vg.homeScore ? calcTotal(vg.homeScore) : 0;
+    var awayName = vg ? (vg.awayTeam||'アウェイ') : 'アウェイ';
+    var homeName = vg ? (vg.homeTeam||'ホーム') : 'ホーム';
     return React.createElement('div', {style:{background:'#080f1e',minHeight:'100vh',color:'white',padding:16,fontFamily:'sans-serif'}},
       React.createElement('div', {style:{textAlign:'center',marginBottom:16}},
         React.createElement('div', {style:{fontSize:12,color:'#93c5fd',marginBottom:8}}, '👁 観戦中: '+syncGameId),
         React.createElement('button', {onClick:stopViewing, style:{background:'#475569',color:'white',border:'none',borderRadius:8,padding:'6px 14px',fontSize:12,cursor:'pointer'}}, '■ 観戦終了')
       ),
       React.createElement('div', {style:{background:'#0f1e35',borderRadius:12,padding:16,marginBottom:12,textAlign:'center'}},
-        React.createElement('div', {style:{fontSize:14,color:'#94a3b8',marginBottom:8}}, (vg&&vg.awayTeam)||'アウェイ'+' vs '+(vg&&vg.homeTeam||'ホーム')),
+        React.createElement('div', {style:{fontSize:14,color:'#94a3b8',marginBottom:8}}, awayName+' vs '+homeName),
         React.createElement('div', {style:{fontSize:48,fontWeight:900,letterSpacing:8}}, awayScore+' - '+homeScore),
-        React.createElement('div', {style:{fontSize:14,color:'#7dd3fc',marginTop:8}}, inning+'回'+topBot+' '+outs+'アウト')
+        React.createElement('div', {style:{fontSize:14,color:'#7dd3fc',marginTop:8}}, inning+'回'+topBot+' '+vouts+'アウト')
       ),
       React.createElement('div', {style:{background:'#0f1e35',borderRadius:12,padding:16,textAlign:'center'}},
         React.createElement('div', {style:{fontSize:12,color:'#94a3b8',marginBottom:8}}, 'ランナー'),

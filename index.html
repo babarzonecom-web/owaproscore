@@ -135,8 +135,12 @@ function applyResult(code, bases, outs, batterName) {
     }
     case "GO": {
       // ゴロ: 打者アウト、ランナーは進塁調整モーダルで決定
+      // n3は得点or残塁の可能性があるのでpostBasesに含める
       newOuts=outs+1;
-      b=[null,n1,n2]; batterOn=-1; break;
+      b=[null,n1,n2]; 
+      // 3塁ランナーがいる場合はscored扱いでモーダルに渡す（調整可能）
+      if(n3){ scoredNames=[n3]; runs=1; }
+      batterOn=-1; break;
     }
     case "FO": case "FF": {
       // フライ/ファウルフライ: 打者アウト、ランナーはそのまま（タッチアップは調整モーダルで）
@@ -160,7 +164,9 @@ function applyResult(code, bases, outs, batterName) {
     case "SAC": {
       // 犠打: 打者アウト、ランナーは進塁調整モーダルで決定
       newOuts=outs+1;
-      b=[null,n1,n2]; batterOn=-1; break;
+      b=[null,n1,n2];
+      if(n3){ scoredNames=[n3]; runs=1; }
+      batterOn=-1; break;
     }
     case "SF": {
       // 犠飛: 打者アウト、3塁ランナー得点（犠飛は必ず3塁ランナー得点）
@@ -287,8 +293,13 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
   // postBasesで見つからないランナーのデフォルト先
   // H1/H2/H3/E等はscored、GO/FO等はout
   const defaultToScored = ["H1","H2","H3","HR","E","BB","HBP","KW","FC"].includes(batterOut === false ? "H1" : "GO");
-  // batterOutフラグを使って判定
-  const runnerDefaultTo = batterOut ? "out" : "scored";
+  // postBasesで見つからないランナーのデフォルト先
+  // GO/FO等で打者アウトでもランナーは進塁することが多い→デフォルトscoredに
+  // K/KL等で明らかにランナーも動かない場合はout
+  const runnerDefaultTo = ["K","KL","FO","FF"].includes(batterOut ? "GO" : "H1") ? "out" : "scored";
+  // 実際にはbatterOutフラグだけでなくコードで判定する必要があるが、
+  // モーダルでタップ変更可能なのでデフォルトをscoredにしておく
+  const runnerDefaultToCalc = "scored";
 
   const buildRunners = () => {
     const list = [];
@@ -302,7 +313,7 @@ function RunnerAdjustModal({ preBases, postBases, batterName, batterScored: init
         if (postBases[j] === name) { to = j; break; }
       }
       // 見つからない場合: batterOutならout、そうでなければscored
-      if (to === null) to = runnerDefaultTo;
+      if (to === null) to = runnerDefaultToCalc;
       list.push({ name, from: i, to });
     });
 
@@ -921,21 +932,24 @@ function App() {
   const recordSpecialPlay = useCallback((team, code, advanceBases, runs)=>{
     const sp = SPECIAL_PLAYS.find(p=>p.code===code);
     mutGame(g=>{
-      const newBases = advanceBases !== undefined ? advanceBases : g.bases;
-      const newScore = recomputeScores({...g,
-        [team+"Lineup"]: g[team+"Lineup"].map((p,i)=>{
-          
-          return p;
-        })
-      });
-      
-      const scoreKey = team+"Score";
+      // advanceBasesはbool配列(true=ランナー残る)またはbases配列
+      // SpecialPlayModalからはbool配列が来る: trueなら元の塁のランナーを保持
+      var newBases;
+      if(Array.isArray(advanceBases) && advanceBases.length===3 && typeof advanceBases[0]==='boolean') {
+        // bool配列: trueの塁は元のランナーを保持、falseはnull（得点or消去）
+        newBases = advanceBases.map(function(keep,i){ return keep ? g.bases[i] : null; });
+      } else if(advanceBases !== undefined) {
+        newBases = advanceBases;
+      } else {
+        newBases = g.bases;
+      }
+      const scoreKey = team+'Score';
       const inn = g.inning;
       const prevRuns = parseInt(g[scoreKey][inn])||0;
       const scores = runs>0 ? {...g[scoreKey],[inn]:prevRuns+runs} : g[scoreKey];
       const log=[{
-        ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-        msg:`【${g[team+"Team"]}】${_optionalChain([sp, 'optionalAccess', _16 => _16.label])||code}${runs>0?` [${runs}点]`:""}`
+        ts:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
+        msg:`【${g[team+'Team']}】${_optionalChain([sp, 'optionalAccess', _16 => _16.label])||code}${runs>0?` [${runs}点]`:''}`
       },...g.log.slice(0,99)];
       return {...g,
         [scoreKey]:scores,
@@ -1301,8 +1315,8 @@ function App() {
     for(var k in hsc) homeScore += parseInt(hsc[k])||0;
     var side  = half==='top' ? 'away' : 'home';
     var pside = half==='top' ? 'home' : 'away';
-    var lu    = (vg && vg[side+'Lineup'])  || [];
-    var plu   = (vg && vg[pside+'Lineup']) || [];
+    var lu    = (vg && vg[side+'Lineup'])    || [];
+    var plu   = (vg && vg[pside+'Pitchers']) || [];
     var bi    = (vg && vg[side+'BatterIdx'])   || 0;
     var pi2   = (vg && vg[pside+'PitcherIdx']) || 0;
     var bat   = lu[bi]  || {};

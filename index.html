@@ -487,10 +487,12 @@ const calcTotal   = (s) => Object.values(s).reduce((a,v)=>a+(parseInt(v)||0),0);
 const recomputeScores = (g) => {
   const aScore={...g.awayScore}, hScore={...g.homeScore};
   INNINGS.forEach(inn=>{
-    let ar=0,hr=0;
-    g.awayLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ ar+=norm(e).runs||0; }));
-    g.homeLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ hr+=norm(e).runs||0; }));
-    aScore[inn]=ar; hScore[inn]=hr;
+    let ar=0, hr=0, aHas=false, hHas=false;
+    g.awayLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ ar+=norm(e).runs||0; aHas=true; }));
+    g.homeLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ hr+=norm(e).runs||0; hHas=true; }));
+    // 打席がある回だけスコアをセット（まだ攻撃していない回は""のまま）
+    if(aHas) aScore[inn]=ar;
+    if(hHas) hScore[inn]=hr;
   });
   return {awayScore:aScore, homeScore:hScore};
 };
@@ -837,7 +839,7 @@ function App() {
       
       const snap = JSON.parse(JSON.stringify(s.currentGame));
       const newGame = fn(s.currentGame);
-      const newUndoStack = [snap, ...(s.undoStack||[])].slice(0,5);
+      const newUndoStack = [snap, ...(s.undoStack||[])];
       return {...s, currentGame:newGame, undoStack:newUndoStack};
     });
   },[]);
@@ -1086,9 +1088,9 @@ function App() {
   },[mutGame]);
 
   
-  const openNew     = (team,pidx,inning) => { setSelDir(null); setModal({team,pidx,inning,step:"result"}); };
+  const openNew     = (team,pidx,inning) => { setSelDir(null); setTab("score"); setModal({team,pidx,inning,step:"result"}); };
   const openSB      = (team,pidx)        => setModal({team,pidx,step:"sb"});
-  const openEdit    = (team,pidx,inning) => { setSelDir(null); setModal({team,pidx,inning,step:"edit_list"}); };
+  const openEdit    = (team,pidx,inning) => { setSelDir(null); setTab("score"); setModal({team,pidx,inning,step:"edit_list"}); };
   const openSpecial = (team)             => setModal({team,step:"special"});
   
   const openCurrentBatter = (team,inning) => {
@@ -1230,13 +1232,32 @@ function App() {
       const outPlayer = g[lk][outIdx];
       const lineup = g[lk].map((p,i)=>{
         if(i!==outIdx) return p;
-        return {...p, name:newName, pos:newPos, subbed:true};
+        // 元の選手の記録(atBats等)はそのまま保持し、名前・ポジションだけ新選手に
+        // ただしatBatsは元選手のものなので、新選手は空のatBatsで開始
+        const newPlayer = {
+          ...makePlayer(p.order||outIdx+1),  // 新選手は空記録
+          name: newName,
+          pos: newPos,
+          subbed: true,
+          subNote: reason||"",
+          prevName: outPlayer.name,  // 元選手名を記録
+        };
+        // 元選手の記録はそのまま残し、新選手を上書き
+        // lineup上は新選手に入れ替え（元選手のatBatsは消える→元選手オブジェクトを別途保存）
+        return {...p, // 元選手のatBats等を引き継ぐためのベース
+          // 元選手記録を_subOutとして退避
+          _subOut: {name:outPlayer.name, pos:outPlayer.pos, atBats:p.atBats, sb:p.sb, cs:p.cs, run:p.run},
+          // 新選手の記録は空から
+          name: newName, pos: newPos, subbed: true, subNote: reason||"",
+          prevName: outPlayer.name,
+          atBats: {}, sb:0, cs:0, run:0,
+        };
       });
       const ts = new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"});
       
       const log=[{
         ts,
-        msg:`【${g[team+"Team"]}】守備交代: ${outPlayer.name}(${outPlayer.pos||"-"}) → ${newName}(${newPos||"-"})${reason?` [${reason}]`:""} (${g.inning}回${g.half==="top"?"表":"裏"})`
+        msg:`【${g[team+"Team"]}】交代: ${outPlayer.name}(${outPlayer.pos||"-"}) → ${newName}(${newPos||"-"})${reason?` [${reason}]`:""} (${g.inning}回${g.half==="top"?"表":"裏"})`
       },...g.log.slice(0,99)];
       
       const defEntry = {

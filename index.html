@@ -2238,12 +2238,12 @@ function App() {
                           color:p._ab===0?"#475569":parseFloat(p._avg)>=.3?"#fbbf24":parseFloat(p._avg)>=.25?"#e2e8f0":"#94a3b8"},}
                           , p._avg
                         )
+                        , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:700,color:"#f97316",fontSize:11},}, p._slg||".---")
+                        , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:700,color:"#a78bfa",fontSize:11},}, p._obp||".---")
+                        , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:900,
+                          color:"#34d399",fontSize:11,
+                          background:parseFloat(p._ops||0)>=1?"#0f2a1a":"transparent"},}, p._ops||".---")
                       )
-                      , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:700,color:"#f97316",fontSize:11},}, p._slg||".---")
-                      , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:700,color:"#a78bfa",fontSize:11},}, p._obp||".---")
-                      , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:900,
-                        color:"#34d399",fontSize:11,
-                        background:parseFloat(p._ops||0)>=1?"#0f2a1a":"transparent"},}, p._ops||".---")
                     ))
                   )
                   , React.createElement('tfoot', null
@@ -2636,7 +2636,10 @@ function App() {
                         , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"CS",sel),
                           style: {flex:1,background:"#f8717133",border:"2px solid #f87171",borderRadius:10,
                             color:"#f87171",padding:"14px",cursor:"pointer",fontSize:14,fontWeight:700},}, "❌ 盗塁刺"
-
+                        )
+                        , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"PO",sel),
+                          style: {flex:1,background:"#a78bfa33",border:"2px solid #a78bfa",borderRadius:10,
+                            color:"#a78bfa",padding:"14px",cursor:"pointer",fontSize:14,fontWeight:700},}, "🏷 牽制死"
                         )
                       )
                     )

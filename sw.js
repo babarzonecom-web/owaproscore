@@ -1,4 +1,4 @@
-// Service Worker無効化版 - キャッシュを使わずネットワークから常に取得
+// v73 - キャッシュ無効化版
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(

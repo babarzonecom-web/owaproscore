@@ -2498,11 +2498,18 @@ function App() {
               onApply: (t, assignments, slotCount)=>{
                 mutGame(g=>{
                   const lk=side+"Lineup";
-                  const newLineup = Array.from({length: slotCount}, (_,i)=>{
+                  // 割り当てられた選手だけをラインナップに（空スロットは除外）
+                  const assignedCount = Object.keys(assignments).length;
+                  const finalCount = assignedCount > 0 ? slotCount : 9;
+                  const newLineup = Array.from({length: finalCount}, (_,i)=>{
                     const name = assignments[i];
-                    return {...makePlayer(i+1), name: name || `選手${i+1}`};
-                  });
-                  const updated = {...g, [lk]:newLineup, [side+"Team"]:t.name};
+                    if(!name) return null;
+                    return {...makePlayer(i+1), name};
+                  }).filter(Boolean);
+                  // 割り当てゼロの場合は9人分の空枠
+                  const lineup = newLineup.length > 0 ? newLineup
+                    : Array.from({length:9},(_,i)=>makePlayer(i+1));
+                  const updated = {...g, [lk]:lineup, [side+"Team"]:t.name};
                   return syncPitcherFromLineup(updated, side);
                 });
                 showToast(`${t.name} ${Object.keys(assignments).length}名のスタメンをセットしました`);
@@ -3171,7 +3178,7 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, onA
   };
 
   
-  const [slotCount, setSlotCount] = useState(Math.max(9, currentLineup.length));
+  const [slotCount, setSlotCount] = useState(9);
   const addSlot    = () => setSlotCount(n=>Math.min(n+1, 15));
   const removeSlot = () => setSlotCount(n=>{
     const next = Math.max(1, n-1);

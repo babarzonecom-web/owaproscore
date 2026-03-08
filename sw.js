@@ -1,4 +1,4 @@
-// v77 - キャッシュ無効化版
+// v78 - キャッシュ無効化版
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(

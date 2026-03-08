@@ -497,9 +497,10 @@ const recomputeScores = (g) => {
   return {awayScore:aScore, homeScore:hScore};
 };
 
-const computeStats = (players) => players.map(p=>{
+const computeOneStats = (p) => {
   let ab=0,h=0,hr=0,bb=0,hbp=0,k=0,tb=0,r=0,sac=0,sf=0;
-  Object.values(p.atBats).flat().forEach(e=>{
+  const atBatsObj = p.atBats || {};
+  Object.values(atBatsObj).flat().forEach(e=>{
     const ne=norm(e); const code=ne.code; if(!code) return;
     if(!NOAB_CODES.has(code)) ab++;
     if(HIT_CODES.has(code)){h++;tb+=code==="H1"?1:code==="H2"?2:code==="H3"?3:4;}
@@ -511,11 +512,11 @@ const computeStats = (players) => players.map(p=>{
     if(code==="SF")  sf++;
     if(ne.scored) r++;
   });
-  r += (p.run||0);  // ランナーとして得点した分を加算
+  r += (p.run||0);
   const pa = ab + bb + hbp + sac + sf;
-  const slg = ab>0 ? (tb/ab) : 0;  // 長打率
-  const obp = (ab+bb+hbp)>0 ? ((h+bb+hbp)/(ab+bb+hbp)) : 0;  // 出塁率
-  const ops = obp + slg;  // OPS
+  const slg = ab>0 ? (tb/ab) : 0;
+  const obp = (ab+bb+hbp)>0 ? ((h+bb+hbp)/(ab+bb+hbp)) : 0;
+  const ops = obp + slg;
   const fmtAvg = v => v>0 ? v.toFixed(3).replace(/^0/,"") : ".---";
   return {...p,_pa:pa,_ab:ab,_h:h,_hr:hr,_bb:bb,_hbp:hbp,_k:k,_tb:tb,_r:r,
     _avg:ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---",
@@ -523,7 +524,32 @@ const computeStats = (players) => players.map(p=>{
     _obp:(ab+bb+hbp)>0?fmtAvg(obp):".---",
     _ops:ops>0?ops.toFixed(3).replace(/^0/,""):".---",
   };
-});
+};
+
+const computeStats = (players) => {
+  const rows = [];
+  players.forEach(p => {
+    // _subOut がある場合は元選手を先に追加（打席順を維持）
+    if (p._subOut) {
+      const prev = computeOneStats({
+        ...p._subOut,
+        id: (p.id||p.name) + "_subout",
+        order: p.order,
+        _isSub: false,
+        _subOutLabel: true,  // 「→交代」マーク
+        _nextName: p.name,
+      });
+      rows.push(prev);
+    }
+    // 現在の選手（交代後は新選手、交代なしは通常）
+    rows.push(computeOneStats({
+      ...p,
+      _isSub: !!p._subOut,
+      _prevName: p._subOut ? p._subOut.name : null,
+    }));
+  });
+  return rows;
+};
 const computePitcherStats = (g) => {
   const result = { away:[], home:[] };
 
@@ -2355,10 +2381,22 @@ function App() {
                     React.createElement('th', { key: h, style: S.th,}, h)
                   ))))
                   , React.createElement('tbody', null
-                    , stats.filter(p=>p._pa>0||(p.sb||0)>0).map((p,i)=>(
-                      React.createElement('tr', { key: p.id, style: {background:i%2===0?"#0a1628":"#0d1f35"},}
-                        , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#7db8e8",fontSize:11},}, stats.findIndex(x=>x.id===p.id)+1)
-                        , React.createElement('td', { style: {...S.td,fontWeight:600},}, p.name)
+                    , stats.filter(p=>p._pa>0||(p.sb||0)>0||p._subOutLabel).map((p,i)=>(
+                      React.createElement('tr', { key: p.id||p.name, style: {background:i%2===0?"#0a1628":"#0d1f35"},}
+                        , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#7db8e8",fontSize:11},}, p.order||"")
+                        , React.createElement('td', { style: {...S.td,fontWeight:600},}
+                          , p._subOutLabel
+                            ? React.createElement('span', null,
+                                p.name,
+                                React.createElement('span', {style:{fontSize:10,color:"#94a3b8",marginLeft:4}}, `→${p._nextName}`)
+                              )
+                            : p._isSub
+                              ? React.createElement('span', null,
+                                  React.createElement('span', {style:{fontSize:10,color:"#60a5fa",marginRight:4}}, "代"),
+                                  p.name
+                                )
+                              : p.name
+                        )
                         , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#cbd5e1",fontWeight:700},}, p._pa||0)
                         , React.createElement('td', { style: {...S.td,textAlign:"center"},}, p._ab)
                         , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#4ade80",fontWeight:p._h>0?700:400},}, p._h)

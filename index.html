@@ -537,6 +537,8 @@ const computePitcherStats = (g) => {
     const currentPIdx = g[defTeam+"PitcherIdx"]||0;
 
     
+    const OUT_CODES_FOR_IP = new Set(["K","KL","GO","FO","LO","FF","SAC","SF"]);
+    const OUT_CODES = OUT_CODES_FOR_IP;
     const allAtBats = []; 
     INNINGS.forEach(inn=>{
       ["top","bottom"].forEach(half=>{
@@ -591,8 +593,6 @@ const computePitcherStats = (g) => {
 
     
     
-    const OUT_CODES_FOR_IP = new Set(["K","KL","GO","FO","LO","FF","SAC","SF"]);
-    const OUT_CODES = OUT_CODES_FOR_IP;
     allAtBats.forEach(ab=>{
       let activePIdx = log[0].pitcherIdx;
       for(let i=0;i<log.length;i++){

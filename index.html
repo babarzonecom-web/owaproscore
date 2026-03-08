@@ -50,6 +50,7 @@ const RESULTS = [
   { code:"HBP", label:"死球",    color:"#a78bfa", short:"HBP" },
   { code:"GO",  label:"ゴロ",    color:"#fbbf24", short:"GO"  },
   { code:"FO",  label:"フライ",  color:"#fb923c", short:"FO"  },
+  { code:"LO",  label:"ライナー", color:"#f97316", short:"LO"  },
   { code:"DP",  label:"ゲッツー",color:"#f43f5e", short:"DP"  },
   { code:"E",   label:"エラー",  color:"#38bdf8", short:"E"   },
   { code:"FC",  label:"野選",    color:"#a3e635", short:"FC"  },
@@ -57,7 +58,7 @@ const RESULTS = [
   { code:"SAC", label:"犠打",    color:"#c084fc", short:"SAC" },
   { code:"SF",  label:"犠飛",    color:"#f472b6", short:"SF"  },
 ];
-const DIR_CODES  = new Set(["H1","H2","H3","HR","GO","FO","FF","DP","E","FC","SAC","SF"]);
+const DIR_CODES  = new Set(["H1","H2","H3","HR","GO","FO","LO","FF","DP","E","FC","SAC","SF"]);
 const HIT_CODES  = new Set(["H1","H2","H3","HR"]);
 const NOAB_CODES = new Set(["BB","HBP","SAC","SF"]);
 const rOf = (code) => RESULTS.find(r => r.code === code);
@@ -140,7 +141,7 @@ function applyResult(code, bases, outs, batterName) {
       if(n3){ scoredNames=[n3]; runs=1; }
       batterOn=-1; break;
     }
-    case "FO": case "FF": {
+    case "FO": case "LO": case "FF": {
       // フライ/ファウルフライ: 打者アウト、ランナーはそのまま（タッチアップは調整モーダルで）
       newOuts=outs+1; b=[n1,n2,n3]; batterOn=-1; break;
     }
@@ -274,8 +275,13 @@ function MiniDiamond({ bases, size=56 }) {
         return (
           React.createElement('g', { key: idx,}
             , React.createElement('circle', { cx: bx, cy: by, r: sq*0.55, fill: "#fbbf24", opacity: 0.9,})
+            , React.createElement('rect', {
+                x: bx+dx*0.4 - shortName.length*3.2, y: by+dy*0.6-6,
+                width: shortName.length*6.4+2, height: 9, rx: 2,
+                fill: "#1a0a00",
+              })
             , React.createElement('text', { x: bx+dx*0.4, y: by+dy*0.6, textAnchor: "middle",
-              fontSize: 5.5, fill: "#0a1628", fontWeight: "bold", dy: "0.35em",}
+              fontSize: 6, fill: "#fbbf24", fontWeight: "bold", dy: "0.35em",}
               , shortName
             )
           )
@@ -578,7 +584,7 @@ const computePitcherStats = (g) => {
 
     
     
-    const OUT_CODES = new Set(["K","KL","GO","FO","FF","SAC","SF"]);
+    const OUT_CODES = new Set(["K","KL","GO","FO","LO","FF","SAC","SF"]);
     allAtBats.forEach(ab=>{
       let activePIdx = log[0].pitcherIdx;
       for(let i=0;i<log.length;i++){
@@ -2196,9 +2202,12 @@ function App() {
                                   style: {background:"transparent",border:"none",color:"#e2e8f0",fontSize:12,outline:"none",width:72},})
                                 , (()=>{
                                   const regT = teams.find(t=>t.name===game[defTeam+"Team"]);
-                                  const ms = (_optionalChain([regT, 'optionalAccess', _31 => _31.members])||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean);
+                                  const matchMs = (_optionalChain([regT, 'optionalAccess', _31 => _31.members])||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean);
+                                  // 一致チームがなければ全チームをフラットに
+                                  const ms = matchMs.length ? matchMs
+                                    : (teams||[]).flatMap(t=>(t.members||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean));
                                   if(!ms.length) return null;
-                                  return React.createElement(PitcherPicker, { members: ms, onSelect: n=>editPitcher(defTeam,i,"name",n),});
+                                  return React.createElement(PitcherPicker, { members: ms, teams: teams, currentTeamName: game[defTeam+"Team"], onSelect: n=>editPitcher(defTeam,i,"name",n),});
                                 })()
                               )
                             )
@@ -2994,7 +3003,7 @@ function App() {
                   preScoredNames: modal.autoScoredNames||[],
                   batterName: _optionalChain([mPlayer, 'optionalAccess', _63 => _63.name])||"打者",
                   batterScored: modal.pendingCode==="HR" ? true : false,
-                  batterOut: ["K","KL","GO","FO","FF","SAC","SF","DP"].includes(modal.pendingCode) || modal.autoNewOuts>=3,
+                  batterOut: ["K","KL","GO","FO","LO","FF","SAC","SF","DP"].includes(modal.pendingCode) || modal.autoNewOuts>=3,
                   outs: modal.autoNewOuts,
                   onConfirm: (adjBases,scoredNames,adjOuts)=>{
                     commitAtBat(modal.team,modal.pidx,modal.inning,
@@ -3056,7 +3065,12 @@ function SpecialPlayModal({ teamLabel, bases, inning, onCommit, onCancel }) {
   const [runs,    setRuns]    = useState(0);
   const sp = SPECIAL_PLAYS.find(p=>p.code===selCode);
 
-  const toggleBase = (i) => setAdjB(b=>{ const n=[...b]; n[i]=!n[i]; return n; });
+  // ランナーON/OFF: 名前を保持しつつ切り替え（nullで消す、元のbases名で復元）
+  const toggleBase = (i) => setAdjB(b=>{
+    const n=[...b];
+    n[i] = n[i] ? null : (bases[i] || "●");
+    return n;
+  });
   
 
   return (
@@ -3490,7 +3504,7 @@ function EndGameModal({ game, onConfirm, onCancel }) {
     )
   );
 }
-function PitcherPicker({ members, onSelect }) {
+function PitcherPicker({ members, teams, currentTeamName, onSelect }) {
   const [open, setOpen] = useState(false);
   const btnRef = React.useRef(null);
   const [style, setStyle] = useState({});
@@ -3499,36 +3513,66 @@ function PitcherPicker({ members, onSelect }) {
     if(btnRef.current){
       const r = btnRef.current.getBoundingClientRect();
       const below = window.innerHeight - r.bottom;
+      const popH = 280;
       setStyle({
         position:"fixed",
-        left: Math.min(r.left, window.innerWidth-160),
-        top: below>160 ? r.bottom+2 : r.top-160,
+        left: Math.min(r.left, window.innerWidth-200),
+        top: below>popH ? r.bottom+2 : r.top-popH-4,
         zIndex:9999, background:"#0f2040",
         border:"1px solid #2a4a7a", borderRadius:10, padding:8,
-        display:"flex", flexDirection:"column", gap:4, width:150,
+        display:"flex", flexDirection:"column", gap:4, width:192,
+        maxHeight:280, overflowY:"auto",
         boxShadow:"0 8px 24px rgba(0,0,0,.8)",
       });
     }
     setOpen(o=>!o);
   };
 
+  const groups = (teams||[]).map(t=>({
+    name: t.name,
+    ms: (t.members||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean),
+  })).filter(g=>g.ms.length>0);
+  const flat = groups.length===0 ? members : null;
+
   return (
     React.createElement('div', null
       , React.createElement('button', { ref: btnRef, onClick: handleOpen,
         style: {background:"transparent",border:"1px solid #2a4a7a",borderRadius:4,
-          color:"#64748b",fontSize:9,padding:"1px 4px",cursor:"pointer"},}, "▼")
+          color:"#64748b",fontSize:9,padding:"1px 4px",cursor:"pointer"}}, "▼")
       , open&&(React.createElement(React.Fragment, null
         , React.createElement('div', { style: {position:"fixed",inset:0,zIndex:9998}, onClick: ()=>setOpen(false),})
         , React.createElement('div', { style: style,}
-          , React.createElement('div', { style: {fontSize:10,color:"#475569",marginBottom:2,paddingLeft:2},}, "登録メンバーから選択")
-          , members.map(n=>(
-            React.createElement('button', { key: n, onClick: ()=>{onSelect(n);setOpen(false);},
-              style: {background:"#0d1f35",border:"1px solid #1e3a5f",borderRadius:6,
-                color:"#e2e8f0",fontSize:12,fontWeight:600,padding:"5px 8px",
-                cursor:"pointer",textAlign:"left"},}
-              , n
+          , flat ? (
+            React.createElement(React.Fragment, null
+              , React.createElement('div', { style: {fontSize:10,color:"#475569",marginBottom:2,paddingLeft:2}}, "メンバーから選択")
+              , flat.map(n=>(
+                React.createElement('button', { key: n, onClick: ()=>{onSelect(n);setOpen(false);},
+                  style: {background:"#0d1f35",border:"1px solid #1e3a5f",borderRadius:6,
+                    color:"#e2e8f0",fontSize:12,fontWeight:600,padding:"5px 8px",
+                    cursor:"pointer",textAlign:"left"}}
+                  , n
+                )
+              ))
             )
-          ))
+          ) : (
+            groups.map((g,gi)=>(
+              React.createElement(React.Fragment, { key: g.name }
+                , React.createElement('div', { style: {
+                    fontSize:10, fontWeight:700, padding:"4px 4px 2px",
+                    color: g.name===currentTeamName ? "#7dd3fc" : "#64748b",
+                    borderTop: gi>0?"1px solid #1e3a5f":"none", marginTop: gi>0?4:0,
+                  }}, g.name===currentTeamName ? "⭐ "+g.name : g.name)
+                , g.ms.map(n=>(
+                  React.createElement('button', { key: n, onClick: ()=>{onSelect(n);setOpen(false);},
+                    style: {background:"#0d1f35",border:"1px solid #1e3a5f",borderRadius:6,
+                      color:"#e2e8f0",fontSize:12,fontWeight:600,padding:"5px 8px",
+                      cursor:"pointer",textAlign:"left"}}
+                    , n
+                  )
+                ))
+              )
+            ))
+          )
         )
       ))
     )

@@ -983,42 +983,56 @@ function App() {
   },[mutGame]);
 
   
-  const recordSB = useCallback((team,pidx,type,runner)=>{
-    
+  const recordSB = useCallback((team,pidx,type,runner,destBi)=>{
+    // destBi: 進塁先の塁インデックス (0=1塁,1=2塁,2=3塁,3=ホーム)
     mutGame(g=>{
       const lk=team+"Lineup";
       const lineup=g[lk].map((p,i)=>{
         if(i!==pidx) return p;
-        return type==="SB"?{...p,sb:(p.sb||0)+1}:{...p,cs:(p.cs||0)+1};
+        if(type==="SB") return {...p, sb:(p.sb||0)+1};
+        return {...p, cs:(p.cs||0)+1};
       });
 
-      
       let newBases = [...g.bases];
       let scoreAdd = 0;
+      let scoredRunner = null;
+
       if(runner){
         if(type==="SB"){
-          newBases[runner.bi] = null; 
-          if(runner.bi === 2){
-            
+          newBases[runner.bi] = null;
+          if(destBi >= 3){
+            // ホームイン
             scoreAdd = 1;
+            scoredRunner = runner.name;
           } else {
-            newBases[runner.bi+1] = runner.name; 
+            newBases[destBi] = runner.name;
           }
         } else {
-          
+          // CS / PO
           newBases[runner.bi] = null;
         }
       }
 
-      
+      // チームスコア加算
       const inning = g.inning;
       let newScore = {...g[team+"Score"]};
       if(scoreAdd>0){
         newScore[inning] = (parseInt(newScore[inning])||0) + scoreAdd;
       }
-      const scores = recomputeScores({...g, [lk]:lineup, [team+"Score"]:newScore});
 
-      const baseLabel = runner ? ["1→2塁","2→3塁","3塁→本塁"][runner.bi] : "";
+      // ホームインした選手の個人得点加算
+      let updatedLineup = lineup;
+      if(scoredRunner){
+        updatedLineup = lineup.map(p=>
+          p.name===scoredRunner ? {...p, run:(p.run||0)+1} : p
+        );
+      }
+
+      const scores = recomputeScores({...g, [lk]:updatedLineup, [team+"Score"]:newScore});
+
+      const destLabel = destBi>=3 ? "ホーム" : ["1塁","2塁","3塁"][destBi];
+      const fromLabel = ["1塁","2塁","3塁"][runner?.bi??0];
+      const baseLabel = runner ? `${fromLabel}→${destLabel}` : "";
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
         msg:`【${g[team+"Team"]}】${_optionalChain([runner, 'optionalAccess', _15 => _15.name])||lineup[pidx].name} → ${type==="SB"?`盗塁成功(${baseLabel})`:type==="PO"?"牽制アウト":"盗塁刺"}${scoreAdd>0?" [1点]":""}`
@@ -1026,7 +1040,7 @@ function App() {
 
       const outs = (type==="CS"||type==="PO") ? Math.min(g.outs+1,3) : g.outs;
       const changeOccurs = outs>=3;
-      return {...g,[lk]:lineup,...scores,
+      return {...g,[lk]:updatedLineup,...scores,
         bases:newBases, outs:changeOccurs?0:outs,
         inning:changeOccurs?(g.half==="top"?g.inning:Math.min(g.inning+1,15)):g.inning,
         half:changeOccurs?(g.half==="top"?"bottom":"top"):g.half,
@@ -2695,28 +2709,31 @@ function App() {
         
         if(modal.step==="sb") {
           const runners = [0,1,2].map(bi=>({bi, name:game.bases[bi]})).filter(r=>r.name);
-          const sel = modal.sbRunner; 
-          const destBase = sel ? sel.bi+1 : null; 
+          const sel = modal.sbRunner;
+          const destBi = modal.sbDest ?? (sel ? sel.bi+1 : null);
+          // sel.biから選べる進塁先（1つ先〜ホーム）
+          const destOptions = sel
+            ? Array.from({length: 3-sel.bi}, (_,i)=>sel.bi+1+i).concat(sel.bi<3?[3]:[]).filter((v,idx,a)=>a.indexOf(v)===idx && v<=3)
+            : [];
+
           return (
             React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
               , React.createElement('div', { style: S.mBox, onClick: e=>e.stopPropagation(),}
-                , React.createElement('div', { style: {...S.mt,marginBottom:4},}, "🏃 盗塁 / 走塁 / 牽制"   )
+                , React.createElement('div', { style: {...S.mt,marginBottom:4},}, "🏃 盗塁 / 走塁 / 牽制")
                 , React.createElement('div', { style: {fontSize:11,color:"#94a3b8",marginBottom:14},}, "塁にいるランナーを選んでください")
 
                 , runners.length===0 ? (
-                  React.createElement('div', { style: {color:"#f87171",fontSize:13,textAlign:"center",marginBottom:14},}, "現在塁上にランナーがいません"
-
-                  )
+                  React.createElement('div', { style: {color:"#f87171",fontSize:13,textAlign:"center",marginBottom:14},}, "現在塁上にランナーがいません")
                 ) : (React.createElement(React.Fragment, null
-                  
+
                   , React.createElement('div', { style: {marginBottom:14},}
-                    , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "ランナー選択")
+                    , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "① ランナー選択")
                     , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:8},}
                       , runners.map(r=>{
                         const baseLabel=["1塁","2塁","3塁"][r.bi];
                         const isSel = sel && sel.bi===r.bi;
                         return (
-                          React.createElement('button', { key: r.bi, onClick: ()=>setModal(m=>({...m,sbRunner:isSel?null:r})),
+                          React.createElement('button', { key: r.bi, onClick: ()=>setModal(m=>({...m, sbRunner:isSel?null:r, sbDest:isSel?null:r.bi+1})),
                             style: {background:isSel?"#1d4ed833":"#0d1f35",
                               border:`2px solid ${isSel?"#3b82f6":"#1e3a5f"}`,
                               borderRadius:10,padding:"10px 16px",cursor:"pointer",
@@ -2729,33 +2746,43 @@ function App() {
                     )
                   )
 
-                  
-                  , sel && (
-                    React.createElement('div', { style: {marginBottom:14},}
-                      , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}
-                        , sel.name, " (" , ["1塁","2塁","3塁"][sel.bi], " → "  , ["2塁","3塁","ホーム"][sel.bi], ")"
+                  , sel && (React.createElement(React.Fragment, null
+
+                    , React.createElement('div', { style: {marginBottom:12},}
+                      , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "② 進塁先")
+                      , React.createElement('div', { style: {display:"flex",gap:8},}
+                        , destOptions.map(di=>{
+                          const label = di>=3?"🏠 ホーム":["1塁","2塁","3塁"][di];
+                          const isSelDest = destBi===di;
+                          return React.createElement('button', { key: di, onClick: ()=>setModal(m=>({...m,sbDest:di})),
+                            style: {flex:1,padding:"10px 6px",borderRadius:9,cursor:"pointer",fontSize:13,fontWeight:700,
+                              background:isSelDest?"#1d4ed833":"#0d1f35",
+                              border:`2px solid ${isSelDest?"#3b82f6":"#1e3a5f"}`,
+                              color:isSelDest?"#7dd3fc":"#e2e8f0"}}, label);
+                        })
                       )
-                      , React.createElement('div', { style: {display:"flex",gap:10},}
-                        , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"SB",sel),
+                    )
+
+                    , React.createElement('div', { style: {marginBottom:8},}
+                      , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "③ 結果")
+                      , React.createElement('div', { style: {display:"flex",gap:8,flexWrap:"wrap"},}
+                        , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"SB",sel,destBi??sel.bi+1),
                           style: {flex:1,background:"#4ade8033",border:"2px solid #4ade80",borderRadius:10,
-                            color:"#4ade80",padding:"14px",cursor:"pointer",fontSize:14,fontWeight:700},}, "✅ 盗塁成功"
-                           , sel.bi===2?" (ホームイン)":""
+                            color:"#4ade80",padding:"12px",cursor:"pointer",fontSize:13,fontWeight:700},},
+                          "✅ 盗塁成功", destBi>=3?" (ホームイン)":""
                         )
-                        , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"CS",sel),
+                        , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"CS",sel,sel.bi+1),
                           style: {flex:1,background:"#f8717133",border:"2px solid #f87171",borderRadius:10,
-                            color:"#f87171",padding:"14px",cursor:"pointer",fontSize:14,fontWeight:700},}, "❌ 盗塁刺"
+                            color:"#f87171",padding:"12px",cursor:"pointer",fontSize:13,fontWeight:700},}, "❌ 盗塁刺"
                         )
-                        , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"PO",sel),
+                        , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"PO",sel,sel.bi),
                           style: {flex:1,background:"#a78bfa33",border:"2px solid #a78bfa",borderRadius:10,
-                            color:"#a78bfa",padding:"14px",cursor:"pointer",fontSize:14,fontWeight:700},}, "🏷 牽制死"
+                            color:"#a78bfa",padding:"12px",cursor:"pointer",fontSize:13,fontWeight:700},}, "🏷 牽制死"
                         )
                       )
                     )
-                  )
-                ))
-
-                
-                , mPlayer&&(
+                  ))
+                )), mPlayer&&(
                   React.createElement('div', { style: {fontSize:11,color:"#7db8e8",textAlign:"center",marginBottom:10},}
                     , mPlayer.name, ": 盗塁 "  , React.createElement('span', { style: {color:"#4ade80",fontWeight:700},}, mPlayer.sb||0), "　 盗塁刺 "
                      , React.createElement('span', { style: {color:"#f87171",fontWeight:700},}, mPlayer.cs||0)

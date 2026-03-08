@@ -1,4 +1,4 @@
-// v83 - 強制キャッシュクリア版
+// v84 - 強制キャッシュクリア版
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(

@@ -510,9 +510,8 @@ const computeOneStats = (p) => {
     if(code==="K"||code==="KL"||code==="KW") k++;
     if(code==="SAC") sac++;
     if(code==="SF")  sf++;
-    if(ne.scored) r++;
   });
-  r += (p.run||0);
+  r += (p.run||0);  // HR・盗塁・WP等すべての得点はp.runに集約
   const pa = ab + bb + hbp + sac + sf;
   const slg = ab>0 ? (tb/ab) : 0;
   const obp = (ab+bb+hbp)>0 ? ((h+bb+hbp)/(ab+bb+hbp)) : 0;
@@ -901,7 +900,12 @@ function App() {
       const lineup=g[lk].map((p,i)=>{
         if(i===pidx) {
           const prev=toList(p.atBats,inning);
-          return {...p, atBats:{...p.atBats,[inning]:[...prev,entry]}, rbi:(p.rbi||0)+rbiAdd};
+          return {...p,
+            atBats:{...p.atBats,[inning]:[...prev,entry]},
+            rbi:(p.rbi||0)+rbiAdd,
+            // HR等で打者自身が得点した場合はrunも+1
+            run: batterScored ? (p.run||0)+1 : (p.run||0),
+          };
         }
         // ランナーとして得点した選手にscored記録を追加
         if((scoredNames||[]).includes(p.name) && p.name !== batterName) {
@@ -3863,7 +3867,7 @@ function SubstituteModal({ player, team, game, pidx, teams, onConfirm, onCancel 
           React.createElement('div', { style: {marginBottom:14},}
             , React.createElement('div', { style: {fontSize:11,color:"#7db8e8",marginBottom:5,fontWeight:700},}, "交代理由（任意）")
             , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:5,marginBottom:6},}
-              , ["代打","代走","守備固め","故障"].map(r=>(
+              , ["代打","代走","守備固め"].map(r=>(
                 React.createElement('button', { key: r, onClick: ()=>setReason(r===reason?"":r),
                   style: {padding:"4px 10px",borderRadius:6,cursor:"pointer",fontSize:11,
                     background:reason===r?"#1d4ed833":"transparent",

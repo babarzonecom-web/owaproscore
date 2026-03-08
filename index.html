@@ -543,9 +543,16 @@ const computePitcherStats = (g) => {
         
         const battingTeam = half==="top" ? "away" : "home";
         if(battingTeam !== offTeam) return;
+        // このイニング・ハーフの累積アウト数を打席順に付与
+        let outsInHalf = 0;
         lineup.forEach((p,pi)=>{
           toList(p.atBats,inn).forEach((e,ei)=>{
-            allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:norm(e)});
+            const ne = norm(e);
+            const outsAtAb = outsInHalf;
+            allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb});
+            // この打席でアウトが増えた数を加算
+            if(OUT_CODES_FOR_IP.has(ne.code)) outsInHalf++;
+            if(ne.code==="DP") outsInHalf++;
           });
         });
       });
@@ -559,17 +566,17 @@ const computePitcherStats = (g) => {
     const log = pitcherLog.length>0 ? pitcherLog : [{pitcherIdx:0, fromInning:1, fromHalf:"top", outsAtStart:0}];
 
     allAtBats.forEach(ab=>{
-      
-      
       let activePIdx = log[0].pitcherIdx;
       for(let i=0;i<log.length;i++){
         const l = log[i];
-        const lInn = l.fromInning, lHalf = l.fromHalf;
-        const abInn = ab.inning, abHalf = ab.half;
-        
-        const logTime = lInn*2 + (lHalf==="top"?0:1);
-        const abTime  = abInn*2 + (abHalf==="top"?0:1);
-        if(logTime <= abTime) activePIdx = l.pitcherIdx;
+        const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
+        const abTime  = ab.inning*2 + (ab.half==="top"?0:1);
+        if(logTime < abTime) {
+          activePIdx = l.pitcherIdx;
+        } else if(logTime === abTime) {
+          // 同イニング・ハーフ内はアウトカウントで判定
+          if((l.outsAtStart||0) <= (ab.outsAtAb||0)) activePIdx = l.pitcherIdx;
+        }
       }
 
       const ps = stats[activePIdx];
@@ -584,14 +591,19 @@ const computePitcherStats = (g) => {
 
     
     
-    const OUT_CODES = new Set(["K","KL","GO","FO","LO","FF","SAC","SF"]);
+    const OUT_CODES_FOR_IP = new Set(["K","KL","GO","FO","LO","FF","SAC","SF"]);
+    const OUT_CODES = OUT_CODES_FOR_IP;
     allAtBats.forEach(ab=>{
       let activePIdx = log[0].pitcherIdx;
       for(let i=0;i<log.length;i++){
         const l = log[i];
         const logTime = l.fromInning*2+(l.fromHalf==="top"?0:1);
         const abTime  = ab.inning*2+(ab.half==="top"?0:1);
-        if(logTime<=abTime) activePIdx = l.pitcherIdx;
+        if(logTime < abTime) {
+          activePIdx = l.pitcherIdx;
+        } else if(logTime === abTime) {
+          if((l.outsAtStart||0) <= (ab.outsAtAb||0)) activePIdx = l.pitcherIdx;
+        }
       }
       const ps = stats[activePIdx];
       if(!ps) return;
@@ -1219,12 +1231,17 @@ function App() {
   const changePitcher = useCallback((defTeam, newPitcherIdx)=>{
     mutGame(g=>{
       const logKey = defTeam+"PitcherLog";
-      const offHalf = defTeam==="away" ? "bottom" : "top"; 
+      // 新投手が実際に投げる（打者と対戦する）ハーフを記録する
+      // away投手 → 表(top)に投げる、home投手 → 裏(bottom)に投げる
+      const pitchHalf = defTeam==="away" ? "top" : "bottom";
+      // 現在のハーフが新投手の守備ハーフと一致していれば今のイニング、そうでなければ次のイニング
+      const fromInning = g.half === pitchHalf ? g.inning : g.inning;
+      const fromHalf = pitchHalf;
       const entry = {
         pitcherIdx: newPitcherIdx,
-        fromInning: g.inning,
-        fromHalf: g.half,
-        outsAtStart: g.outs,
+        fromInning,
+        fromHalf,
+        outsAtStart: g.half === pitchHalf ? g.outs : 0,
       };
       const newLog = [...(g[logKey]||[]), entry];
       const log=[{
@@ -2202,12 +2219,9 @@ function App() {
                                   style: {background:"transparent",border:"none",color:"#e2e8f0",fontSize:12,outline:"none",width:72},})
                                 , (()=>{
                                   const regT = teams.find(t=>t.name===game[defTeam+"Team"]);
-                                  const matchMs = (_optionalChain([regT, 'optionalAccess', _31 => _31.members])||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean);
-                                  // 一致チームがなければ全チームをフラットに
-                                  const ms = matchMs.length ? matchMs
-                                    : (teams||[]).flatMap(t=>(t.members||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean));
+                                  const ms = (_optionalChain([regT, 'optionalAccess', _31 => _31.members])||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean);
                                   if(!ms.length) return null;
-                                  return React.createElement(PitcherPicker, { members: ms, teams: teams, currentTeamName: game[defTeam+"Team"], onSelect: n=>editPitcher(defTeam,i,"name",n),});
+                                  return React.createElement(PitcherPicker, { members: ms, teams: null, currentTeamName: game[defTeam+"Team"], onSelect: n=>editPitcher(defTeam,i,"name",n),});
                                 })()
                               )
                             )

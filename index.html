@@ -505,7 +505,16 @@ const computeStats = (players) => players.map(p=>{
   });
   r += (p.run||0);  // ランナーとして得点した分を加算
   const pa = ab + bb + hbp + sac + sf;
-  return {...p,_pa:pa,_ab:ab,_h:h,_hr:hr,_bb:bb,_hbp:hbp,_k:k,_tb:tb,_r:r,_avg:ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---"};
+  const slg = ab>0 ? (tb/ab) : 0;  // 長打率
+  const obp = (ab+bb+hbp)>0 ? ((h+bb+hbp)/(ab+bb+hbp)) : 0;  // 出塁率
+  const ops = obp + slg;  // OPS
+  const fmtAvg = v => v>0 ? v.toFixed(3).replace(/^0/,"") : ".---";
+  return {...p,_pa:pa,_ab:ab,_h:h,_hr:hr,_bb:bb,_hbp:hbp,_k:k,_tb:tb,_r:r,
+    _avg:ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---",
+    _slg:ab>0?fmtAvg(slg):".---",
+    _obp:(ab+bb+hbp)>0?fmtAvg(obp):".---",
+    _ops:ops>0?ops.toFixed(3).replace(/^0/,""):".---",
+  };
 });
 const computePitcherStats = (g) => {
   const result = { away:[], home:[] };
@@ -935,10 +944,10 @@ function App() {
       const baseLabel = runner ? ["1→2塁","2→3塁","3塁→本塁"][runner.bi] : "";
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-        msg:`【${g[team+"Team"]}】${_optionalChain([runner, 'optionalAccess', _15 => _15.name])||lineup[pidx].name} → ${type==="SB"?`盗塁成功(${baseLabel})`:"盗塁刺"}${scoreAdd>0?" [1点]":""}`
+        msg:`【${g[team+"Team"]}】${_optionalChain([runner, 'optionalAccess', _15 => _15.name])||lineup[pidx].name} → ${type==="SB"?`盗塁成功(${baseLabel})`:type==="PO"?"牽制アウト":"盗塁刺"}${scoreAdd>0?" [1点]":""}`
       },...g.log.slice(0,99)];
 
-      const outs = type==="CS" ? Math.min(g.outs+1,3) : g.outs;
+      const outs = (type==="CS"||type==="PO") ? Math.min(g.outs+1,3) : g.outs;
       const changeOccurs = outs>=3;
       return {...g,[lk]:lineup,...scores,
         bases:newBases, outs:changeOccurs?0:outs,
@@ -947,7 +956,7 @@ function App() {
         log};
     });
     setModal(null);
-    showToast(type==="SB"?"盗塁✅":"盗塁刺❌");
+    showToast(type==="SB"?"盗塁✅":type==="PO"?"牽制アウト❌":"盗塁刺❌");
   },[mutGame]);
 
   
@@ -1174,7 +1183,7 @@ function App() {
     const title = `${g.awayTeam} vs ${g.homeTeam} (${g.date})`;
 
     
-    const batHeader = ["チーム","#","選手名","打席","打数","安打","二塁打","三塁打","本塁打","打点","四球","死球","三振","失策","盗塁","盗刺","得点","打率"];
+    const batHeader = ["チーム","#","選手名","打席","打数","安打","二塁打","三塁打","本塁打","打点","四球","死球","三振","失策","盗塁","盗刺","得点","打率","長打率","出塁率","OPS"];
     const batRows = [batHeader];
     [[g.awayTeam, aStats],[g.homeTeam, hStats]].forEach(([teamName, stats])=>{
       let totals = {pa:0,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,e:0,sb:0,cs:0,r:0};
@@ -1186,7 +1195,7 @@ function App() {
           if(code==="H2") h2++;
           if(code==="H3") h3++;
         });
-        batRows.push([teamName,i+1,p.name,p._pa||0,p._ab,p._h,h2,h3,p._hr,p.rbi||0,p._bb,p._hbp||0,p._k,p.e||0,p.sb||0,p.cs||0,p._r||0,p._avg]);
+        batRows.push([teamName,i+1,p.name,p._pa||0,p._ab,p._h,h2,h3,p._hr,p.rbi||0,p._bb,p._hbp||0,p._k,p.e||0,p.sb||0,p.cs||0,p._r||0,p._avg,p._slg||".---",p._obp||".---",p._ops||".---"]);
         totals.ab+=p._ab; totals.h+=p._h; totals.h2+=h2; totals.h3+=h3; totals.hr+=p._hr;
         totals.rbi+=p.rbi||0; totals.bb+=p._bb; totals.hbp+=(p._hbp||0); totals.k+=p._k; totals.e+=p.e||0;
         totals.sb+=p.sb||0; totals.cs+=p.cs||0; totals.r+=(p._r||0); totals.pa+=(p._pa||0);
@@ -2204,7 +2213,7 @@ function App() {
               , React.createElement('div', { style: {...S.ct,borderLeft:`4px solid ${color}`,paddingLeft:10},}, label, " — 打撃成績"  )
               , React.createElement('div', { style: {overflowX:"auto"},}
                 , React.createElement('table', { style: S.table,}
-                  , React.createElement('thead', null, React.createElement('tr', null, ["#","名前","打席","打数","安打","本塁打","打点","四球","死球","三振","盗塁","盗刺","得点","打率"].map(h=>(
+                  , React.createElement('thead', null, React.createElement('tr', null, ["#","名前","打席","打数","安打","本塁打","打点","四球","死球","三振","盗塁","盗刺","得点","打率","長打率","出塁率","OPS"].map(h=>(
                     React.createElement('th', { key: h, style: S.th,}, h)
                   ))))
                   , React.createElement('tbody', null
@@ -2230,6 +2239,11 @@ function App() {
                           , p._avg
                         )
                       )
+                      , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:700,color:"#f97316",fontSize:11},}, p._slg||".---")
+                      , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:700,color:"#a78bfa",fontSize:11},}, p._obp||".---")
+                      , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:900,
+                        color:"#34d399",fontSize:11,
+                        background:parseFloat(p._ops||0)>=1?"#0f2a1a":"transparent"},}, p._ops||".---")
                     ))
                   )
                   , React.createElement('tfoot', null
@@ -2578,7 +2592,7 @@ function App() {
           return (
             React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
               , React.createElement('div', { style: S.mBox, onClick: e=>e.stopPropagation(),}
-                , React.createElement('div', { style: {...S.mt,marginBottom:4},}, "🏃 盗塁 / 走塁記録"   )
+                , React.createElement('div', { style: {...S.mt,marginBottom:4},}, "🏃 盗塁 / 走塁 / 牽制"   )
                 , React.createElement('div', { style: {fontSize:11,color:"#94a3b8",marginBottom:14},}, "塁にいるランナーを選んでください")
 
                 , runners.length===0 ? (

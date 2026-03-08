@@ -1,6 +1,6 @@
 {
-  "name": "草野球スコアブック",
-  "short_name": "スコアブック",
+  "name": "おわプロスコア",
+  "short_name": "おわプロスコア",
   "description": "草野球のスコアを記録するアプリ",
   "start_url": "./index.html",
   "display": "standalone",

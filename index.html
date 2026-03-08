@@ -1231,17 +1231,19 @@ function App() {
   const changePitcher = useCallback((defTeam, newPitcherIdx)=>{
     mutGame(g=>{
       const logKey = defTeam+"PitcherLog";
-      // 新投手が実際に投げる（打者と対戦する）ハーフを記録する
+      // 新投手が実際に投げる（打者と対戦する）ハーフ
       // away投手 → 表(top)に投げる、home投手 → 裏(bottom)に投げる
       const pitchHalf = defTeam==="away" ? "top" : "bottom";
-      // 現在のハーフが新投手の守備ハーフと一致していれば今のイニング、そうでなければ次のイニング
-      const fromInning = g.half === pitchHalf ? g.inning : g.inning;
+      // 現在が新投手の守備ハーフと一致 → 今のイニング・今のアウトカウントから
+      // 一致しない（例:裏に away投手交代）→ 次のイニングの頭から
+      const sameHalf = g.half === pitchHalf;
+      const fromInning = sameHalf ? g.inning : g.inning + 1;
       const fromHalf = pitchHalf;
       const entry = {
         pitcherIdx: newPitcherIdx,
         fromInning,
         fromHalf,
-        outsAtStart: g.half === pitchHalf ? g.outs : 0,
+        outsAtStart: sameHalf ? g.outs : 0,
       };
       const newLog = [...(g[logKey]||[]), entry];
       const log=[{

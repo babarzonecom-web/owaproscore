@@ -3139,14 +3139,39 @@ function App() {
 }
 function SpecialPlayModal({ teamLabel, bases, inning, onCommit, onCancel }) {
   const [selCode, setSelCode] = useState(null);
-  const [adjB,    setAdjB]    = useState([...bases]);
-  const [runs,    setRuns]    = useState(0);
+
+  // デフォルト: 全ランナーを1つ前進させた状態
+  const autoAdvance = () => {
+    const nb = [null, null, null];
+    let scored = 0;
+    // 3塁→本塁、2塁→3塁、1塁→2塁 の順で処理（上書き防止）
+    for (let i = 2; i >= 0; i--) {
+      if (bases[i]) {
+        if (i === 2) { scored++; }
+        else { nb[i+1] = bases[i]; }
+      }
+    }
+    return { nb, scored };
+  };
+
+  const { nb: initBases, scored: initRuns } = autoAdvance();
+  const [adjB, setAdjB] = useState(initBases);
+  const [runs, setRuns] = useState(initRuns);
+
   const sp = SPECIAL_PLAYS.find(p=>p.code===selCode);
 
-  // ランナーON/OFF: 名前を保持しつつ切り替え（nullで消す、元のbases名で復元）
+  // ランナーON/OFF: クリックした塁を切り替え
+  // ON→OFF: null、OFF→ON: 元のランナー名（bases内を探す）か "●"
   const toggleBase = (i) => setAdjB(b=>{
     const n=[...b];
-    n[i] = n[i] ? null : (bases[i] || "●");
+    if (n[i]) {
+      n[i] = null;
+    } else {
+      // 元のbases内のランナー名で、adjBにまだ入っていないものを当てる
+      const usedNames = n.filter(Boolean);
+      const available = bases.filter(name => name && !usedNames.includes(name));
+      n[i] = available[0] || "●";
+    }
     return n;
   });
   

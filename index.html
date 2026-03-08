@@ -565,7 +565,13 @@ const computePitcherStats = (g) => {
 
     
     
-    const log = pitcherLog.length>0 ? pitcherLog : [{pitcherIdx:0, fromInning:1, fromHalf:"top", outsAtStart:0}];
+    // 先発投手（idx:0）のエントリを必ず1回表頭に補完する
+    // pitcherLogが空 or 最初のエントリが1回表より後の場合に対応
+    const starterEntry = {pitcherIdx:0, fromInning:1, fromHalf:"top", outsAtStart:0};
+    const rawLog = pitcherLog.length>0 ? pitcherLog : [];
+    // 先発エントリが既にあるか確認
+    const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf==="top" && l.outsAtStart===0);
+    const log = hasStarter ? rawLog : [starterEntry, ...rawLog];
 
     allAtBats.forEach(ab=>{
       let activePIdx = log[0].pitcherIdx;
@@ -1231,13 +1237,18 @@ function App() {
   const changePitcher = useCallback((defTeam, newPitcherIdx)=>{
     mutGame(g=>{
       const logKey = defTeam+"PitcherLog";
-      // 新投手が実際に投げる（打者と対戦する）ハーフ
-      // away投手 → 表(top)に投げる、home投手 → 裏(bottom)に投げる
+      // 新投手が実際に投げるハーフ
+      // away投手 → 表(top)、home投手 → 裏(bottom)
       const pitchHalf = defTeam==="away" ? "top" : "bottom";
-      // 現在が新投手の守備ハーフと一致 → 今のイニング・今のアウトカウントから
-      // 一致しない（例:裏に away投手交代）→ 次のイニングの頭から
       const sameHalf = g.half === pitchHalf;
-      const fromInning = sameHalf ? g.inning : g.inning + 1;
+      // 同ハーフ中に交代 → 今のイニング・今のアウトから
+      // 違うハーフ（例:4回裏にaway投手交代）→ 次のイニングの同ハーフ頭から
+      // ただし「違うハーフ」とは今が裏でaway交代 or 今が表でhome交代の場合
+      // その場合は次のイニング（4回裏→5回表、4回表→4回裏…はhome）
+      // away: 今が裏(bottom)なら次は(inning+1)の表、今が表なら今のイニングの表
+      // home: 今が表(top)なら今のイニングの裏、今が裏なら今のイニングの裏
+      const fromInning = sameHalf ? g.inning
+        : (defTeam==="away" ? g.inning + 1 : g.inning);
       const fromHalf = pitchHalf;
       const entry = {
         pitcherIdx: newPitcherIdx,

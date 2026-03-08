@@ -1337,48 +1337,43 @@ function App() {
     for(var k in hsc) homeScore += parseInt(hsc[k])||0;
     var side  = half==='top' ? 'away' : 'home';
     var pside = half==='top' ? 'home' : 'away';
-    var lu    = (vg && vg[side+'Lineup'])  || [];
-    var plu   = (vg && vg[pside+'Lineup']) || [];
+    var lu    = (vg && vg[side+'Lineup'])    || [];
+    var ptrs  = (vg && vg[pside+'Pitchers']) || [];
     var bi    = (vg && vg[side+'BatterIdx'])    || 0;
     var pi2   = (vg && vg[pside+'pitcherIdx'])  || 0;
-    var bat   = lu[bi]  || {};
-    var pit   = plu[pi2]|| {};
+    var bat   = lu[bi]   || {};
+    var pit   = ptrs[pi2]|| {};
     var batStr = (bat.num ? bat.num+'番 ' : '') + (bat.name || '－');
     var pitStr = pit.name || '－';
     var aName  = (vg && vg.awayTeam) || 'アウェイ';
     var hName  = (vg && vg.homeTeam) || 'ホーム';
     var INNS   = [1,2,3,4,5,6,7,8,9];
+    var vlog   = (vg && Array.isArray(vg.log)) ? vg.log : [];
 
     var b0 = bases[0] ? String(bases[0]) : null;
     var b1 = bases[1] ? String(bases[1]) : null;
     var b2 = bases[2] ? String(bases[2]) : null;
 
-    // アウト丸（●＝アウト済み、○＝残り）
-    var outDots = React.createElement('div', {style:{display:'flex',gap:6,alignItems:'center',justifyContent:'center',marginTop:8}},
+    // アウト丸
+    var outDots = React.createElement('div', {style:{display:'flex',gap:7,alignItems:'center',justifyContent:'center',marginTop:6}},
       [0,1,2].map(function(i){
         return React.createElement('div', {key:i, style:{
-          width:14, height:14, borderRadius:'50%',
+          width:13, height:13, borderRadius:'50%',
           background: i < outs ? '#f87171' : 'transparent',
           border: '2px solid ' + (i < outs ? '#f87171' : '#475569'),
-          transition:'all .2s'
         }});
       })
     );
 
     // ダイヤモンドSVG
-    var diamond = React.createElement('div', {style:{position:'relative',display:'flex',flexDirection:'column',alignItems:'center'}},
-      React.createElement('svg', {viewBox:'0 0 160 150', width:170, height:155, style:{display:'block'}},
+    var diamond = React.createElement('div', {style:{display:'flex',flexDirection:'column',alignItems:'center'}},
+      React.createElement('svg', {viewBox:'0 0 160 150', width:160, height:145, style:{display:'block'}},
         React.createElement('path', {d:'M80,130 L20,70 L80,10 L140,70 Z', fill:'#1a2e1a'}),
         React.createElement('path', {d:'M80,118 L32,70 L80,22 L128,70 Z', fill:'none', stroke:'#2d4a2d', strokeWidth:1.5}),
-        // 二塁
         React.createElement('rect', {x:71,y:11, width:18,height:18, rx:2, transform:'rotate(45 80 20)', fill: b1 ? '#f59e0b' : '#1e3a5f', stroke: b1?'#fbbf24':'#334d66', strokeWidth:1.5}),
-        // 一塁
         React.createElement('rect', {x:119,y:59, width:18,height:18, rx:2, transform:'rotate(45 128 68)', fill: b0 ? '#f59e0b' : '#1e3a5f', stroke: b0?'#fbbf24':'#334d66', strokeWidth:1.5}),
-        // 三塁
         React.createElement('rect', {x:23,y:59, width:18,height:18, rx:2, transform:'rotate(45 32 68)', fill: b2 ? '#f59e0b' : '#1e3a5f', stroke: b2?'#fbbf24':'#334d66', strokeWidth:1.5}),
-        // 本塁
         React.createElement('polygon', {points:'80,128 87,121 80,114 73,121', fill:'#334155', stroke:'#475569', strokeWidth:1}),
-        // ランナー名
         b1 ? React.createElement('text',{x:80,y:18,textAnchor:'middle',fontSize:7,fill:'#fff',fontWeight:'bold'}, b1.slice(0,3)) : null,
         b0 ? React.createElement('text',{x:128,y:66,textAnchor:'middle',fontSize:7,fill:'#fff',fontWeight:'bold'}, b0.slice(0,3)) : null,
         b2 ? React.createElement('text',{x:32,y:66,textAnchor:'middle',fontSize:7,fill:'#fff',fontWeight:'bold'}, b2.slice(0,3)) : null
@@ -1391,16 +1386,16 @@ function App() {
     var tdS = {fontSize:12,padding:'4px 4px',textAlign:'center',borderBottom:'1px solid #0f1e35',minWidth:20};
     var tdB = Object.assign({},tdS,{fontWeight:900,fontSize:15,color:'#fff'});
 
-    return React.createElement('div', {style:{background:'#080f1e',minHeight:'100vh',maxWidth:'100vw',color:'white',fontFamily:'sans-serif',display:'flex',flexDirection:'column',overflow:'hidden'}},
+    return React.createElement('div', {style:{background:'#080f1e',height:'100vh',maxWidth:'100vw',color:'white',fontFamily:'sans-serif',display:'flex',flexDirection:'column',overflow:'hidden'}},
 
-      // ヘッダー：チーム vs チーム ＋ 回＋ 終了ボタン
-      React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',borderBottom:'1px solid #1e3a5f',flexShrink:0}},
+      // ヘッダー
+      React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',borderBottom:'1px solid #1e3a5f',flexShrink:0}},
         React.createElement('div', {style:{fontSize:13,fontWeight:700,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}, aName+' vs '+hName),
         React.createElement('div', {style:{fontSize:13,color:'#93c5fd',fontWeight:700,marginLeft:8,whiteSpace:'nowrap'}}, inning+'回'+topBot),
-        React.createElement('button', {onClick:stopViewing, style:{marginLeft:10,background:'#1e3a5f',color:'#93c5fd',border:'none',borderRadius:6,padding:'5px 10px',fontSize:11,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}, '終了')
+        React.createElement('button', {onClick:stopViewing, style:{marginLeft:10,background:'#1e3a5f',color:'#93c5fd',border:'none',borderRadius:6,padding:'5px 10px',fontSize:11,cursor:'pointer',flexShrink:0}}, '終了')
       ),
 
-      // スコアボード（横スクロール）
+      // スコアボード
       React.createElement('div', {style:{overflowX:'auto',flexShrink:0,borderBottom:'1px solid #1e3a5f',WebkitOverflowScrolling:'touch'}},
         React.createElement('table', {style:{borderCollapse:'collapse',fontSize:11,minWidth:'max-content',width:'100%'}},
           React.createElement('thead', null,
@@ -1433,25 +1428,54 @@ function App() {
         )
       ),
 
-      // 中段：ダイヤモンド＋打者投手
-      React.createElement('div', {style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'12px 0 8px'}},
-        diamond,
+      // 中段：ダイヤモンド＋打者投手 (flex:1でのこりを占有)
+      React.createElement('div', {style:{flex:1,display:'flex',flexDirection:'row',alignItems:'stretch',minHeight:0,borderBottom:'1px solid #1e3a5f'}},
 
-        // 打者・投手カード
-        React.createElement('div', {style:{display:'flex',width:'100%',marginTop:14,borderTop:'1px solid #1e3a5f'}},
-          React.createElement('div', {style:{flex:1,padding:'10px 14px',borderRight:'1px solid #1e3a5f'}},
-            React.createElement('div', {style:{fontSize:10,color:'#64748b',marginBottom:3}}, '打者'),
-            React.createElement('div', {style:{fontSize:16,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}, batStr)
+        // 左：ダイヤモンド
+        React.createElement('div', {style:{flex:'0 0 auto',display:'flex',alignItems:'center',justifyContent:'center',padding:'8px 8px',borderRight:'1px solid #1e3a5f'}},
+          diamond
+        ),
+
+        // 右：打者・投手・前打者・ログ
+        React.createElement('div', {style:{flex:1,display:'flex',flexDirection:'column',minWidth:0,overflow:'hidden'}},
+
+          // 打者・投手
+          React.createElement('div', {style:{display:'flex',borderBottom:'1px solid #1e3a5f',flexShrink:0}},
+            React.createElement('div', {style:{flex:1,padding:'8px 10px',borderRight:'1px solid #1e3a5f'}},
+              React.createElement('div', {style:{fontSize:9,color:'#64748b',marginBottom:2}}, '打者'),
+              React.createElement('div', {style:{fontSize:14,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}, batStr)
+            ),
+            React.createElement('div', {style:{flex:1,padding:'8px 10px'}},
+              React.createElement('div', {style:{fontSize:9,color:'#64748b',marginBottom:2}}, '投手'),
+              React.createElement('div', {style:{fontSize:14,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}, pitStr)
+            )
           ),
-          React.createElement('div', {style:{flex:1,padding:'10px 14px'}},
-            React.createElement('div', {style:{fontSize:10,color:'#64748b',marginBottom:3}}, '投手'),
-            React.createElement('div', {style:{fontSize:16,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}, pitStr)
+
+          // 前打者結果
+          vlog.length > 0 ? React.createElement('div', {style:{padding:'6px 10px',borderBottom:'1px solid #1e3a5f',flexShrink:0,background:'#0a1628'}},
+            React.createElement('div', {style:{fontSize:9,color:'#64748b',marginBottom:2}}, '前打者'),
+            React.createElement('div', {style:{fontSize:11,color:'#cbd5e1',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}, vlog[0].msg)
+          ) : null,
+
+          // プレイログ
+          React.createElement('div', {style:{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch'}},
+            React.createElement('div', {style:{fontSize:9,color:'#64748b',padding:'5px 10px 2px'}}, 'プレイログ'),
+            vlog.slice(0,20).map(function(entry,i){
+              return React.createElement('div', {key:i, style:{
+                padding:'4px 10px',
+                borderBottom:'1px solid #0f1e35',
+                display:'flex',gap:6,alignItems:'flex-start'
+              }},
+                React.createElement('span', {style:{fontSize:9,color:'#475569',flexShrink:0,paddingTop:1}}, entry.ts||''),
+                React.createElement('span', {style:{fontSize:11,color: i===0?'#e2e8f0':'#94a3b8',lineHeight:'1.4'}}, entry.msg||'')
+              );
+            })
           )
         )
       ),
 
-      // フッター：観戦コード
-      React.createElement('div', {style:{textAlign:'center',padding:'6px',color:'#1e3a5f',fontSize:10,flexShrink:0}}, '👁 '+syncGameId)
+      // フッター
+      React.createElement('div', {style:{textAlign:'center',padding:'4px',color:'#1e3a5f',fontSize:10,flexShrink:0}}, '👁 '+syncGameId)
     );
   }
 

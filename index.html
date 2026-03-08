@@ -667,14 +667,23 @@ const fbDeleteTeam = (id) => {
   } catch(e) { console.error("[FB] team delete error:", e); }
 };
 const fbWatchTeams = (cb) => {
-  if (!fbInit()) return ()=>{};
-  const ref = fbDB.ref("shared_teams");
-  ref.on("value", s => {
-    const val = s ? s.val() : null;
-    const teams = val ? Object.values(val).filter(t=>t&&t.id).sort((a,b)=>(a._ts||0)-(b._ts||0)) : [];
-    cb(teams);
-  });
-  return () => ref.off("value");
+  // fbInitが失敗しても少し待ってリトライ
+  const tryConnect = (attempt) => {
+    if (fbInit()) {
+      const ref = fbDB.ref("shared_teams");
+      ref.on("value", s => {
+        const val = s ? s.val() : null;
+        const teams = val ? Object.values(val).filter(t=>t&&t.id).sort((a,b)=>(a._ts||0)-(b._ts||0)) : [];
+        cb(teams);
+      });
+      return () => ref.off("value");
+    } else if (attempt < 5) {
+      setTimeout(() => tryConnect(attempt+1), 1000 * attempt);
+      return ()=>{};
+    }
+    return ()=>{};
+  };
+  return tryConnect(1);
 };
 const fbUnsub = (id) => { if(fbDB&&id) try{fbDB.ref("games/"+id).off("value");}catch(e){} };
 
@@ -774,6 +783,21 @@ function App() {
       }, 1000);
     } catch(e){ showToast("エラー: "+e.message); }
   };
+  // Firebaseチーム共有の監視（マウント時に開始）
+  useEffect(() => {
+    setTeamSyncStatus("syncing");
+    try {
+      const unsub = fbWatchTeams((fbTeams) => {
+        setStorage(s => ({...s, teams: fbTeams}));
+        setTeamSyncStatus("ok");
+      });
+      return unsub;
+    } catch(e) {
+      setTeamSyncStatus("error");
+      return ()=>{};
+    }
+  }, []);
+
   const stopViewing = ()=>{
     if(syncGameId && fbDB) {
       try { fbDB.ref("games/"+syncGameId).off("value"); } catch(e){}

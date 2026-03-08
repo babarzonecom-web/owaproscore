@@ -650,6 +650,32 @@ const fbSubscribe = (id, cb) => {
   ref.on("value", s => { if(s&&s.exists()) cb(s.val()); });
   return () => ref.off("value");
 };
+
+// チーム共有用Firebase関数
+const fbSaveTeam = (team) => {
+  if (!fbInit()) return;
+  try {
+    fbDB.ref("shared_teams/"+team.id).set({...team, _ts: Date.now()});
+    console.log("[FB] team saved:", team.id);
+  } catch(e) { console.error("[FB] team save error:", e); }
+};
+const fbDeleteTeam = (id) => {
+  if (!fbInit()) return;
+  try {
+    fbDB.ref("shared_teams/"+id).remove();
+    console.log("[FB] team deleted:", id);
+  } catch(e) { console.error("[FB] team delete error:", e); }
+};
+const fbWatchTeams = (cb) => {
+  if (!fbInit()) return ()=>{};
+  const ref = fbDB.ref("shared_teams");
+  ref.on("value", s => {
+    const val = s ? s.val() : null;
+    const teams = val ? Object.values(val).filter(t=>t&&t.id).sort((a,b)=>(a._ts||0)-(b._ts||0)) : [];
+    cb(teams);
+  });
+  return () => ref.off("value");
+};
 const fbUnsub = (id) => { if(fbDB&&id) try{fbDB.ref("games/"+id).off("value");}catch(e){} };
 
 const SKEY = "bb_v7";
@@ -682,6 +708,7 @@ function App() {
   const [syncGameId, setSyncGameId] = useState("");
   const [viewerCode, setViewerCode] = useState("");
   const [viewerGame, setViewerGame] = useState(null);
+  const [teamSyncStatus, setTeamSyncStatus] = useState("idle"); // idle/syncing/ok/error
   const isViewer = syncMode==="viewer";
   const isHost   = syncMode==="host";
   const [modal, setModal] = useState(null);
@@ -1061,11 +1088,15 @@ function App() {
   
   const makeTeamId = () => Date.now().toString(36);
   const saveTeam = (team) => {
+    const teamWithId = team.id ? team : {...team, id:makeTeamId()};
+    // Firebaseに保存（全員に共有）
+    fbSaveTeam(teamWithId);
+    // ローカルにも即時反映
     setStorage(s => {
-      const existing = (s.teams||[]).findIndex(t=>t.id===team.id);
+      const existing = (s.teams||[]).findIndex(t=>t.id===teamWithId.id);
       const teams = existing>=0
-        ? s.teams.map(t=>t.id===team.id?team:t)
-        : [...(s.teams||[]), {...team, id:makeTeamId()}];
+        ? s.teams.map(t=>t.id===teamWithId.id?teamWithId:t)
+        : [...(s.teams||[]), teamWithId];
       return {...s, teams};
     });
     showToast(`「${team.name}」を保存しました`);
@@ -1998,7 +2029,14 @@ function App() {
         , tab==="teams"&&(React.createElement(React.Fragment, null
           , React.createElement('div', { style: S.card,}
             , React.createElement('div', { style: {display:"flex",alignItems:"center",marginBottom:14},}
-              , React.createElement('div', { style: S.ct,}, "🏟 チーム登録・管理" )
+                           , React.createElement('div', { style: S.ct,}
+                  , "🏟 チーム登録・管理 "
+                  , React.createElement('span', { style: {fontSize:10,
+                    color: teamSyncStatus==="ok"?"#4ade80": teamSyncStatus==="syncing"?"#fbbf24":"#64748b",
+                    fontWeight:400}},
+                    teamSyncStatus==="ok"?"☁ 共有中": teamSyncStatus==="syncing"?"⏳ 同期中...":"☁ 接続待ち"
+                  )
+                )
               , React.createElement('button', { onClick: ()=>setModal({step:"team_edit",editTeam:null}),
                 style: {...sBt("#16a34a"),marginLeft:"auto",padding:"5px 14px",fontSize:12},}, "＋ 新規チーム登録"
 
@@ -2468,6 +2506,7 @@ function App() {
                 , React.createElement('span', { style: {color:"#f87171",fontSize:12},}, "この操作は取り消せません。")
               )
               , React.createElement('button', { onClick: ()=>{
+                fbDeleteTeam(modal.targetTeamId);
                 setStorage(s=>({...s,teams:(s.teams||[]).filter(t=>t.id!==modal.targetTeamId)}));
                 setModal(null);
                 showToast("チームを削除しました");

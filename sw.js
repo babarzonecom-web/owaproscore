@@ -1,4 +1,4 @@
-// v97
+// v99
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(

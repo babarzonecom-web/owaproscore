@@ -292,7 +292,7 @@ function MiniDiamond({ bases, size=56 }) {
 }
 const BASE_LABELS = ["1塁","2塁","3塁","ホームイン🏠","アウト❌"];
 const BASE_COLORS = ["#fbbf24","#22c55e","#f87171","#f97316","#94a3b8"];
-function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel }) {
+function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel, defTeamLineup }) {
   
   // postBasesで見つからないランナーのデフォルト先
   // batterOutフラグを使って判定
@@ -343,6 +343,8 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
 
   const [runners, setRunners] = useState(buildRunners);
   const [adjOuts, setAdjOuts] = useState(outs);
+  const [adjErrorPos, setAdjErrorPos] = useState(null);
+  const [showErrPicker, setShowErrPicker] = useState(false);
 
 
   
@@ -459,9 +461,42 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
           )
         )
 
-        , React.createElement('button', { onClick: ()=>onConfirm(adjBases, scoredNames, adjOuts),
+        , React.createElement('button', { onClick: ()=>onConfirm(adjBases, scoredNames, adjOuts, adjErrorPos),
           style: {...sBt("#16a34a"),width:"100%",padding:"11px",fontSize:14,fontWeight:700,marginBottom:6},}, "✅ "
            , adjRuns>0?`${adjRuns}点 — `:"", "この内容で記録する"
+        )
+        , React.createElement('div', { style: {marginBottom:8}},
+          React.createElement('button', {
+            onClick: ()=>setShowErrPicker(v=>!v),
+            style: {...sBt(adjErrorPos?"#7f1d1d":"#1e3a5f"), width:"100%", padding:"8px", fontSize:12,
+              border:`1px dashed ${adjErrorPos?"#f87171":"#2a4a7a"}`, marginBottom: showErrPicker?8:0},
+          }, adjErrorPos ? `🔴 エラー: ${adjErrorPos}` : "🔴 エラーを追加（任意）")
+          , showErrPicker && React.createElement('div', {style:{background:"#0a1628",borderRadius:8,padding:10,border:"1px solid #1e3a5f"}},
+            React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:8}}, "エラーをつけるポジションを選択"),
+            React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}},
+              ["投","捕","一","二","三","遊","左","中","右"].map(pos => {
+                const defLineup = defTeamLineup||[];
+                const posMap = {};
+                defLineup.forEach(p=>{ if(p.pos) posMap[p.pos]=p.name; });
+                const pname = posMap[pos];
+                return React.createElement('button', {
+                  key: pos,
+                  onClick: ()=>{ setAdjErrorPos(adjErrorPos===pos?null:pos); },
+                  style: {
+                    padding:"6px 10px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:700,
+                    background: adjErrorPos===pos?"#7f1d1d":"#0d1f35",
+                    border:`1.5px solid ${adjErrorPos===pos?"#f87171":"#1e3a5f"}`,
+                    color: adjErrorPos===pos?"#f87171":"#e2e8f0",
+                    display:"flex", flexDirection:"column", alignItems:"center", gap:2,
+                  }
+                }, pos, pname&&React.createElement('span',{style:{fontSize:9,color:"#94a3b8"}},pname));
+              })
+            )
+            , React.createElement('button', {
+              onClick:()=>{setAdjErrorPos(null);setShowErrPicker(false);},
+              style:{fontSize:11,color:"#64748b",background:"transparent",border:"none",cursor:"pointer",padding:"4px 0"}
+            }, "エラーなし（クリア）")
+          )
         )
         , React.createElement('button', { onClick: onCancel, style: S.cBtn,}, "キャンセル")
       )
@@ -473,7 +508,7 @@ const eShort = (e) => { const n=norm(e); return (_optionalChain([rOf, 'call', _2
 const eRuns  = (list) => list.reduce((s,e)=>s+(norm(e).runs||0),0);
 const toList = (ab,inn) => Array.isArray(ab[inn])?ab[inn]:(ab[inn]?[ab[inn]]:[]);
 
-const makePlayer  = (i) => ({ id:i, name:`選手${i}`, pos:String(i<=9?i:"代"), atBats:{}, rbi:0, sb:0, cs:0 });
+const makePlayer  = (i) => ({ id:i, name:`選手${i}`, pos:"", atBats:{}, rbi:0, sb:0, cs:0 });
 const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:0,
   
   autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0,
@@ -3178,9 +3213,10 @@ function App() {
                   batterScored: modal.pendingCode==="HR" ? true : false,
                   batterOut: ["K","KL","GO","FO","LO","FF","SAC","SF","DP"].includes(modal.pendingCode) || modal.autoNewOuts>=3,
                   outs: modal.autoNewOuts,
-                  onConfirm: (adjBases,scoredNames,adjOuts)=>{
+                  defTeamLineup: game[(modal.team==="away"?"home":"away")+"Lineup"]||[],
+                  onConfirm: (adjBases,scoredNames,adjOuts,adjErrorPos)=>{
                     commitAtBat(modal.team,modal.pidx,modal.inning,
-                      modal.pendingCode,modal.pendingDir||null,scoredNames,adjBases,adjOuts,modal.errorPos||null);
+                      modal.pendingCode,modal.pendingDir||null,scoredNames,adjBases,adjOuts,adjErrorPos||modal.errorPos||null);
                     setModal(null);
                   },
                   onCancel: ()=>setModal(null),}

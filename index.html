@@ -971,7 +971,7 @@ function App() {
       });
       
       let defLineupUpdate = {};
-      if(code==="E" && errorPos){
+      if(errorPos){
         const defTeam = team==="away"?"home":"away";
         const defLk = defTeam+"Lineup";
         const defLineup = g[defLk].map(p => {

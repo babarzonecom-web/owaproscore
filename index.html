@@ -889,7 +889,25 @@ function App() {
   const awayTotal = calcTotal(game.awayScore);
   const homeTotal = calcTotal(game.homeScore);
 
-  
+  // エラー数・ヒット数をlineupから直接集計（_subOuts含む）
+  const sumLineupE = (lu) => lu.reduce((s,p) => {
+    let e = p.e||0;
+    (p._subOuts||[]).forEach(so => { e += so.e||0; });
+    if(p._subOut && !p._subOuts) e += p._subOut.e||0;
+    return s+e;
+  }, 0);
+  const sumLineupH = (lu) => lu.reduce((s,p) => {
+    const countH = (ab) => Object.values(ab||{}).flat().filter(en=>{const c=(en&&en.code)||en;return c==='H1'||c==='H2'||c==='H3'||c==='HR';}).length;
+    let h = countH(p.atBats);
+    (p._subOuts||[]).forEach(so => { h += countH(so.atBats); });
+    if(p._subOut && !p._subOuts) h += countH(p._subOut.atBats);
+    return s+h;
+  }, 0);
+  const awayErrsTotal = sumLineupE(game.awayLineup||[]);
+  const homeErrsTotal = sumLineupE(game.homeLineup||[]);
+  const awayHitsTotal = sumLineupH(game.awayLineup||[]);
+  const homeHitsTotal = sumLineupH(game.homeLineup||[]);
+
   const RBI_CODES = new Set(["H1","H2","H3","HR","BB","HBP","SAC","SF"]);
   const commitAtBat = useCallback((team, pidx, inning, code, dir, scoredNames, newBases, newOuts, errorPos)=>{
     const runs = (scoredNames||[]).length;
@@ -1898,8 +1916,8 @@ function App() {
                 )
                 , React.createElement('tbody', null
                   , [
-                    {team:"away",label:game.awayTeam,score:game.awayScore,total:awayTotal,stats:aStats,errStats:aStats,color:"#fbbf24"},
-                    {team:"home",label:game.homeTeam,score:game.homeScore,total:homeTotal,stats:hStats,errStats:hStats,color:"#7dd3fc"},
+                    {team:"away",label:game.awayTeam,score:game.awayScore,total:awayTotal,hits:awayHitsTotal,errs:awayErrsTotal,color:"#fbbf24"},
+                    {team:"home",label:game.homeTeam,score:game.homeScore,total:homeTotal,hits:homeHitsTotal,errs:homeErrsTotal,color:"#7dd3fc"},
                   ].map(row=>(
                     React.createElement('tr', { key: row.team, style: {background:"#0d1f35"},}
                       , React.createElement('td', { style: {...S.td,color:row.color,fontWeight:700,paddingLeft:10,fontSize:13},}, row.label)
@@ -1911,8 +1929,8 @@ function App() {
                         )
                       ))
                       , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:900,fontSize:20,color:"#fbbf24"},}, row.total)
-                      , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#4ade80"},}, row.stats.reduce((s,p)=>s+(p._h||0),0))
-                      , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#f87171"},}, row.errStats.reduce((s,p)=>s+(p.e||0),0))
+                      , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#4ade80"},}, row.hits)
+                      , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#f87171"},}, row.errs)
                     )
                   ))
                 )

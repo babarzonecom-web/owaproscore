@@ -2632,16 +2632,17 @@ function App() {
             // 大会未参加時: コード入力UI
             , !tournament && React.createElement('div', null
               , React.createElement('div', {style:{fontSize:13,color:"#94a3b8",marginBottom:14}}, "大会コードを入力して参加、または新しい大会を作成してください")
+              , React.createElement('input', {
+                  value: tournamentCode,
+                  onChange: e=>setTournamentCode(e.target.value.toUpperCase()),
+                  placeholder: "例: SUMMER2026",
+                  style:{width:"100%",boxSizing:"border-box",padding:"10px 12px",borderRadius:8,
+                    background:"#0d1f35",border:"1.5px solid #1e3a5f",color:"#e2e8f0",
+                    fontSize:14,outline:"none",marginBottom:10},
+                })
               , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:8}}
-                , React.createElement('input', {
-                    value: tournamentCode,
-                    onChange: e=>setTournamentCode(e.target.value.toUpperCase()),
-                    placeholder: "例: SUMMER2026",
-                    style:{flex:1,padding:"10px 12px",borderRadius:8,background:"#0d1f35",
-                      border:"1.5px solid #1e3a5f",color:"#e2e8f0",fontSize:14,outline:"none"},
-                  })
                 , React.createElement('button', {
-                    onClick: async ()=>{
+                    onClick: ()=>{
                       const code = tournamentCode.trim().toUpperCase();
                       if(!code){ setTournamentMsg("コードを入力してください"); return; }
                       if(!fbDB){ setTournamentMsg("Firebase未接続です"); return; }
@@ -2652,29 +2653,29 @@ function App() {
                           setTournamentMsg("");
                           fbTournamentListen(code, d=>{ if(d) setTournament(d); });
                         } else {
-                          setTournamentMsg("見つかりません。新規作成しますか？");
+                          setTournamentMsg("この大会コードは存在しません");
                         }
                       });
                     },
-                    style:{...sBt("#1d4ed8"),padding:"10px 16px",fontSize:13}
-                  }, "参加")
+                    style:{...sBt("#1d4ed8"),flex:1,padding:"10px",fontSize:13}
+                  }, "🔍 参加（既存）")
+                , React.createElement('button', {
+                    onClick: ()=>{
+                      const code = tournamentCode.trim().toUpperCase();
+                      if(!code){ setTournamentMsg("コードを入力してください"); return; }
+                      if(!fbDB){ setTournamentMsg("Firebase未接続です"); return; }
+                      const t = {code, name:code, createdAt:Date.now(), teams:{}, games:{}};
+                      fbTournamentSave(t);
+                      setTournament(t);
+                      fbTournamentListen(code, d=>{ if(d) setTournament(d); });
+                      setTournamentMsg("");
+                    },
+                    style:{...sBt("#16a34a"),flex:1,padding:"10px",fontSize:13}
+                  }, "✅ 新規作成")
               )
-              , tournamentMsg && React.createElement('div', {style:{fontSize:12,color:"#f87171",marginBottom:8}}, tournamentMsg)
-              , tournamentMsg.includes("新規作成") && React.createElement('button', {
-                  onClick: ()=>{
-                    const code = tournamentCode.trim().toUpperCase();
-                    if(!code) return;
-                    const t = {code, name:code, createdAt:Date.now(), teams:{}, games:{}};
-                    fbTournamentSave(t);
-                    fbTournamentListen(code, d=>{ if(d) setTournament(d); });
-                    setTournament(t);
-                    setTournamentMsg("");
-                  },
-                  style:{...sBt("#16a34a"),width:"100%",padding:"10px",fontSize:13}
-                }, `✅ 「${tournamentCode}」を新規作成`)
+              , tournamentMsg && React.createElement('div', {style:{fontSize:12,color:"#f87171"}}, tournamentMsg)
             )
 
-            // 大会参加中
             , tournament && React.createElement('div', null
               , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}}
                 , React.createElement('div', {style:{fontSize:18,fontWeight:700,color:"#fbbf24"}}, tournament.name||tournament.code)

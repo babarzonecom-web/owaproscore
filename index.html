@@ -516,12 +516,13 @@ const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:
 });
 const makeLineup  = (n=DEFAULT_PLAYERS) => Array.from({length:n},(_,i)=>makePlayer(i+1));
 const makePitchers= () => Array.from({length:5},(_,i)=>makePitcher(i+1));
-const emptyScore  = () => Object.fromEntries(INNINGS.map(i=>[i,""]));
+const emptyScore  = (n=9) => Object.fromEntries(Array.from({length:n},(_,i)=>i+1).map(i=>[i,""]));
 const calcTotal   = (s) => Object.values(s).reduce((a,v)=>a+(parseInt(v)||0),0);
 
 const recomputeScores = (g) => {
   const aScore={...g.awayScore}, hScore={...g.homeScore};
-  INNINGS.forEach(inn=>{
+  const _inns = Array.from({length:g.innings||9},(_,i)=>i+1);
+  _inns.forEach(inn=>{
     let ar=0, hr=0, aHas=false, hHas=false;
     g.awayLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ ar+=norm(e).runs||0; aHas=true; }));
     g.homeLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ hr+=norm(e).runs||0; hHas=true; }));
@@ -605,7 +606,8 @@ const computePitcherStats = (g) => {
     const OUT_CODES_FOR_IP = new Set(["K","KL","GO","FO","LO","FF","SAC","SF"]);
     const OUT_CODES = OUT_CODES_FOR_IP;
     const allAtBats = []; 
-    INNINGS.forEach(inn=>{
+    const _pitInns = Array.from({length:g.innings||9},(_,i)=>i+1);
+    _pitInns.forEach(inn=>{
       ["top","bottom"].forEach(half=>{
         
         const battingTeam = half==="top" ? "away" : "home";
@@ -692,11 +694,12 @@ const computePitcherStats = (g) => {
   return result;
 };
 
-const newGame = () => ({
+const newGame = (innings=7) => ({
   id:Date.now(),
   date:new Date().toISOString().split("T")[0],
+  innings: innings,
   venue:"", awayTeam:"ビジターチーム", homeTeam:"ホームチーム",
-  awayScore:emptyScore(), homeScore:emptyScore(),
+  awayScore:emptyScore(innings), homeScore:emptyScore(innings),
   awayLineup:makeLineup(), homeLineup:makeLineup(),
   awayPitchers:makePitchers(), homePitchers:makePitchers(),
   defenseLog:[], 
@@ -801,7 +804,7 @@ function App() {
   const isViewer = syncMode==="viewer";
   const isHost   = syncMode==="host";
   const [modal, setModal] = useState(null);
-  
+  const [newInnings, setNewInnings] = useState(7);
   const [selDir, setSelDir] = useState(null);
   const [toast,  setToast]  = useState("");
 
@@ -921,6 +924,7 @@ function App() {
     });
   },[]);
 
+  const gameInnings = Array.from({length: game.innings||9}, (_,i)=>i+1);
   const awayTotal = calcTotal(game.awayScore);
   const homeTotal = calcTotal(game.homeScore);
 
@@ -1456,7 +1460,7 @@ function App() {
         const k   = isOverride ? p.k    : auto.autoK;
         
         const ipNum = Math.floor(ip/10) + (ip%10)/3;
-        const era = ipNum>0 ? (er*9/ipNum).toFixed(2) : "---";
+        const era = ipNum>0 ? (er*(g.innings||9)/ipNum).toFixed(2) : "---";
         const ipDisp = `${Math.floor(ip/10)}.${ip%10}`;
         pitRows.push([teamName,p.name,ipDisp,h,er,bb,k,era]);
       });
@@ -1471,7 +1475,7 @@ function App() {
     const scoreRows = [scoreHeader];
     [["away",g.awayTeam],["home",g.homeTeam]].forEach(([side,name])=>{
       const row = [name];
-      INNINGS.forEach(i=>row.push(parseInt(g[side+"Score"][i])||0));
+      Array.from({length:g.innings||9},(_,i)=>i+1).forEach(i=>row.push(parseInt(g[side+"Score"][i])||0));
       row.push(calcTotal(g[side+"Score"]));
       scoreRows.push(row);
     });
@@ -1599,7 +1603,7 @@ function App() {
     var pitStr = pit.name || '－';
     var aName  = (vg && vg.awayTeam) || 'アウェイ';
     var hName  = (vg && vg.homeTeam) || 'ホーム';
-    var INNS   = [1,2,3,4,5,6,7,8,9];
+    var INNS   = Array.from({length:(vg&&vg.innings)||9},(_,i)=>i+1);
     var vlog   = (vg && Array.isArray(vg.log)) ? vg.log : [];
 
     var b0 = bases[0] ? String(bases[0]) : null;
@@ -1943,7 +1947,7 @@ function App() {
                 , React.createElement('thead', null
                   , React.createElement('tr', null
                     , React.createElement('th', { style: {...S.th,width:110,textAlign:"left",paddingLeft:10},}, "チーム")
-                    , INNINGS.map(i=>React.createElement('th', { key: i, style: S.th,}, i))
+                    , gameInnings.map(i=>React.createElement('th', { key: i, style: S.th,}, i))
                     , React.createElement('th', { style: {...S.th,color:"#fbbf24"},}, "計")
                     , React.createElement('th', { style: S.th,}, "H")
                     , React.createElement('th', { style: S.th,}, "E")
@@ -1956,7 +1960,7 @@ function App() {
                   ].map(row=>(
                     React.createElement('tr', { key: row.team, style: {background:"#0d1f35"},}
                       , React.createElement('td', { style: {...S.td,color:row.color,fontWeight:700,paddingLeft:10,fontSize:13},}, row.label)
-                      , INNINGS.map(i=>(
+                      , gameInnings.map(i=>(
                         React.createElement('td', { key: i, style: {...S.td,padding:2,textAlign:"center"},}
                           , React.createElement('span', { style: {fontSize:16,fontWeight:700,color:"#fff",display:"block",padding:"4px 0"},}
                             , row.score[i]===""||row.score[i]===undefined?"":row.score[i]
@@ -2164,7 +2168,7 @@ function App() {
                       , React.createElement('th', { style: {...S.th,width:32},}, "守")
                       , React.createElement('th', { style: {...S.th,width:34},}, "盗/刺")
                       , React.createElement('th', { style: {...S.th,width:32},})
-                      , INNINGS.map(i=>React.createElement('th', { key: i, style: {...S.th,width:54},}, i, "回"))
+                      , gameInnings.map(i=>React.createElement('th', { key: i, style: {...S.th,width:54},}, i, "回"))
                     )
                   )
                   , React.createElement('tbody', null
@@ -2196,7 +2200,7 @@ function App() {
 
                           )
                         )
-                        , INNINGS.map(inn=>{
+                        , gameInnings.map(inn=>{
                           const list=toList(p.atBats,inn);
                           const runs=eRuns(list);
                           const last=list.length?norm(list[list.length-1]):null;
@@ -2374,7 +2378,7 @@ function App() {
                         };
                         const ipVal = dispIp;
                         const eraBase = Math.floor(ipVal/10)*3 + (ipVal%10); 
-                        const era = eraBase>0 ? (dispEr/(eraBase/3)*9).toFixed(2) : "—";
+                        const era = eraBase>0 ? (dispEr/(eraBase/3)*(game.innings||9)).toFixed(2) : "—";
                         const isCurrent = i===curPIdx;
                         return (
                           React.createElement('tr', { key: p.id, style: {background:i%2===0?"#0a1628":"#0d1f35",
@@ -2806,23 +2810,51 @@ function App() {
           React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
             , React.createElement('div', { style: {...S.mBox,maxWidth:320}, onClick: e=>e.stopPropagation(),}
               , React.createElement('div', { style: {...S.mt,marginBottom:8},}, "⚾ 新試合を開始" )
-              , React.createElement('div', { style: {fontSize:13,color:"#94a3b8",marginBottom:20,lineHeight:1.6},}, "現在の試合を保存して"
-                , React.createElement('br', null), "新しい試合を開始しますか？"
+              , React.createElement('div', { style: {fontSize:13,color:"#94a3b8",marginBottom:14,lineHeight:1.6},}, "イニング数を選択してください")
+              , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:12,justifyContent:"center"},}
+                , [5,7,9].map(n=>React.createElement('button', {
+                    key:n,
+                    onClick:()=>setNewInnings(n),
+                    style:{
+                      padding:"10px 18px", borderRadius:8, fontSize:16, fontWeight:700, cursor:"pointer",
+                      background: newInnings===n ? "#1d4ed8" : "#0d1f35",
+                      border: `2px solid ${newInnings===n?"#3b82f6":"#1e3a5f"}`,
+                      color: newInnings===n ? "#fff" : "#94a3b8",
+                    }
+                  }, n,"回"))
+              )
+              , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:20,justifyContent:"center"},}
+                , React.createElement('span', { style: {fontSize:12,color:"#94a3b8"},}, "その他:")
+                , React.createElement('input', {
+                    type:"number", min:1, max:15,
+                    value: [5,7,9].includes(newInnings) ? "" : newInnings,
+                    placeholder:"回数を入力",
+                    onChange: e=>{
+                      const v=parseInt(e.target.value);
+                      if(v>=1 && v<=15) setNewInnings(v);
+                    },
+                    style:{
+                      width:90, padding:"6px 10px", borderRadius:8, fontSize:14, fontWeight:700,
+                      background:"#0d1f35", border:"1.5px solid #1e3a5f", color:"#e2e8f0",
+                      textAlign:"center", outline:"none",
+                    }
+                  })
+                , React.createElement('span', { style: {fontSize:12,color:"#94a3b8"},}, "回")
               )
               , React.createElement('button', { onClick: ()=>{
                 saveGame();
-                setStorage(s=>({...s,currentGame:newGame(),undoStack:[]}));
+                setStorage(s=>({...s,currentGame:newGame(newInnings),undoStack:[]}));
                 setTab("score");
                 setModal(null);
-                showToast("新試合を開始しました");
+                showToast(`新試合を開始しました（${newInnings}回制）`);
               }, style: {...sBt("#16a34a"),width:"100%",padding:"12px",fontSize:14,fontWeight:700,marginBottom:8},}, "✅ 保存して新試合へ"
 
               )
               , React.createElement('button', { onClick: ()=>{
-                setStorage(s=>({...s,currentGame:newGame(),undoStack:[]}));
+                setStorage(s=>({...s,currentGame:newGame(newInnings),undoStack:[]}));
                 setTab("score");
                 setModal(null);
-                showToast("新試合を開始しました");
+                showToast(`新試合を開始しました（${newInnings}回制）`);
               }, style: {...sBt("#f59e0b",true),width:"100%",padding:"12px",fontSize:13,fontWeight:700,marginBottom:8},}, "⚠️ 保存せずに新試合へ"
 
               )

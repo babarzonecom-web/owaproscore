@@ -2065,8 +2065,8 @@ function App() {
 
         
         , tab==="lineup"&&(
-          [{team:"away",label:game.awayTeam,stats:aStats,color:"#fbbf24"},
-           {team:"home",label:game.homeTeam,stats:hStats,color:"#7dd3fc"}].map(({team,label,stats,color})=>(
+          [{team:"away",label:game.awayTeam,lineup:game.awayLineup,color:"#fbbf24"},
+           {team:"home",label:game.homeTeam,lineup:game.homeLineup,color:"#7dd3fc"}].map(({team,label,lineup,color})=>(
             React.createElement('div', { key: team, style: S.card,}
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"},}
                 , React.createElement('div', { style: {...S.ct,borderLeft:`4px solid ${color}`,paddingLeft:10,marginBottom:0},}, label)
@@ -2097,9 +2097,9 @@ function App() {
                     )
                   )
                   , React.createElement('tbody', null
-                    , stats.map((p,idx)=>(
+                    , lineup.map((p,idx)=>(
                       React.createElement('tr', { key: p.id, style: {background:idx%2===0?"#0a1628":"#0d1f35",
-                        opacity:idx>=DEFAULT_PLAYERS?0.9:1},}
+                        opacity:1},}
                         , React.createElement('td', { style: {...S.td,textAlign:"center",fontSize:11,
                           color:idx<DEFAULT_PLAYERS?"#7db8e8":"#64748b"},}, idx+1)
                         , React.createElement('td', { style: S.td,}

@@ -1523,6 +1523,17 @@ function App() {
     var asc = (vg && vg.awayScore)||{}; var hsc = (vg && vg.homeScore)||{};
     for(var k in asc) awayScore += parseInt(asc[k])||0;
     for(var k in hsc) homeScore += parseInt(hsc[k])||0;
+    // ヒット数・エラー数集計
+    var awayLu = (vg && vg.awayLineup)||[];
+    var homeLu = (vg && vg.homeLineup)||[];
+    var countHits = function(lu){ return lu.reduce(function(s,p){
+      var ab = p.atBats||{}; var h=0;
+      Object.values(ab).flat().forEach(function(e){ var c=(e&&e.code)||e; if(c==='H1'||c==='H2'||c==='H3'||c==='HR') h++; });
+      return s+h;
+    },0); };
+    var countErrs = function(lu){ return lu.reduce(function(s,p){ return s+(p.e||0); },0); };
+    var awayHits = countHits(awayLu); var homeHits = countHits(homeLu);
+    var awayErrs = countErrs(awayLu); var homeErrs = countErrs(homeLu);
     var side  = half==='top' ? 'away' : 'home';
     var pside = half==='top' ? 'home' : 'away';
     var lu    = (vg && vg[side+'Lineup'])    || [];
@@ -1593,12 +1604,14 @@ function App() {
                 var active = n===inning;
                 return React.createElement('th',{key:n,style:Object.assign({},thS,{color:active?'#7dd3fc':'#64748b',fontWeight:active?700:400,background:active?'#0a1e3d':'transparent'})},n);
               }),
-              React.createElement('th',{style:Object.assign({},thS,{color:'#e2e8f0',fontWeight:700})},'計')
+              React.createElement('th',{style:Object.assign({},thS,{color:'#e2e8f0',fontWeight:700})},'計'),
+              React.createElement('th',{style:Object.assign({},thS,{color:'#4ade80',fontWeight:700})},'H'),
+              React.createElement('th',{style:Object.assign({},thS,{color:'#f87171',fontWeight:700})},'E')
             )
           ),
           React.createElement('tbody', null,
-            [[aName,asc,awayScore],[hName,hsc,homeScore]].map(function(row,ri){
-              var nm=row[0],sc=row[1],tot=row[2];
+            [[aName,asc,awayScore,awayHits,awayErrs],[hName,hsc,homeScore,homeHits,homeErrs]].map(function(row,ri){
+              var nm=row[0],sc=row[1],tot=row[2],hits=row[3],errs=row[4];
               return React.createElement('tr',{key:nm},
                 React.createElement('td',{style:Object.assign({},tdS,{textAlign:'left',paddingLeft:10,fontWeight:700,fontSize:12,color:ri===0?'#fbbf24':'#7dd3fc'})},nm),
                 INNS.map(function(n){
@@ -1609,7 +1622,9 @@ function App() {
                     fontWeight:v>0?700:400
                   })},v!==undefined&&v!==''?v:'-');
                 }),
-                React.createElement('td',{style:tdB},tot)
+                React.createElement('td',{style:tdB},tot),
+                React.createElement('td',{style:Object.assign({},tdB,{color:'#4ade80'})},hits),
+                React.createElement('td',{style:Object.assign({},tdB,{color:'#f87171'})},errs)
               );
             })
           )
@@ -1877,13 +1892,14 @@ function App() {
                     , React.createElement('th', { style: {...S.th,width:110,textAlign:"left",paddingLeft:10},}, "チーム")
                     , INNINGS.map(i=>React.createElement('th', { key: i, style: S.th,}, i))
                     , React.createElement('th', { style: {...S.th,color:"#fbbf24"},}, "計")
-                    , React.createElement('th', { style: S.th,}, "安打")
+                    , React.createElement('th', { style: S.th,}, "H")
+                    , React.createElement('th', { style: S.th,}, "E")
                   )
                 )
                 , React.createElement('tbody', null
                   , [
-                    {team:"away",label:game.awayTeam,score:game.awayScore,total:awayTotal,stats:aStats,color:"#fbbf24"},
-                    {team:"home",label:game.homeTeam,score:game.homeScore,total:homeTotal,stats:hStats,color:"#7dd3fc"},
+                    {team:"away",label:game.awayTeam,score:game.awayScore,total:awayTotal,stats:aStats,errStats:aStats,color:"#fbbf24"},
+                    {team:"home",label:game.homeTeam,score:game.homeScore,total:homeTotal,stats:hStats,errStats:hStats,color:"#7dd3fc"},
                   ].map(row=>(
                     React.createElement('tr', { key: row.team, style: {background:"#0d1f35"},}
                       , React.createElement('td', { style: {...S.td,color:row.color,fontWeight:700,paddingLeft:10,fontSize:13},}, row.label)
@@ -1895,7 +1911,8 @@ function App() {
                         )
                       ))
                       , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:900,fontSize:20,color:"#fbbf24"},}, row.total)
-                      , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#4ade80"},}, row.stats.reduce((s,p)=>s+p._h,0))
+                      , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#4ade80"},}, row.stats.reduce((s,p)=>s+(p._h||0),0))
+                      , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#f87171"},}, row.errStats.reduce((s,p)=>s+(p.e||0),0))
                     )
                   ))
                 )

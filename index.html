@@ -772,6 +772,34 @@ const fbWatchTeams = (cb) => {
 };
 const fbUnsub = (id) => { if(fbDB&&id) try{fbDB.ref("games/"+id).off("value");}catch(e){} };
 
+// ===== 大会管理 Firebase =====
+const fbTournamentSave = (t) => {
+  if(!fbDB||!t||!t.code) return;
+  try { fbDB.ref("tournaments/"+t.code).set({...t, _ts:Date.now()}); } catch(e){}
+};
+const fbTournamentGet = (code, cb) => {
+  if(!fbDB||!code) { cb(null); return ()=>{}; }
+  const ref = fbDB.ref("tournaments/"+code.toUpperCase());
+  ref.once("value", s => cb(s?s.val():null));
+  return ()=>{};
+};
+const fbTournamentListen = (code, cb) => {
+  if(!fbDB||!code) return ()=>{};
+  const ref = fbDB.ref("tournaments/"+code.toUpperCase());
+  ref.on("value", s => cb(s?s.val():null));
+  return () => ref.off("value");
+};
+const fbTournamentAddGame = (code, game) => {
+  if(!fbDB||!code||!game) return;
+  try { fbDB.ref("tournaments/"+code.toUpperCase()+"/games/"+game.id).set({
+    id:game.id, date:game.date||"", innings:game.innings||9,
+    awayTeam:game.awayTeam, homeTeam:game.homeTeam,
+    awayScore:Object.values(game.awayScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0),
+    homeScore:Object.values(game.homeScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0),
+    finished:!!game.finished, _ts:Date.now(),
+  }); } catch(e){}
+};
+
 const SKEY = "bb_v7";
 const lsLoad = () => { 
   try {
@@ -807,6 +835,10 @@ function App() {
   const isHost   = syncMode==="host";
   const [modal, setModal] = useState(null);
   const [newInnings, setNewInnings] = useState(7);
+  const [tournament, setTournament] = useState(null); // 現在参加中の大会データ
+  const [tournamentCode, setTournamentCode] = useState(""); // 入力中のコード
+  const [tournamentMsg, setTournamentMsg] = useState("");
+  const [tournamentTab, setTournamentTab] = useState("top"); // top/teams/games/ranking
   const [selDir, setSelDir] = useState(null);
   const [toast,  setToast]  = useState("");
 
@@ -1878,7 +1910,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , [["score","📊 スコア"],["lineup","👕 打順"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"],["sync","📡 配信"]].map(([id,l])=>(
+        , [["score","📊 スコア"],["lineup","👕 打順"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"],["tournament","🏆 大会"],["sync","📡 配信"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
             borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
@@ -2590,6 +2622,182 @@ function App() {
               })()
             )
           ))
+        )
+
+        
+        , tab==="tournament"&&React.createElement(React.Fragment, null
+          , React.createElement('div', {style:S.card}
+            , React.createElement('div', {style:{...S.ct,marginBottom:12}}, "🏆 大会管理")
+
+            // 大会未参加時: コード入力UI
+            , !tournament && React.createElement('div', null
+              , React.createElement('div', {style:{fontSize:13,color:"#94a3b8",marginBottom:14}}, "大会コードを入力して参加、または新しい大会を作成してください")
+              , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:8}}
+                , React.createElement('input', {
+                    value: tournamentCode,
+                    onChange: e=>setTournamentCode(e.target.value.toUpperCase()),
+                    placeholder: "例: SUMMER2026",
+                    style:{flex:1,padding:"10px 12px",borderRadius:8,background:"#0d1f35",
+                      border:"1.5px solid #1e3a5f",color:"#e2e8f0",fontSize:14,outline:"none"},
+                  })
+                , React.createElement('button', {
+                    onClick: async ()=>{
+                      const code = tournamentCode.trim().toUpperCase();
+                      if(!code){ setTournamentMsg("コードを入力してください"); return; }
+                      if(!fbDB){ setTournamentMsg("Firebase未接続です"); return; }
+                      setTournamentMsg("検索中...");
+                      fbTournamentGet(code, (data)=>{
+                        if(data){
+                          setTournament(data);
+                          setTournamentMsg("");
+                          fbTournamentListen(code, d=>{ if(d) setTournament(d); });
+                        } else {
+                          setTournamentMsg("見つかりません。新規作成しますか？");
+                        }
+                      });
+                    },
+                    style:{...sBt("#1d4ed8"),padding:"10px 16px",fontSize:13}
+                  }, "参加")
+              )
+              , tournamentMsg && React.createElement('div', {style:{fontSize:12,color:"#f87171",marginBottom:8}}, tournamentMsg)
+              , tournamentMsg.includes("新規作成") && React.createElement('button', {
+                  onClick: ()=>{
+                    const code = tournamentCode.trim().toUpperCase();
+                    if(!code) return;
+                    const t = {code, name:code, createdAt:Date.now(), teams:{}, games:{}};
+                    fbTournamentSave(t);
+                    fbTournamentListen(code, d=>{ if(d) setTournament(d); });
+                    setTournament(t);
+                    setTournamentMsg("");
+                  },
+                  style:{...sBt("#16a34a"),width:"100%",padding:"10px",fontSize:13}
+                }, `✅ 「${tournamentCode}」を新規作成`)
+            )
+
+            // 大会参加中
+            , tournament && React.createElement('div', null
+              , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}}
+                , React.createElement('div', {style:{fontSize:18,fontWeight:700,color:"#fbbf24"}}, tournament.name||tournament.code)
+                , React.createElement('div', {style:{fontSize:11,color:"#64748b",background:"#0d1f35",padding:"2px 8px",borderRadius:10,border:"1px solid #1e3a5f"}}, tournament.code)
+                , React.createElement('button', {
+                    onClick:()=>{ setTournament(null); setTournamentCode(""); setTournamentMsg(""); setTournamentTab("top"); },
+                    style:{marginLeft:"auto",...sBt("#475569",true),fontSize:11,padding:"4px 10px"}
+                  }, "退出")
+              )
+
+              // サブタブ
+              , React.createElement('div', {style:{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}
+                , [["top","🏠 トップ"],["teams","👥 チーム"],["games","📋 試合結果"],["ranking","🥇 ランキング"]].map(([id,l])=>
+                    React.createElement('button', {key:id, onClick:()=>setTournamentTab(id),
+                      style:{padding:"6px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",
+                        background:tournamentTab===id?"#1d4ed8":"#0d1f35",
+                        border:`1.5px solid ${tournamentTab===id?"#3b82f6":"#1e3a5f"}`,
+                        color:tournamentTab===id?"#fff":"#94a3b8"}}, l))
+              )
+
+              // トップ
+              , tournamentTab==="top" && React.createElement('div', null
+                , React.createElement('div', {style:{fontSize:13,color:"#94a3b8",marginBottom:12}}, "この試合を大会に登録：")
+                , React.createElement('button', {
+                    onClick:()=>{
+                      fbTournamentAddGame(tournament.code, game);
+                      // チームも登録
+                      const tms = {...(tournament.teams||{})};
+                      [game.awayTeam, game.homeTeam].forEach(n=>{ if(n) tms[n]=n; });
+                      const updated = {...tournament, teams:tms};
+                      fbTournamentSave(updated);
+                      setTournament(updated);
+                      setTournamentMsg("✅ 登録しました！");
+                      setTimeout(()=>setTournamentMsg(""),2000);
+                    },
+                    style:{...sBt("#16a34a"),width:"100%",padding:"10px",fontSize:13,marginBottom:8}
+                  }, `📝 「${game.awayTeam} vs ${game.homeTeam}」を登録`)
+                , tournamentMsg && React.createElement('div', {style:{fontSize:12,color:"#4ade80"}}, tournamentMsg)
+              )
+
+              // チーム一覧
+              , tournamentTab==="teams" && React.createElement('div', null
+                , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:8}}, `参加チーム: ${Object.keys(tournament.teams||{}).length}チーム`)
+                , Object.values(tournament.teams||{}).length === 0
+                  ? React.createElement('div', {style:{color:"#475569",fontSize:13}}, "まだチームが登録されていません")
+                  : Object.values(tournament.teams||{}).map(teamName=>
+                      React.createElement('div', {key:teamName,
+                        style:{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",
+                          background:"#0d1f35",borderRadius:8,marginBottom:6,border:"1px solid #1e3a5f"}}
+                        , React.createElement('span', {style:{fontSize:14,color:"#e2e8f0",fontWeight:700}}, teamName)
+                        , React.createElement('button', {
+                            onClick:()=>{
+                              // チームタブのチームから選手をスタメンに呼び出す
+                              const found = teams.find(t=>t.name===teamName);
+                              if(found){
+                                setTab("teams");
+                                showToast(`${teamName}のチームタブを開きました`);
+                              } else {
+                                showToast("チームタブに登録がありません");
+                              }
+                            },
+                            style:{marginLeft:"auto",...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}
+                          }, "👥 チームタブへ")
+                      ))
+              )
+
+              // 試合結果
+              , tournamentTab==="games" && React.createElement('div', null
+                , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:8}}, `登録試合: ${Object.keys(tournament.games||{}).length}試合`)
+                , Object.keys(tournament.games||{}).length === 0
+                  ? React.createElement('div', {style:{color:"#475569",fontSize:13}}, "まだ試合が登録されていません")
+                  : Object.values(tournament.games||{}).sort((a,b)=>(b._ts||0)-(a._ts||0)).map(g=>
+                      React.createElement('div', {key:g.id,
+                        style:{padding:"10px 12px",background:"#0d1f35",borderRadius:8,
+                          marginBottom:6,border:"1px solid #1e3a5f"}}
+                        , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:4}}, g.date||"")
+                        , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8}}
+                          , React.createElement('span', {style:{fontSize:13,color:"#fbbf24",fontWeight:700}}, g.awayTeam)
+                          , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:g.awayScore>g.homeScore?"#4ade80":g.awayScore<g.homeScore?"#f87171":"#e2e8f0"}}, g.awayScore)
+                          , React.createElement('span', {style:{fontSize:12,color:"#475569"}}, "—")
+                          , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:g.homeScore>g.awayScore?"#4ade80":g.homeScore<g.awayScore?"#f87171":"#e2e8f0"}}, g.homeScore)
+                          , React.createElement('span', {style:{fontSize:13,color:"#7dd3fc",fontWeight:700}}, g.homeTeam)
+                          , g.finished && React.createElement('span', {style:{fontSize:10,color:"#64748b",marginLeft:"auto"}}, "終了")
+                        )
+                      ))
+              )
+
+              // ランキング
+              , tournamentTab==="ranking" && React.createElement('div', null
+                , (()=>{
+                    const glist = Object.values(tournament.games||{});
+                    const stats = {};
+                    glist.forEach(g=>{
+                      [["away",g.awayTeam,g.awayScore,g.homeScore],["home",g.homeTeam,g.homeScore,g.awayScore]].forEach(([,name,score,opp])=>{
+                        if(!name) return;
+                        if(!stats[name]) stats[name]={name,w:0,l:0,d:0,rf:0,ra:0};
+                        stats[name].rf+=score||0; stats[name].ra+=opp||0;
+                        if(g.finished){ if(score>opp) stats[name].w++; else if(score<opp) stats[name].l++; else stats[name].d++; }
+                      });
+                    });
+                    const rows = Object.values(stats).sort((a,b)=>b.w-a.w||(b.rf-b.ra)-(a.rf-a.ra));
+                    if(!rows.length) return React.createElement('div',{style:{color:"#475569",fontSize:13}},"まだデータがありません");
+                    return React.createElement('div', null
+                      , React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 40px 40px 40px 40px 40px",gap:4,
+                          fontSize:11,color:"#64748b",padding:"4px 8px",marginBottom:4}},
+                        "チーム名","勝","負","分","得点","失点")
+                      , rows.map((r,i)=>React.createElement('div', {key:r.name,
+                          style:{display:"grid",gridTemplateColumns:"1fr 40px 40px 40px 40px 40px",gap:4,
+                            padding:"8px",background:i%2===0?"#0d1f35":"#0a1628",borderRadius:6,marginBottom:3,
+                            fontSize:13,alignItems:"center"}}
+                          , React.createElement('span',{style:{fontWeight:700,color:i===0?"#fbbf24":"#e2e8f0"}},
+                              (i===0?"🥇 ":i===1?"🥈 ":i===2?"🥉 ":"")+r.name)
+                          , React.createElement('span',{style:{color:"#4ade80",textAlign:"center",fontWeight:700}},r.w)
+                          , React.createElement('span',{style:{color:"#f87171",textAlign:"center"}},r.l)
+                          , React.createElement('span',{style:{color:"#94a3b8",textAlign:"center"}},r.d)
+                          , React.createElement('span',{style:{color:"#60a5fa",textAlign:"center"}},r.rf)
+                          , React.createElement('span',{style:{color:"#f87171",textAlign:"center"}},r.ra)
+                        ))
+                    );
+                  })()
+              )
+            )
+          )
         )
 
         

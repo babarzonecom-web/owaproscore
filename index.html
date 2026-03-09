@@ -292,7 +292,7 @@ function MiniDiamond({ bases, size=56 }) {
 }
 const BASE_LABELS = ["1塁","2塁","3塁","ホームイン🏠","アウト❌"];
 const BASE_COLORS = ["#fbbf24","#22c55e","#f87171","#f97316","#94a3b8"];
-function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel, defTeamLineup }) {
+function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel, defTeamLineup, pendingCode, preErrorPos }) {
   
   // postBasesで見つからないランナーのデフォルト先
   // batterOutフラグを使って判定
@@ -343,8 +343,9 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
 
   const [runners, setRunners] = useState(buildRunners);
   const [adjOuts, setAdjOuts] = useState(outs);
-  const [adjErrorPos, setAdjErrorPos] = useState(null);
+  const [adjErrorPos, setAdjErrorPos] = useState(preErrorPos||null);
   const [showErrPicker, setShowErrPicker] = useState(false);
+  const isECode = pendingCode === "E";
 
 
   
@@ -467,11 +468,12 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
         )
         , React.createElement('div', { style: {marginBottom:8}},
           React.createElement('button', {
-            onClick: ()=>setShowErrPicker(v=>!v),
+            onClick: ()=>{ if(!isECode) setShowErrPicker(v=>!v); },
             style: {...sBt(adjErrorPos?"#7f1d1d":"#1e3a5f"), width:"100%", padding:"8px", fontSize:12,
-              border:`1px dashed ${adjErrorPos?"#f87171":"#2a4a7a"}`, marginBottom: showErrPicker?8:0},
+              border:`1px dashed ${adjErrorPos?"#f87171":"#2a4a7a"}`, marginBottom: showErrPicker?8:0,
+              opacity: isECode ? 0.6 : 1, cursor: isECode ? "default" : "pointer"},
           }, adjErrorPos ? `🔴 エラー: ${adjErrorPos}` : "🔴 エラーを追加（任意）")
-          , showErrPicker && React.createElement('div', {style:{background:"#0a1628",borderRadius:8,padding:10,border:"1px solid #1e3a5f"}},
+          , !isECode && showErrPicker && React.createElement('div', {style:{background:"#0a1628",borderRadius:8,padding:10,border:"1px solid #1e3a5f"}},
             React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:8}}, "エラーをつけるポジションを選択"),
             React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}},
               ["投","捕","一","二","三","遊","左","中","右"].map(pos => {
@@ -3245,6 +3247,8 @@ function App() {
                   batterScored: modal.pendingCode==="HR" ? true : false,
                   batterOut: ["K","KL","GO","FO","LO","FF","SAC","SF","DP"].includes(modal.pendingCode) || modal.autoNewOuts>=3,
                   outs: modal.autoNewOuts,
+                  pendingCode: modal.pendingCode,
+                  preErrorPos: modal.errorPos||null,
                   defTeamLineup: game[(modal.team==="away"?"home":"away")+"Lineup"]||[],
                   onConfirm: (adjBases,scoredNames,adjOuts,adjErrorPos)=>{
                     commitAtBat(modal.team,modal.pidx,modal.inning,

@@ -528,23 +528,26 @@ const computeOneStats = (p) => {
 const computeStats = (players) => {
   const rows = [];
   players.forEach(p => {
-    // _subOut がある場合は元選手を先に追加（打席順を維持）
-    if (p._subOut) {
-      const prev = computeOneStats({
-        ...p._subOut,
-        id: (p.id||p.name) + "_subout",
+    // _subOuts配列（旧_subOut単体も吸収）から過去選手を先に追加
+    const legacySubOut = p._subOut && !p._subOuts ? [p._subOut] : [];
+    const subOuts = [...legacySubOut, ...(p._subOuts || [])];
+    subOuts.forEach((prev, idx) => {
+      const nextName = idx < subOuts.length-1 ? subOuts[idx+1].name : p.name;
+      rows.push(computeOneStats({
+        ...prev,
+        id: (p.id||p.name) + "_subout_" + idx,
         order: p.order,
-        _isSub: false,
-        _subOutLabel: true,  // 「→交代」マーク
-        _nextName: p.name,
-      });
-      rows.push(prev);
-    }
-    // 現在の選手（交代後は新選手、交代なしは通常）
+        _subOutLabel: true,
+        _nextName: nextName,
+      }));
+    });
+    // 現在の選手
     rows.push(computeOneStats({
       ...p,
-      _isSub: !!p._subOut,
-      _prevName: p._subOut ? p._subOut.name : null,
+      _subOut: null,
+      _subOuts: null,
+      _isSub: subOuts.length > 0,
+      _prevName: subOuts.length > 0 ? subOuts[subOuts.length-1].name : null,
     }));
   });
   return rows;
@@ -1260,36 +1263,50 @@ function App() {
     mutGame(g=>{
       const lk = team+"Lineup";
       const outPlayer = g[lk][outIdx];
+      const isPosChange = newName === outPlayer.name; // 同名＝ポジション変更のみ
+
       const lineup = g[lk].map((p,i)=>{
         if(i!==outIdx) return p;
-        // 元の選手の記録(atBats等)はそのまま保持し、名前・ポジションだけ新選手に
-        // ただしatBatsは元選手のものなので、新選手は空のatBatsで開始
-        const newPlayer = {
-          ...makePlayer(p.order||outIdx+1),  // 新選手は空記録
+
+        if(isPosChange) {
+          // ポジション変更のみ → _subOut不要、posだけ更新
+          return {...p, pos: newPos};
+        }
+
+        // 選手交代 → 元選手を_subOuts配列に追記（チェーン対応）
+        const prevSubOuts = p._subOuts || [];
+        // 既に_subOutが1件ある古い形式も吸収
+        const legacySubOut = p._subOut && !p._subOuts ? [p._subOut] : [];
+        const allPrevious = [...legacySubOut, ...prevSubOuts, {
+          name: outPlayer.name,
+          pos: outPlayer.pos || "",
+          atBats: p.atBats || {},
+          sb: p.sb || 0,
+          cs: p.cs || 0,
+          run: p.run || 0,
+        }];
+
+        return {
+          ...p,
+          _subOuts: allPrevious,
+          _subOut: null, // 古い形式はクリア
           name: newName,
           pos: newPos,
           subbed: true,
-          subNote: reason||"",
-          prevName: outPlayer.name,  // 元選手名を記録
-        };
-        // 元選手の記録はそのまま残し、新選手を上書き
-        // lineup上は新選手に入れ替え（元選手のatBatsは消える→元選手オブジェクトを別途保存）
-        return {...p, // 元選手のatBats等を引き継ぐためのベース
-          // 元選手記録を_subOutとして退避
-          _subOut: {name:outPlayer.name, pos:outPlayer.pos, atBats:p.atBats, sb:p.sb, cs:p.cs, run:p.run},
-          // 新選手の記録は空から
-          name: newName, pos: newPos, subbed: true, subNote: reason||"",
+          subNote: reason || "",
           prevName: outPlayer.name,
-          atBats: {}, sb:0, cs:0, run:0,
+          atBats: {}, sb: 0, cs: 0, run: 0,
         };
       });
+
       const ts = new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"});
-      
       const log=[{
         ts,
-        msg:`【${g[team+"Team"]}】交代: ${outPlayer.name}(${outPlayer.pos||"-"}) → ${newName}(${newPos||"-"})${reason?` [${reason}]`:""} (${g.inning}回${g.half==="top"?"表":"裏"})`
+        msg: isPosChange
+          ? `【${g[team+"Team"]}】ポジション変更: ${outPlayer.name} ${outPlayer.pos||"-"}→${newPos} (${g.inning}回${g.half==="top"?"表":"裏"})`
+          : `【${g[team+"Team"]}】交代: ${outPlayer.name}(${outPlayer.pos||"-"}) → ${newName}(${newPos||"-"})${reason?` [${reason}]`:""} (${g.inning}回${g.half==="top"?"表":"裏"})`
       },...g.log.slice(0,99)];
-      
+
       const defEntry = {
         inning:g.inning, half:g.half, team,
         outName:outPlayer.name, outPos:outPlayer.pos||"",

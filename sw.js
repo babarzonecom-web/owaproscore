@@ -1,4 +1,4 @@
-// v90 - 強制キャッシュクリア
+// v91
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(

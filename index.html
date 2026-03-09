@@ -922,7 +922,7 @@ function App() {
         const defTeam = team==="away"?"home":"away";
         const defLk = defTeam+"Lineup";
         const defLineup = g[defLk].map(p => {
-          
+          // 現在その守備位置にいる選手（交代後も含む）
           if(p.pos===errorPos) return {...p, e:(p.e||0)+1};
           return p;
         });
@@ -1284,6 +1284,7 @@ function App() {
           sb: p.sb || 0,
           cs: p.cs || 0,
           run: p.run || 0,
+          e: p.e || 0,
         }];
 
         return {
@@ -1295,7 +1296,7 @@ function App() {
           subbed: true,
           subNote: reason || "",
           prevName: outPlayer.name,
-          atBats: {}, sb: 0, cs: 0, run: 0,
+          atBats: {}, sb: 0, cs: 0, run: 0, e: 0,
         };
       });
 

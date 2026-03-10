@@ -754,6 +754,30 @@ const fbSaveTeam = (team) => {
   } catch(e) { console.error("[FB] team save error:", e); }
 };
 
+// Firebase チームメンバー更新（管理者用）
+const fbUpdateTeamMembers = (teamId, members, adminCode) => {
+  if(!fbInit()||!teamId) return;
+  try {
+    fbDB.ref("shared_teams/"+teamId).update({ members, adminCode, _ts: Date.now() });
+  } catch(e){ console.error(e); }
+};
+
+// 投手自責点を特定ゲームで更新（管理者用）
+const fbUpdatePitcherER = (teamId, gameId, pitcherName, newER, side) => {
+  if(!fbInit()||!teamId||!gameId||!pitcherName) return;
+  try {
+    const ref = fbDB.ref("shared_teams/"+teamId+"/games/"+gameId+"/"+side+"Pitchers");
+    ref.once("value").then(snap=>{
+      if(!snap||!snap.val()) return;
+      const pitchers = snap.val();
+      const idx = pitchers.findIndex(p=>p&&p.name===pitcherName);
+      if(idx<0) return;
+      pitchers[idx] = {...pitchers[idx], er: newER, manualER: true};
+      ref.set(pitchers);
+    });
+  } catch(e){ console.error(e); }
+};
+
 // チームに試合データを丸ごと保存（閲覧時に集計）
 const fbSaveTeamGame = (teamId, game) => {
   if(!fbInit()||!teamId||!game) return;
@@ -864,6 +888,9 @@ function App() {
   const [viewerTeamData, setViewerTeamData] = useState(null);
   const [viewerAdminInput, setViewerAdminInput] = useState("");
   const [isTeamAdmin, setIsTeamAdmin] = useState(false);
+  const [statsTabTeamId, setStatsTabTeamId] = useState("");
+  const [statsTabTeamData, setStatsTabTeamData] = useState(null);
+  const [statsTabLoading, setStatsTabLoading] = useState(false);
   const [teamSyncStatus, setTeamSyncStatus] = useState("idle"); // idle/syncing/ok/error
   const isViewer = syncMode==="viewer";
   const isHost   = syncMode==="host";
@@ -970,6 +997,20 @@ function App() {
       // リアルタイム更新
       fbDB.ref("shared_teams/"+id).on("value", s=>{ if(s&&s.val()) setViewerTeamData(s.val()); });
     });
+  };
+
+  // 成績タブ用チーム読み込み
+  const startStatsTabTeam = (tid)=>{
+    const id = (tid||"").trim();
+    if(!id){ showToast("チームIDを入力してください"); return; }
+    if(!fbInit()){ showToast("Firebase未接続"); return; }
+    setStatsTabLoading(true);
+    fbDB.ref("shared_teams/"+id).once("value").then(snap=>{
+      setStatsTabLoading(false);
+      if(!snap||!snap.exists()){ showToast("チームが見つかりません"); setStatsTabTeamData(null); return; }
+      setStatsTabTeamData(snap.val());
+      fbDB.ref("shared_teams/"+id).on("value", s=>{ if(s&&s.val()) setStatsTabTeamData(s.val()); });
+    }).catch(()=>{ setStatsTabLoading(false); showToast("読み込みエラー"); });
   };
 
   const stopViewing = ()=>{
@@ -1950,26 +1991,6 @@ function App() {
               , React.createElement('button', { onClick: changeInning, style: sBt("#16a34a"),}, "チェンジ ▶" )
               , React.createElement('button', { onClick: saveGame,     style: sBt("#1d4ed8"),}, "💾 保存" )
               
-
-            // 打点入力（スコアタブ）
-            , !game.finished && React.createElement('div', {style:{marginTop:10,padding:"8px 12px",background:"#0a1628",borderRadius:8,border:"1px solid #1e3a5f"}}
-              , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}}, "打点（自動計算・手動修正可）")
-              , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6}}
-                , [...(game.awayLineup||[]),...(game.homeLineup||[])].map((p,i)=>(
-                    React.createElement('label', {key:p.id+"-"+i, style:{display:"flex",alignItems:"center",gap:3,fontSize:11}}
-                      , React.createElement('span', {style:{color:"#7db8e8",fontSize:10,minWidth:42,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, p.name)
-                      , React.createElement('input', {type:"number", value:p.rbi||0,
-                          onChange: e=>{
-                            const t = i < (game.awayLineup||[]).length ? "away" : "home";
-                            const pi = i < (game.awayLineup||[]).length ? i : i-(game.awayLineup||[]).length;
-                            editPlayer(t,pi,"rbi",parseInt(e.target.value)||0);
-                          },
-                          style:{width:36,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
-                            borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:12,outline:"none"}})
-                    )
-                  ))
-              )
-            )
             , React.createElement('button', { onClick: ()=>setModal({step:"endgame"}), style: sBt("#dc2626"),}, "⚾ 試合終了" )
             )) : (React.createElement(React.Fragment, null
               , React.createElement('span', { style: {background:"#dc2626",borderRadius:6,padding:"4px 10px",
@@ -2247,6 +2268,28 @@ function App() {
             )
           )
         )
+
+        
+        
+
+          , !game.finished && React.createElement('div', {style:{marginTop:0,background:"#0a1628",borderRadius:8,padding:"10px 12px",border:"1px solid #1e3a5f"}}
+            , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}}, "打点（自動計算・手動修正可）")
+            , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6}}
+              , [...(game.awayLineup||[]),...(game.homeLineup||[])].map((p,i)=>(
+                  React.createElement('label', {key:p.id+"-"+i, style:{display:"flex",alignItems:"center",gap:3,fontSize:11}}
+                    , React.createElement('span', {style:{color:"#7db8e8",fontSize:10,minWidth:42,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, p.name)
+                    , React.createElement('input', {type:"number", value:p.rbi||0,
+                        onChange: e=>{
+                          const t = i < (game.awayLineup||[]).length ? "away" : "home";
+                          const pi = i < (game.awayLineup||[]).length ? i : i-(game.awayLineup||[]).length;
+                          editPlayer(t,pi,"rbi",parseInt(e.target.value)||0);
+                        },
+                        style:{width:36,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
+                          borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:12,outline:"none"}})
+                  )
+                ))
+            )
+          )
 
         
         , tab==="lineup"&&(
@@ -2864,6 +2907,221 @@ function App() {
           )
         )
 
+        // ===== 成績タブ: チーム通算成績 =====
+        , tab==="stats"&&React.createElement('div', {style:{marginTop:8}}
+          , React.createElement('div', {style:{background:"#0f1e35",borderRadius:10,padding:16,border:"1px solid #1e3a5f",marginBottom:8}}
+            , React.createElement('div', {style:{fontSize:14,fontWeight:700,color:"#7dd3fc",marginBottom:10}}, "📊 チーム通算成績を見る")
+            , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:8}}
+              , React.createElement('input', {
+                  value: statsTabTeamId||"",
+                  onChange: e=>setStatsTabTeamId(e.target.value.trim()),
+                  placeholder: "チームID",
+                  style:{flex:1,padding:"8px 12px",borderRadius:8,background:"#0a1628",
+                    border:"1px solid #334155",color:"#e2e8f0",fontSize:13,fontFamily:"monospace",outline:"none"}
+                })
+              , React.createElement('button', {
+                  onClick:()=>startStatsTabTeam(statsTabTeamId),
+                  style:{...sBt("#3b82f6"),padding:"8px 16px",fontSize:13}
+                }, statsTabLoading ? "⏳" : "👁 表示")
+            )
+            , !statsTabTeamId && teams.length > 0 && React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6}}
+              , React.createElement('div', {style:{fontSize:11,color:"#64748b",width:"100%",marginBottom:4}}, "登録済みチーム:")
+              , teams.map(t=>React.createElement('button', {key:t.id,
+                  onClick:()=>{ setStatsTabTeamId(t.id); startStatsTabTeam(t.id); },
+                  style:{...sBt("#1e3a5f"),fontSize:11,padding:"4px 10px",border:"1px solid #334155"}
+                }, t.name))
+            )
+          )
+
+          , statsTabTeamData && (()=>{
+              const td = statsTabTeamData;
+              const games = Object.values(td.games||{});
+              const teamName = td.name;
+              const HIT_CODES = ['H1','H2','H3','HR'];
+              const NO_AB = ['BB','HBP','SAC','SF'];
+
+              // チーム通算集計
+              let wins=0,loses=0,draws=0,totalRF=0,totalRA=0;
+              let totalAB=0,totalHits=0,totalHR=0,totalSB=0,totalE=0;
+              let totalER=0,totalIP=0;
+              games.forEach(g=>{
+                const myScore = g.awayTeam===teamName?g.awayScoreTotal:g.homeScoreTotal;
+                const oppScore = g.awayTeam===teamName?g.homeScoreTotal:g.awayScoreTotal;
+                totalRF+=myScore||0; totalRA+=oppScore||0;
+                if(myScore>oppScore) wins++; else if(myScore<oppScore) loses++; else draws++;
+                const lu = g.awayTeam===teamName?g.awayLineup:g.homeLineup;
+                (lu||[]).forEach(slot=>{
+                  const allP = [...(slot._subOuts||[]), slot];
+                  allP.forEach(p=>{
+                    if(!p||!p.name) return;
+                    const ab = Object.values(p.atBats||{});
+                    totalAB += ab.filter(c=>!NO_AB.includes(c)).length;
+                    totalHits += ab.filter(c=>HIT_CODES.includes(c)).length;
+                    totalHR += ab.filter(c=>c==='HR').length;
+                    totalSB += p.sb||0;
+                    totalE += p.e||0;
+                  });
+                });
+                const myPitchers = g.awayTeam===teamName?g.awayPitchers:g.homePitchers;
+                (myPitchers||[]).forEach(p=>{
+                  if(!p) return;
+                  const ipVal = p.er!==undefined ? (parseFloat(p.ip||0)) : 0;
+                  totalIP += Math.floor(ipVal/10)*3+(ipVal%10);
+                  totalER += p.er||0;
+                });
+              });
+              const teamAvg = totalAB>0?(totalHits/totalAB).toFixed(3).replace(/^0/,""):".000";
+              const teamERA = totalIP>0?(totalER*9/totalIP).toFixed(2):"-.--";
+
+              return React.createElement(React.Fragment, null
+                // チーム通算
+                , React.createElement('div', {style:{background:"#0f1e35",borderRadius:10,padding:14,border:"1px solid #1e3a5f",marginBottom:8}}
+                  , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fbbf24",marginBottom:10}}, "🏟 ", teamName, " — チーム通算")
+                  , React.createElement('div', {style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}
+                    , [
+                        ["試合数", games.length, "#94a3b8"],
+                        ["勝", wins, "#4ade80"],
+                        ["負", loses, "#f87171"],
+                        ["分", draws, "#94a3b8"],
+                        ["得点", totalRF, "#60a5fa"],
+                        ["失点", totalRA, "#f87171"],
+                        ["打率", teamAvg, "#fbbf24"],
+                        ["本塁打", totalHR, "#fbbf24"],
+                        ["盗塁", totalSB, "#4ade80"],
+                        ["失策", totalE, "#f87171"],
+                        ["防御率", teamERA, "#a78bfa"],
+                      ].map(([label,val,color])=>
+                        React.createElement('div', {key:label, style:{background:"#0a1628",borderRadius:8,padding:"8px",textAlign:"center"}}
+                          , React.createElement('div', {style:{fontSize:label==="打率"||label==="防御率"?16:20,fontWeight:900,color}}, val)
+                          , React.createElement('div', {style:{fontSize:10,color:"#64748b",marginTop:2}}, label)
+                        ))
+                  )
+                )
+
+                // 野手通算
+                , React.createElement('div', {style:{background:"#0f1e35",borderRadius:10,padding:14,border:"1px solid #1e3a5f",marginBottom:8}}
+                  , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#7dd3fc",marginBottom:8}}, "⚾ 野手通算成績")
+                  , (()=>{
+                      const statsMap = {};
+                      games.forEach(g=>{
+                        const lu = g.awayTeam===teamName?g.awayLineup:g.homeLineup;
+                        (lu||[]).forEach(slot=>{
+                          const allP = [...(slot._subOuts||[]), slot];
+                          allP.forEach(p=>{
+                            if(!p||!p.name) return;
+                            const n=p.name;
+                            if(!statsMap[n]) statsMap[n]={name:n,games:0,pa:0,ab:0,hits:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,sb:0,cs:0,run:0};
+                            const ab=Object.values(p.atBats||{});
+                            statsMap[n].games++;
+                            statsMap[n].pa+=ab.length;
+                            statsMap[n].ab+=ab.filter(c=>!NO_AB.includes(c)).length;
+                            statsMap[n].hits+=ab.filter(c=>HIT_CODES.includes(c)).length;
+                            statsMap[n].h2+=ab.filter(c=>c==='H2').length;
+                            statsMap[n].h3+=ab.filter(c=>c==='H3').length;
+                            statsMap[n].hr+=ab.filter(c=>c==='HR').length;
+                            statsMap[n].rbi+=p.rbi||0;
+                            statsMap[n].bb+=ab.filter(c=>c==='BB').length;
+                            statsMap[n].hbp+=ab.filter(c=>c==='HBP').length;
+                            statsMap[n].sb+=p.sb||0;
+                            statsMap[n].cs+=p.cs||0;
+                            statsMap[n].run+=p.run||0;
+                          });
+                        });
+                      });
+                      const rows=Object.values(statsMap).sort((a,b)=>b.hits-a.hits);
+                      if(!rows.length) return React.createElement('div',{style:{color:"#475569",fontSize:12}},"データなし");
+                      return React.createElement('div',{style:{overflowX:"auto"}}
+                        , React.createElement('table',{style:{width:"100%",borderCollapse:"collapse",fontSize:10,whiteSpace:"nowrap"}}
+                          , React.createElement('thead',null
+                            , React.createElement('tr',null
+                              , ["選手","試","打席","打数","安打","2塁","3塁","本塁","打点","四球","死球","盗塁","盗刺","得点","打率"].map(h=>
+                                  React.createElement('th',{key:h,style:{padding:"3px 4px",color:"#64748b",textAlign:"center",borderBottom:"1px solid #1e3a5f",fontWeight:400}},h))
+                            )
+                          )
+                          , React.createElement('tbody',null
+                            , rows.map(p=>React.createElement('tr',{key:p.name,style:{borderBottom:"1px solid #0f1e35"}}
+                                , React.createElement('td',{style:{padding:"3px 4px",color:"#e2e8f0",fontWeight:700,whiteSpace:"nowrap"}},p.name)
+                                , ...[p.games,p.pa,p.ab].map((v,i)=>React.createElement('td',{key:i,style:{padding:"3px 4px",color:"#94a3b8",textAlign:"center"}},v))
+                                , React.createElement('td',{style:{padding:"3px 4px",color:"#4ade80",textAlign:"center",fontWeight:700}},p.hits)
+                                , ...[p.h2,p.h3].map((v,i)=>React.createElement('td',{key:"h"+i,style:{padding:"3px 4px",color:"#94a3b8",textAlign:"center"}},v))
+                                , React.createElement('td',{style:{padding:"3px 4px",color:"#fbbf24",textAlign:"center",fontWeight:700}},p.hr)
+                                , React.createElement('td',{style:{padding:"3px 4px",color:"#60a5fa",textAlign:"center"}},p.rbi)
+                                , ...[p.bb,p.hbp,p.sb,p.cs,p.run].map((v,i)=>React.createElement('td',{key:"x"+i,style:{padding:"3px 4px",color:"#94a3b8",textAlign:"center"}},v))
+                                , React.createElement('td',{style:{padding:"3px 4px",color:"#fbbf24",textAlign:"center",fontWeight:700}},
+                                    p.ab>0?(p.hits/p.ab).toFixed(3).replace(/^0/,""):".000")
+                              ))
+                          )
+                        )
+                      );
+                    })()
+                )
+
+                // 投手通算
+                , React.createElement('div', {style:{background:"#0f1e35",borderRadius:10,padding:14,border:"1px solid #1e3a5f",marginBottom:8}}
+                  , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#a78bfa",marginBottom:8}}, "🥎 投手通算成績")
+                  , (()=>{
+                      const pMap={};
+                      games.forEach(g=>{
+                        const myPitchers=g.awayTeam===teamName?g.awayPitchers:g.homePitchers;
+                        const pr=g.pitcherResults||{};
+                        (myPitchers||[]).forEach(p=>{
+                          if(!p||!p.name) return;
+                          const n=p.name;
+                          if(!pMap[n]) pMap[n]={name:n,games:0,win:0,lose:0,save:0,hold:0,bs:0,ip:0,er:0,bb:0,so:0,ha:0};
+                          pMap[n].games++;
+                          const res=pr[n]||{};
+                          if(res.win) pMap[n].win++;
+                          if(res.lose) pMap[n].lose++;
+                          if(res.save) pMap[n].save++;
+                          if(res.hold) pMap[n].hold++;
+                          if(res.bs) pMap[n].bs++;
+                          const ipVal=parseFloat(p.ip||0)||0;
+                          pMap[n].ip+=Math.floor(ipVal/10)*3+(ipVal%10);
+                          pMap[n].er+=p.er||0;
+                          pMap[n].bb+=p.bb||0;
+                          pMap[n].so+=p.so||0;
+                          pMap[n].ha+=p.ha||0;
+                        });
+                      });
+                      const rows=Object.values(pMap).sort((a,b)=>b.win-a.win);
+                      if(!rows.length) return React.createElement('div',{style:{color:"#475569",fontSize:12}},"データなし");
+                      return React.createElement('div',{style:{overflowX:"auto"}}
+                        , React.createElement('table',{style:{width:"100%",borderCollapse:"collapse",fontSize:10,whiteSpace:"nowrap"}}
+                          , React.createElement('thead',null
+                            , React.createElement('tr',null
+                              , ["投手","試","勝","負","S","H","BS","投球回","自責","四球","三振","被安打","防御率"].map(h=>
+                                  React.createElement('th',{key:h,style:{padding:"3px 4px",color:"#64748b",textAlign:"center",borderBottom:"1px solid #1e3a5f",fontWeight:400}},h))
+                            )
+                          )
+                          , React.createElement('tbody',null
+                            , rows.map(p=>{
+                                const era=p.ip>0?(p.er*9/p.ip).toFixed(2):"-.--";
+                                const ipDisp=Math.floor(p.ip)+"."+Math.round((p.ip%1)*3);
+                                return React.createElement('tr',{key:p.name,style:{borderBottom:"1px solid #0f1e35"}}
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#e2e8f0",fontWeight:700}},p.name)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#94a3b8",textAlign:"center"}},p.games)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#4ade80",textAlign:"center",fontWeight:700}},p.win)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#f87171",textAlign:"center"}},p.lose)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#fbbf24",textAlign:"center"}},p.save)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#60a5fa",textAlign:"center"}},p.hold)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#fb923c",textAlign:"center"}},p.bs)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#94a3b8",textAlign:"center"}},ipDisp)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#94a3b8",textAlign:"center"}},p.er)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#94a3b8",textAlign:"center"}},p.bb)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#94a3b8",textAlign:"center"}},p.so)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#94a3b8",textAlign:"center"}},p.ha)
+                                  , React.createElement('td',{style:{padding:"3px 4px",color:"#fbbf24",textAlign:"center",fontWeight:700}},era)
+                                );
+                              })
+                          )
+                        )
+                      );
+                    })()
+                )
+              );
+            })()
+        )
+
         
         , tab==="sync"&&React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:12}},
   React.createElement("div",{style:{background:"#0f1e35",borderRadius:10,padding:16,border:"1px solid #1e3a5f"}},
@@ -3106,7 +3364,35 @@ function App() {
                             , React.createElement('td',{style:{padding:"3px 5px",color:"#60a5fa",textAlign:"center"}},p.hold)
                             , React.createElement('td',{style:{padding:"3px 5px",color:"#fb923c",textAlign:"center"}},p.bs)
                             , React.createElement('td',{style:{padding:"3px 5px",color:"#94a3b8",textAlign:"center"}},ipDisp)
-                            , React.createElement('td',{style:{padding:"3px 5px",color:"#94a3b8",textAlign:"center"}},p.er)
+                            , React.createElement('td',{style:{padding:"2px 3px",textAlign:"center"}}
+                              , isTeamAdmin
+                                ? React.createElement('input',{type:"number",value:p.er,
+                                    onChange:e=>{
+                                      const newER=parseInt(e.target.value)||0;
+                                      // ゲームデータ側のerを探して更新
+                                      const targetGames=Object.entries(viewerTeamData.games||{});
+                                      targetGames.forEach(([gid,g])=>{
+                                        const side=g.awayTeam===viewerTeamData.name?"away":"home";
+                                        const pitchers=g[side+"Pitchers"]||[];
+                                        if(pitchers.find(pp=>pp&&pp.name===p.name)){
+                                          fbUpdatePitcherER(viewerTeamId,gid,p.name,newER,side);
+                                        }
+                                      });
+                                      setViewerTeamData(d=>{
+                                        const ng={...d.games};
+                                        Object.keys(ng).forEach(gid=>{
+                                          const g=ng[gid];
+                                          const side=g.awayTeam===d.name?"away":"home";
+                                          const pl=(g[side+"Pitchers"]||[]).map(pp=>pp&&pp.name===p.name?{...pp,er:newER}:pp);
+                                          ng[gid]={...g,[side+"Pitchers"]:pl};
+                                        });
+                                        return {...d,games:ng};
+                                      });
+                                    },
+                                    style:{width:36,textAlign:"center",background:"#0d1f35",border:"1px solid #3b82f6",
+                                      borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
+                                : React.createElement('span',{style:{color:"#94a3b8"}},p.er)
+                            )
                             , React.createElement('td',{style:{padding:"3px 5px",color:"#94a3b8",textAlign:"center"}},p.bb)
                             , React.createElement('td',{style:{padding:"3px 5px",color:"#94a3b8",textAlign:"center"}},p.so)
                             , React.createElement('td',{style:{padding:"3px 5px",color:"#94a3b8",textAlign:"center"}},p.ha)
@@ -3145,15 +3431,46 @@ function App() {
             // メンバー管理（管理者のみ）
             , isTeamAdmin && React.createElement('div', {style:{marginTop:12,borderTop:"1px solid #1e3a5f",paddingTop:12}}
               , React.createElement('div', {style:{fontSize:12,color:"#fbbf24",marginBottom:8,fontWeight:700}}, "✏️ メンバー管理（管理者）")
-              , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:8}}, "チームタブから登録・編集してください")
-              , React.createElement('button', {
-                  onClick:()=>{
-                    const t = teams.find(tm=>tm.id===viewerTeamId);
-                    if(t){ setTab("teams"); showToast("チームタブを開きました"); }
-                    else showToast("このチームはこの端末に登録されていません");
-                  },
-                  style:{...sBt("#1d4ed8"),width:"100%",padding:"8px",fontSize:13}
-                }, "👥 チームタブで編集する")
+              , (()=>{
+                  const [editMembers, setEditMembers] = [
+                    viewerTeamData._editMembers || (viewerTeamData.members||[]).map(m=>typeof m==="string"?m:(m.name||"")),
+                    (v)=>setViewerTeamData(d=>({...d, _editMembers: v}))
+                  ];
+                  return React.createElement('div', null
+                    , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:8}}, "メンバーを編集してFirebaseに保存します")
+                    , editMembers.map((m,i)=>React.createElement('div', {key:i, style:{display:"flex",gap:6,marginBottom:4}}
+                        , React.createElement('input', {
+                            value: m,
+                            onChange: e=>{
+                              const nm=[...editMembers]; nm[i]=e.target.value;
+                              setEditMembers(nm);
+                            },
+                            placeholder: `選手${i+1}`,
+                            style:{flex:1,padding:"5px 8px",borderRadius:6,background:"#0a1628",border:"1px solid #334155",
+                              color:"#e2e8f0",fontSize:12,outline:"none"}
+                          })
+                        , React.createElement('button', {
+                            onClick:()=>{ const nm=editMembers.filter((_,j)=>j!==i); setEditMembers(nm); },
+                            style:{...sBt("#dc2626",true),fontSize:11,padding:"3px 8px"}
+                          }, "×")
+                      ))
+                    , React.createElement('div', {style:{display:"flex",gap:6,marginTop:6}}
+                      , React.createElement('button', {
+                          onClick:()=>setEditMembers([...editMembers,""]),
+                          style:{...sBt("#475569"),fontSize:11,padding:"5px 12px",flex:1}
+                        }, "＋ 追加")
+                      , React.createElement('button', {
+                          onClick:()=>{
+                            const validMembers=editMembers.filter(m=>m.trim());
+                            fbUpdateTeamMembers(viewerTeamId, validMembers, viewerTeamData.adminCode);
+                            setViewerTeamData(d=>({...d, members:validMembers, _editMembers:validMembers}));
+                            showToast("✅ メンバーを保存しました");
+                          },
+                          style:{...sBt("#16a34a"),fontSize:12,padding:"5px 16px",flex:2,fontWeight:700}
+                        }, "💾 保存する")
+                    )
+                  );
+                })()
             )
           )
         )

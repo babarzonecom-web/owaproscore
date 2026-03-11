@@ -904,7 +904,7 @@ function App() {
   const [tournamentMsg, setTournamentMsg] = useState("");
   const [tournamentTab, setTournamentTab] = useState("top"); // top/teams/games/ranking
   const [selDir, setSelDir] = useState(null);
-  const [currentPitches, setCurrentPitches] = useState([]); // 現打席の投球列 B/S/F
+  const [pitchCount, setPitchCount] = useState({b:0,s:0,f:0}); // 現打席BSFカウント
   const [toast,  setToast]  = useState("");
 
   const game      = storage.currentGame;
@@ -1150,20 +1150,21 @@ function App() {
       return {...tmp,...scores,log,[batterKey]:nextPidx};
     });
     setSelDir(null);
-    // 球数を現在の投手に加算
-    if(currentPitches.length > 0) {
-      mutGame(g => {
-        const side = modal ? (modal.team === "away" ? "home" : "away") : null;
-        if(!side) return g;
-        const pitchers = [...(g[side+"Pitchers"]||[])];
-        const pidx = g[side+"PitcherIdx"]||0;
-        if(pitchers[pidx]) {
-          pitchers[pidx] = {...pitchers[pidx], pitchCount:(pitchers[pidx].pitchCount||0)+currentPitches.length};
-        }
-        return {...g, [side+"Pitchers"]:pitchers};
-      });
-      setCurrentPitches([]);
-    }
+    // 打席結果1球 + 今の投球カウント分を投手の球数に加算（IBBは加算なし）
+    const addPitches = code === "IBB" ? 0 : 1;
+    const defSide = team === "away" ? "home" : "away";
+    mutGame(g => {
+      const pitchers = [...(g[defSide+"Pitchers"]||[])];
+      const pidx = g[defSide+"PitcherIdx"]||0;
+      const bsfTotal = pitchCount.b + pitchCount.s + pitchCount.f;
+      if(pitchers[pidx]) {
+        pitchers[pidx] = {...pitchers[pidx],
+          pitchCount:(pitchers[pidx].pitchCount||0) + bsfTotal + addPitches
+        };
+      }
+      return {...g, [defSide+"Pitchers"]:pitchers};
+    });
+    setPitchCount({b:0,s:0,f:0});
     
     const wasChange = newOuts>=3;
     if(wasChange){
@@ -2210,63 +2211,64 @@ function App() {
                   )
                 )
 
+                
                 , React.createElement('div', {style:{background:"#0a1628",borderRadius:10,border:"1px solid #1e3a5f",padding:"10px 12px",marginBottom:10}}
-                  , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:8}}
-                    , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",fontWeight:700}}, "⚾ 投球カウント")
-                    , React.createElement('div', {style:{display:"flex",gap:4,marginLeft:"auto"}}
-                      , ["B","S","F"].map(t => {
-                          const cnt = currentPitches.filter(p=>p===t).length;
-                          const colors = {B:"#60a5fa",S:"#f87171",F:"#fbbf24"};
-                          const labels = {B:"ボール",S:"ストライク",F:"ファウル"};
-                          return React.createElement('div', {key:t, style:{textAlign:"center",minWidth:32}}
-                            , React.createElement('div', {style:{fontSize:18,fontWeight:900,color:colors[t]}}, cnt)
-                            , React.createElement('div', {style:{fontSize:9,color:"#475569"}}, labels[t])
-                          );
-                        })
-                      , React.createElement('div', {style:{textAlign:"center",minWidth:32}}
-                        , React.createElement('div', {style:{fontSize:18,fontWeight:900,color:"#e2e8f0"}}, currentPitches.length)
-                        , React.createElement('div', {style:{fontSize:9,color:"#475569"}}, "合計")
-                      )
-                    )
+                  , React.createElement('div', {style:{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"6px 0"}}
+                    , ["B","S","O"].map(type => {
+                        const cfg = {
+                          B:{count:pitchCount.b, max:4, color:"#4ade80", label:"ボール"},
+                          S:{count:pitchCount.s, max:3, color:"#fbbf24", label:"ストライク"},
+                          O:{count:game.outs,    max:3, color:"#f87171", label:"アウト"},
+                        }[type];
+                        return React.createElement('div', {key:type, style:{display:"flex",alignItems:"center",gap:6}}
+                          , React.createElement('span', {style:{fontSize:13,fontWeight:700,color:"#94a3b8",minWidth:14}}, type)
+                          , React.createElement('div', {style:{display:"flex",gap:4}}
+                            , Array.from({length:cfg.max},(_,i)=>
+                                React.createElement('div', {key:i, style:{
+                                  width:14, height:14, borderRadius:"50%",
+                                  background: i < cfg.count ? cfg.color : "transparent",
+                                  border: `2px solid ${i < cfg.count ? cfg.color : "#2a4a7a"}`,
+                                  transition:"all 0.15s"
+                                }})
+                              )
+                          )
+                        );
+                      })
                   )
-                  , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
+                  , React.createElement('div', {style:{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}
                     , [
-                        {type:"B", label:"ボール", color:"#60a5fa"},
-                        {type:"S", label:"ストライク", color:"#f87171"},
-                        {type:"F", label:"ファウル", color:"#fbbf24"},
+                        {type:"b", label:"ボール",     color:"#4ade80"},
+                        {type:"s", label:"ストライク", color:"#fbbf24"},
+                        {type:"f", label:"ファウル",   color:"#94a3b8"},
                       ].map(({type,label,color}) =>
                         React.createElement('button', {key:type,
-                          onClick:()=>setCurrentPitches(p=>[...p,type]),
+                          onClick:()=>setPitchCount(p=>({...p,[type]:p[type]+1})),
                           style:{background:color+"20",border:`1.5px solid ${color}`,borderRadius:8,
-                            color:color,padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:700,flex:1}
+                            color:color,padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1}
                         }, label)
                       )
                     , React.createElement('button', {
-                        onClick:()=>setCurrentPitches(p=>p.slice(0,-1)),
-                        disabled:currentPitches.length===0,
+                        onClick:()=>setPitchCount(p=>{
+                          if(p.f>0) return {...p,f:p.f-1};
+                          if(p.s>0) return {...p,s:p.s-1};
+                          if(p.b>0) return {...p,b:p.b-1};
+                          return p;
+                        }),
+                        disabled:(pitchCount.b+pitchCount.s+pitchCount.f)===0,
                         style:{background:"#1e293b",border:"1px solid #334155",borderRadius:8,
-                          color:currentPitches.length===0?"#334155":"#94a3b8",
-                          padding:"8px 12px",cursor:currentPitches.length===0?"not-allowed":"pointer",fontSize:12}
+                          color:(pitchCount.b+pitchCount.s+pitchCount.f)===0?"#334155":"#94a3b8",
+                          padding:"9px 12px",cursor:(pitchCount.b+pitchCount.s+pitchCount.f)===0?"not-allowed":"pointer",fontSize:12}
                       }, "↩ 取消")
                     , React.createElement('button', {
-                        onClick:()=>setCurrentPitches([]),
-                        disabled:currentPitches.length===0,
+                        onClick:()=>setPitchCount({b:0,s:0,f:0}),
+                        disabled:(pitchCount.b+pitchCount.s+pitchCount.f)===0,
                         style:{background:"#1e293b",border:"1px solid #334155",borderRadius:8,
-                          color:currentPitches.length===0?"#334155":"#f87171",
-                          padding:"8px 12px",cursor:currentPitches.length===0?"not-allowed":"pointer",fontSize:12}
+                          color:(pitchCount.b+pitchCount.s+pitchCount.f)===0?"#334155":"#f87171",
+                          padding:"9px 12px",cursor:(pitchCount.b+pitchCount.s+pitchCount.f)===0?"not-allowed":"pointer",fontSize:12}
                       }, "リセット")
                   )
-                  , currentPitches.length>0&&React.createElement('div', {style:{marginTop:8,display:"flex",flexWrap:"wrap",gap:3}}
-                    , currentPitches.map((p,i)=>{
-                        const colors={B:"#60a5fa",S:"#f87171",F:"#fbbf24"};
-                        return React.createElement('span',{key:i,style:{
-                          background:colors[p]+"30",border:`1px solid ${colors[p]}`,
-                          borderRadius:4,padding:"1px 6px",fontSize:11,color:colors[p],fontWeight:700
-                        }},p);
-                      })
-                  )
                 )
-                , React.createElement('div', { style: {fontSize:11,color:"#475569",marginBottom:8},}, "または選手を直接タップ：")
+, React.createElement('div', { style: {fontSize:11,color:"#475569",marginBottom:8},}, "または選手を直接タップ：")
                 , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:5,marginBottom:12},}
                   , curLineup.map((p,i)=>{
                     const isCurrent = i===curBatterIdx;

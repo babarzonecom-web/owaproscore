@@ -661,10 +661,13 @@ const computePitcherStats = (g) => {
       if(!ps) return;
       const code = ab.entry.code;
       if(HIT_CODES.has(code)) ps.autoH++;
-      if(code==="BB") ps.autoBb++;
+      if(code==="BB"||code==="IBB") ps.autoBb++;
       if(code==="K"||code==="KL"||code==="KW") ps.autoK++;
-      
-      ps.autoEr += ab.entry.runs||0;
+      if(code==="HBP") ps.autoHbp = (ps.autoHbp||0)+1;
+      if(code==="HR") ps.autoHr = (ps.autoHr||0)+1;
+      const runsScored = ab.entry.runs||0;
+      ps.autoEr += runsScored;
+      ps.autoRuns = (ps.autoRuns||0) + runsScored;
     });
 
     
@@ -2424,12 +2427,17 @@ function App() {
             , game.log.length===0
               ?React.createElement('div', { style: {color:"#475569",fontSize:13},}, "まだ記録なし")
               :game.log.slice(0,12).map((e,i)=>(
-                React.createElement('div', { key: i, style: {display:"flex",gap:10,padding:"5px 0",borderBottom:"1px solid #0f2040",
-                  opacity: i===0?1:0.7},}
+                React.createElement('div', { key: i, style: {display:"flex",gap:10,padding:"6px 8px",borderBottom:"1px solid #0f2040",
+                  borderRadius:6,
+                  background: (e.runs&&e.runs>0) ? "rgba(251,191,36,0.08)" : "transparent",
+                  border: (e.runs&&e.runs>0) ? "1px solid rgba(251,191,36,0.3)" : "1px solid transparent",
+                  opacity: i===0?1:0.75},}
                   , React.createElement('span', { style: {fontSize:11,color:"#7db8e8",flexShrink:0},}, e.ts)
-                  , React.createElement('span', { style: {fontSize:13},}, e.msg)
-                  , i===0&&React.createElement('span', { style: {fontSize:10,color:"#f59e0b",marginLeft:"auto",flexShrink:0},}, "最新")
+                  , React.createElement('span', { style: {fontSize:13, color:(e.runs&&e.runs>0)?"#fde68a":"#e2e8f0"},}, e.msg)
+                  , (e.runs&&e.runs>0)&&React.createElement('span', {style:{fontSize:11,color:"#fbbf24",fontWeight:700,marginLeft:"auto",flexShrink:0}}, "+", e.runs, "点")
+                  , i===0&&!(e.runs&&e.runs>0)&&React.createElement('span', { style: {fontSize:10,color:"#f59e0b",marginLeft:"auto",flexShrink:0},}, "最新")
                 )
+              ))
 
             , !game.finished && React.createElement('div', {style:{marginTop:8,background:"#0a1628",borderRadius:8,padding:"10px 12px",border:"1px solid #1e3a5f"}}
               , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}}, "打点（自動計算・手動修正可）")
@@ -2449,8 +2457,6 @@ function App() {
                   ))
               )
             )
-              ))
-            
           )
         ))
 
@@ -2615,15 +2621,26 @@ function App() {
                         , React.createElement('th', {style:S.th}, "自責点")
                         , React.createElement('th', {style:S.th}, "四球")
                         , React.createElement('th', {style:S.th}, "三振")
+                        , React.createElement('th', {style:S.th}, "失点")
+                        , React.createElement('th', {style:S.th}, "死球")
+                        , React.createElement('th', {style:S.th}, "被本塁打")
                         , React.createElement('th', {style:S.th}, "防御率")
                       )
                     )
                     , React.createElement('tbody', null
                       , pitchers.map((p,i) => {
                           const isCur = i===curPIdx;
-                          const ip = p.autoIp||p.ip||0;
-                          const er = p.autoEr!==undefined?p.autoEr:(p.er||0);
-                          const era = ip>0 ? ((er/(ip))*9).toFixed(2) : (er>0?"∞":"—");
+                          const auto = (pStats[side]||[])[i]||{};
+                          const rawIp = auto.autoIp||0;
+                          const ipDisp = Math.floor(rawIp/10)+"回"+(rawIp%10>0?(rawIp%10)+"/3":"");
+                          const ipNum = Math.floor(rawIp/10)+(rawIp%10)/3;
+                          const h   = auto.autoH||0;
+                          const bb  = auto.autoBb||0;
+                          const k   = auto.autoK||0;
+                          const hbp = auto.autoHbp||0;
+                          const hr  = auto.autoHr||0;
+                          const er  = p.manualOverride ? (p.autoEr!==undefined?p.autoEr:(p.er||0)) : (auto.autoEr||0);
+                          const era = ipNum>0 ? (er*9/ipNum).toFixed(2) : (er>0?"∞":"—");
                           return React.createElement('tr', {key:p.id,
                             style:{background:isCur?(color+"15"):i%2===0?"#0a1628":"transparent"}}
                             , React.createElement('td', {style:{...S.td, display:"flex", alignItems:"center", gap:4}}
@@ -2636,8 +2653,9 @@ function App() {
                                   color:(p.pitchCount||0)>=100?"#f87171":(p.pitchCount||0)>=80?"#fbbf24":"#4ade80"
                                 }}, p.pitchCount||0)
                             )
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, ip%1===0?ip+"回":Math.floor(ip)+"回"+(ip%1>=0.67?"2/3":ip%1>=0.33?"1/3":""))
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, p.autoH!==undefined?p.autoH:(p.h||0))
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, ipDisp||"0回")
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, h)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, auto.autoRuns||0)
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}
                               , React.createElement('input', {type:"number", min:0,
                                   value:er,
@@ -2645,8 +2663,10 @@ function App() {
                                   style:{width:36,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:12,outline:"none"}})
                             )
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, p.autoBb!==undefined?p.autoBb:(p.bb||0))
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, p.autoK!==undefined?p.autoK:(p.k||0))
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, bb)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, k)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hbp)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hr)
                             , React.createElement('td', {style:{...S.td, textAlign:"center", color:era==="∞"?"#f87171":era==="—"?"#475569":"#e2e8f0"}}, era)
                           );
                         })

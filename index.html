@@ -1178,7 +1178,11 @@ function App() {
       showToast(`${_optionalChain([rOf, 'call', _11 => _11(code), 'optionalAccess', _12 => _12.label])||code}${(runs||0)>0?` +${runs}点`:""} ✅`);
       
       setTimeout(()=>{
-        setModal({team, pidx:nextPidx, inning, step:"result"});
+        if(game.pitchMode !== "pitch") {
+          setModal({team, pidx:nextPidx, inning, step:"result"});
+        } else {
+          setModal(null);
+        }
       }, 350);
     }
   },[mutGame]);

@@ -700,10 +700,11 @@ const computePitcherStats = (g) => {
   return result;
 };
 
-const newGame = (innings=7) => ({
+const newGame = (innings=7, pitchMode="result") => ({
   id:Date.now(),
   date:new Date().toISOString().split("T")[0],
   innings: innings,
+  pitchMode: pitchMode,
   venue:"", awayTeam:"ビジターチーム", homeTeam:"ホームチーム",
   awayScore:emptyScore(innings), homeScore:emptyScore(innings),
   awayLineup:makeLineup(), homeLineup:makeLineup(),
@@ -1178,7 +1179,7 @@ function App() {
       showToast(`${_optionalChain([rOf, 'call', _11 => _11(code), 'optionalAccess', _12 => _12.label])||code}${(runs||0)>0?` +${runs}点`:""} ✅`);
       
       setTimeout(()=>{
-        if(game.pitchMode !== "pitch") {
+        if((game.pitchMode||"result") !== "pitch") {
           setModal({team, pidx:nextPidx, inning, step:"result"});
         } else {
           setModal(null);
@@ -2221,7 +2222,7 @@ function App() {
 
                 
                 
-                , game.pitchMode==="pitch" && React.createElement('div', {style:{background:"#0a1628",borderRadius:10,border:"1px solid #1e3a5f",padding:"10px 12px",marginBottom:10}})
+                , (game.pitchMode||"result")==="pitch" && React.createElement('div', {style:{background:"#0a1628",borderRadius:10,border:"1px solid #1e3a5f",padding:"10px 12px",marginBottom:10}})
 
                   , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:12,marginBottom:10}}
                     , ["B","S","O"].map(type => {
@@ -2362,7 +2363,7 @@ function App() {
                   )
                 )
 
-, React.createElement('div', { style: {fontSize:11,color:"#475569",marginBottom:8},}, game.pitchMode==="pitch" ? "投球入力後、選手タップで打席結果を記録：" : "または選手を直接タップ：")
+, React.createElement('div', { style: {fontSize:11,color:"#475569",marginBottom:8},}, (game.pitchMode||"result")==="pitch" ? "投球入力後、選手タップで打席結果を記録：" : "または選手を直接タップ：")
                 , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:5,marginBottom:12},}
                   , curLineup.map((p,i)=>{
                     const isCurrent = i===curBatterIdx;
@@ -2666,7 +2667,7 @@ function App() {
                               , React.createElement('span', {style:{
                                   fontSize:15, fontWeight:700,
                                   color:(p.pitchCount||0)>=100?"#f87171":(p.pitchCount||0)>=80?"#fbbf24":"#4ade80"
-                                }}, game.pitchMode==="pitch" ? (p.pitchCount||0) : "—")
+                                }}, (game.pitchMode||"result")==="pitch" ? (p.pitchCount||0) : "—")
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}, h)
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hr)

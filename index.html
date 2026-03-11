@@ -2223,7 +2223,7 @@ function App() {
 
                 
                 
-                , (game.pitchMode||"result")==="pitch" && React.createElement('div', {style:{background:"#0a1628",borderRadius:10,border:"1px solid #1e3a5f",padding:"10px 12px",marginBottom:10}})
+                , React.createElement('div', {style:{background:"#0a1628",borderRadius:10,border:"1px solid #1e3a5f",padding:"10px 12px",marginBottom:10}}))
 
                   , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:12,marginBottom:10}}
                     , ["B","S","O"].map(type => {
@@ -2261,7 +2261,9 @@ function App() {
 
                   , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
                     , React.createElement('button', {
+                        disabled:(game.pitchMode||"result")==="result",
                         onClick:()=>{
+                          if((game.pitchMode||"result")==="result") return;
                           const defSide = curTeam==="away"?"home":"away";
                           setPitchCount(p=>({...p,b:p.b+1}));
                           setPitchHistory(h=>[...h,"b"]);
@@ -2278,10 +2280,11 @@ function App() {
                             },100);
                           }
                         },
-                        style:{background:"#4ade8020",border:"1.5px solid #4ade80",borderRadius:8,color:"#4ade80",padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1}
+                        style:{background:"#4ade8020",border:"1.5px solid #4ade80",borderRadius:8,color:"#4ade80",padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1,opacity:(game.pitchMode||"result")==="result"?0.3:1}
                       }, "ボール")
                     , React.createElement('button', {
                         onClick:()=>{
+                          if((game.pitchMode||"result")==="result") return;
                           const defSide = curTeam==="away"?"home":"away";
                           setPitchCount(p=>({...p,s:p.s+1}));
                           setPitchHistory(h=>[...h,"s"]);
@@ -2298,10 +2301,11 @@ function App() {
                             },100);
                           }
                         },
-                        style:{background:"#fbbf2420",border:"1.5px solid #fbbf24",borderRadius:8,color:"#fbbf24",padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1}
+                        style:{background:"#fbbf2420",border:"1.5px solid #fbbf24",borderRadius:8,color:"#fbbf24",padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1,opacity:(game.pitchMode||"result")==="result"?0.3:1}
                       }, "ストライク")
                     , React.createElement('button', {
                         onClick:()=>{
+                          if((game.pitchMode||"result")==="result") return;
                           const defSide = curTeam==="away"?"home":"away";
                           const newS = pitchCount.s < 2 ? pitchCount.s+1 : pitchCount.s;
                           setPitchCount(p=>({...p,f:p.f+1,s:newS}));
@@ -2313,10 +2317,11 @@ function App() {
                             return{...g,[defSide+"Pitchers"]:pitchers};
                           });
                         },
-                        style:{background:"#94a3b820",border:"1.5px solid #94a3b8",borderRadius:8,color:"#94a3b8",padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1}
+                        style:{background:"#94a3b820",border:"1.5px solid #94a3b8",borderRadius:8,color:"#94a3b8",padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1,opacity:(game.pitchMode||"result")==="result"?0.3:1}
                       }, "ファウル")
                     , React.createElement('button', {
                         onClick:()=>{
+                          if((game.pitchMode||"result")==="result") return;
                           if(pitchHistory.length===0) return;
                           const last = pitchHistory[pitchHistory.length-1];
                           const defSide = curTeam==="away"?"home":"away";
@@ -2344,6 +2349,7 @@ function App() {
                       }, "↩ 取消")
                     , React.createElement('button', {
                         onClick:()=>{
+                          if((game.pitchMode||"result")==="result") return;
                           if(pitchHistory.length===0) return;
                           const total = pitchHistory.length;
                           const defSide = curTeam==="away"?"home":"away";
@@ -2362,7 +2368,6 @@ function App() {
                           padding:"9px 12px",cursor:pitchHistory.length===0?"not-allowed":"pointer",fontSize:12}
                       }, "リセット")
                   )
-                )
 
 , React.createElement('div', { style: {fontSize:11,color:"#475569",marginBottom:8},}, (game.pitchMode||"result")==="pitch" ? "投球入力後、選手タップで打席結果を記録：" : "または選手を直接タップ：")
                 , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:5,marginBottom:12},}

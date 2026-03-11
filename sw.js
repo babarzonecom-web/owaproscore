@@ -1,4 +1,4 @@
-// v121
+// v999-nocache
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(
@@ -9,6 +9,7 @@ self.addEventListener('activate', e => {
       .then(clients => clients.forEach(c => c.navigate(c.url)))
   );
 });
+// キャッシュ一切使わない - 常にネットワークから取得
 self.addEventListener('fetch', e => {
-  e.respondWith(fetch(e.request, { cache: 'no-store' }).catch(() => caches.match(e.request)));
+  e.respondWith(fetch(e.request, { cache: 'no-store' }));
 });

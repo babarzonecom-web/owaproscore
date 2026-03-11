@@ -879,6 +879,7 @@ function App() {
   const [storage, setStorage] = useState(()=>{
     const s=lsLoad();
     if(!s.currentGame) s.currentGame=newGame();
+    if(!s.currentGame.pitchMode) s.currentGame.pitchMode="result";
     if(!s.history)     s.history=[];
     if(!s.undoStack)   s.undoStack=[];
     if(!s.teams)       s.teams=[];   
@@ -2222,7 +2223,6 @@ function App() {
 
                 
                 
-                , React.createElement('div', {style:{fontSize:10,color:"#f87171",padding:"2px 6px"}}, "pitchMode=", game.pitchMode||"(未設定=result扱い)")
                 , (game.pitchMode||"result")==="pitch" && React.createElement('div', {style:{background:"#0a1628",borderRadius:10,border:"1px solid #1e3a5f",padding:"10px 12px",marginBottom:10}})
 
                   , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:12,marginBottom:10}}

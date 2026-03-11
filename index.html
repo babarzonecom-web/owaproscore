@@ -905,6 +905,7 @@ function App() {
   const [tournamentTab, setTournamentTab] = useState("top"); // top/teams/games/ranking
   const [selDir, setSelDir] = useState(null);
   const [pitchCount, setPitchCount] = useState({b:0,s:0,f:0}); // 現打席BSFカウント
+  const [pitchHistory, setPitchHistory] = useState([]); // 取り消し用履歴 ["b","s","f",...]
   const [toast,  setToast]  = useState("");
 
   const game      = storage.currentGame;
@@ -1150,21 +1151,20 @@ function App() {
       return {...tmp,...scores,log,[batterKey]:nextPidx};
     });
     setSelDir(null);
-    // 打席結果1球 + 今の投球カウント分を投手の球数に加算（IBBは加算なし）
-    const addPitches = code === "IBB" ? 0 : 1;
-    const defSide = team === "away" ? "home" : "away";
-    mutGame(g => {
-      const pitchers = [...(g[defSide+"Pitchers"]||[])];
-      const pidx = g[defSide+"PitcherIdx"]||0;
-      const bsfTotal = pitchCount.b + pitchCount.s + pitchCount.f;
-      if(pitchers[pidx]) {
-        pitchers[pidx] = {...pitchers[pidx],
-          pitchCount:(pitchers[pidx].pitchCount||0) + bsfTotal + addPitches
-        };
-      }
-      return {...g, [defSide+"Pitchers"]:pitchers};
-    });
+    // 打席結果の1球を投手に加算（IBBは加算なし。BSFは押下時に加算済み）
+    if(code !== "IBB") {
+      const defSide2 = team === "away" ? "home" : "away";
+      mutGame(g => {
+        const pitchers = [...(g[defSide2+"Pitchers"]||[])];
+        const pidx = g[defSide2+"PitcherIdx"]||0;
+        if(pitchers[pidx]) {
+          pitchers[pidx] = {...pitchers[pidx], pitchCount:(pitchers[pidx].pitchCount||0)+1};
+        }
+        return {...g, [defSide2+"Pitchers"]:pitchers};
+      });
+    }
     setPitchCount({b:0,s:0,f:0});
+    setPitchHistory([]);
     
     const wasChange = newOuts>=3;
     if(wasChange){
@@ -2212,62 +2212,147 @@ function App() {
                 )
 
                 
+                
                 , React.createElement('div', {style:{background:"#0a1628",borderRadius:10,border:"1px solid #1e3a5f",padding:"10px 12px",marginBottom:10}}
-                  , React.createElement('div', {style:{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"6px 0"}}
+
+                  , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:12,marginBottom:10}}
                     , ["B","S","O"].map(type => {
                         const cfg = {
-                          B:{count:pitchCount.b, max:4, color:"#4ade80", label:"ボール"},
-                          S:{count:pitchCount.s, max:3, color:"#fbbf24", label:"ストライク"},
-                          O:{count:game.outs,    max:3, color:"#f87171", label:"アウト"},
+                          B:{count:pitchCount.b, max:4, color:"#4ade80"},
+                          S:{count:pitchCount.s, max:3, color:"#fbbf24"},
+                          O:{count:game.outs,    max:3, color:"#f87171"},
                         }[type];
-                        return React.createElement('div', {key:type, style:{display:"flex",alignItems:"center",gap:6}}
-                          , React.createElement('span', {style:{fontSize:13,fontWeight:700,color:"#94a3b8",minWidth:14}}, type)
-                          , React.createElement('div', {style:{display:"flex",gap:4}}
+                        return React.createElement('div', {key:type, style:{display:"flex",alignItems:"center",gap:5}}
+                          , React.createElement('span', {style:{fontSize:13,fontWeight:700,color:"#94a3b8",minWidth:12}}, type)
+                          , React.createElement('div', {style:{display:"flex",gap:3}}
                             , Array.from({length:cfg.max},(_,i)=>
                                 React.createElement('div', {key:i, style:{
-                                  width:14, height:14, borderRadius:"50%",
+                                  width:13, height:13, borderRadius:"50%",
                                   background: i < cfg.count ? cfg.color : "transparent",
-                                  border: `2px solid ${i < cfg.count ? cfg.color : "#2a4a7a"}`,
+                                  border:`2px solid ${i < cfg.count ? cfg.color : "#2a4a7a"}`,
                                   transition:"all 0.15s"
                                 }})
                               )
                           )
                         );
                       })
+                    , React.createElement('div', {style:{marginLeft:"auto",display:"flex",alignItems:"center",gap:4}}
+                      , React.createElement('span', {style:{fontSize:11,color:"#64748b"}}, "球数")
+                      , React.createElement('span', {style:{fontSize:20,fontWeight:900,color:"#e2e8f0",minWidth:28,textAlign:"right"}},
+                          (() => {
+                            const defSide = curTeam==="away"?"home":"away";
+                            const pitchers = game[defSide+"Pitchers"]||[];
+                            const pidx = game[defSide+"PitcherIdx"]||0;
+                            return (pitchers[pidx]||{}).pitchCount||0;
+                          })()
+                        )
+                    )
                   )
-                  , React.createElement('div', {style:{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}
-                    , [
-                        {type:"b", label:"ボール",     color:"#4ade80"},
-                        {type:"s", label:"ストライク", color:"#fbbf24"},
-                        {type:"f", label:"ファウル",   color:"#94a3b8"},
-                      ].map(({type,label,color}) =>
-                        React.createElement('button', {key:type,
-                          onClick:()=>setPitchCount(p=>({...p,[type]:p[type]+1})),
-                          style:{background:color+"20",border:`1.5px solid ${color}`,borderRadius:8,
-                            color:color,padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1}
-                        }, label)
-                      )
+
+                  , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
                     , React.createElement('button', {
-                        onClick:()=>setPitchCount(p=>{
-                          if(p.f>0) return {...p,f:p.f-1};
-                          if(p.s>0) return {...p,s:p.s-1};
-                          if(p.b>0) return {...p,b:p.b-1};
-                          return p;
-                        }),
-                        disabled:(pitchCount.b+pitchCount.s+pitchCount.f)===0,
+                        onClick:()=>{
+                          const defSide = curTeam==="away"?"home":"away";
+                          setPitchCount(p=>({...p,b:p.b+1}));
+                          setPitchHistory(h=>[...h,"b"]);
+                          mutGame(g=>{
+                            const pitchers=[...g[defSide+"Pitchers"]||[]];
+                            const pidx=g[defSide+"PitcherIdx"]||0;
+                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
+                            return{...g,[defSide+"Pitchers"]:pitchers};
+                          });
+                          if(pitchCount.b+1>=4){
+                            setTimeout(()=>{
+                              const curBatterIdx2=game[curTeam+"BatterIdx"]||0;
+                              onPickResult("BB");
+                            },100);
+                          }
+                        },
+                        style:{background:"#4ade8020",border:"1.5px solid #4ade80",borderRadius:8,color:"#4ade80",padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1}
+                      }, "ボール")
+                    , React.createElement('button', {
+                        onClick:()=>{
+                          const defSide = curTeam==="away"?"home":"away";
+                          setPitchCount(p=>({...p,s:p.s+1}));
+                          setPitchHistory(h=>[...h,"s"]);
+                          mutGame(g=>{
+                            const pitchers=[...g[defSide+"Pitchers"]||[]];
+                            const pidx=g[defSide+"PitcherIdx"]||0;
+                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
+                            return{...g,[defSide+"Pitchers"]:pitchers};
+                          });
+                          if(pitchCount.s+1>=3){
+                            setTimeout(()=>{
+                              setModal(m=>({...m,step:"strikeout_select"}));
+                            },100);
+                          }
+                        },
+                        style:{background:"#fbbf2420",border:"1.5px solid #fbbf24",borderRadius:8,color:"#fbbf24",padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1}
+                      }, "ストライク")
+                    , React.createElement('button', {
+                        onClick:()=>{
+                          const defSide = curTeam==="away"?"home":"away";
+                          const newS = pitchCount.s < 2 ? pitchCount.s+1 : pitchCount.s;
+                          setPitchCount(p=>({...p,f:p.f+1,s:newS}));
+                          setPitchHistory(h=>[...h,"f"]);
+                          mutGame(g=>{
+                            const pitchers=[...g[defSide+"Pitchers"]||[]];
+                            const pidx=g[defSide+"PitcherIdx"]||0;
+                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
+                            return{...g,[defSide+"Pitchers"]:pitchers};
+                          });
+                        },
+                        style:{background:"#94a3b820",border:"1.5px solid #94a3b8",borderRadius:8,color:"#94a3b8",padding:"9px 0",cursor:"pointer",fontSize:13,fontWeight:700,flex:1}
+                      }, "ファウル")
+                    , React.createElement('button', {
+                        onClick:()=>{
+                          if(pitchHistory.length===0) return;
+                          const last = pitchHistory[pitchHistory.length-1];
+                          const defSide = curTeam==="away"?"home":"away";
+                          setPitchHistory(h=>h.slice(0,-1));
+                          setPitchCount(p=>{
+                            if(last==="b") return {...p,b:Math.max(0,p.b-1)};
+                            if(last==="s") return {...p,s:Math.max(0,p.s-1)};
+                            if(last==="f"){
+                              const wasS2 = p.s>0 && p.f>0;
+                              return {...p,f:Math.max(0,p.f-1),s:wasS2?Math.max(0,p.s-1):p.s};
+                            }
+                            return p;
+                          });
+                          mutGame(g=>{
+                            const pitchers=[...g[defSide+"Pitchers"]||[]];
+                            const pidx=g[defSide+"PitcherIdx"]||0;
+                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:Math.max(0,(pitchers[pidx].pitchCount||0)-1)};
+                            return{...g,[defSide+"Pitchers"]:pitchers};
+                          });
+                        },
+                        disabled:pitchHistory.length===0,
                         style:{background:"#1e293b",border:"1px solid #334155",borderRadius:8,
-                          color:(pitchCount.b+pitchCount.s+pitchCount.f)===0?"#334155":"#94a3b8",
-                          padding:"9px 12px",cursor:(pitchCount.b+pitchCount.s+pitchCount.f)===0?"not-allowed":"pointer",fontSize:12}
+                          color:pitchHistory.length===0?"#334155":"#94a3b8",
+                          padding:"9px 12px",cursor:pitchHistory.length===0?"not-allowed":"pointer",fontSize:12}
                       }, "↩ 取消")
                     , React.createElement('button', {
-                        onClick:()=>setPitchCount({b:0,s:0,f:0}),
-                        disabled:(pitchCount.b+pitchCount.s+pitchCount.f)===0,
+                        onClick:()=>{
+                          if(pitchHistory.length===0) return;
+                          const total = pitchHistory.length;
+                          const defSide = curTeam==="away"?"home":"away";
+                          setPitchCount({b:0,s:0,f:0});
+                          setPitchHistory([]);
+                          mutGame(g=>{
+                            const pitchers=[...g[defSide+"Pitchers"]||[]];
+                            const pidx=g[defSide+"PitcherIdx"]||0;
+                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:Math.max(0,(pitchers[pidx].pitchCount||0)-total)};
+                            return{...g,[defSide+"Pitchers"]:pitchers};
+                          });
+                        },
+                        disabled:pitchHistory.length===0,
                         style:{background:"#1e293b",border:"1px solid #334155",borderRadius:8,
-                          color:(pitchCount.b+pitchCount.s+pitchCount.f)===0?"#334155":"#f87171",
-                          padding:"9px 12px",cursor:(pitchCount.b+pitchCount.s+pitchCount.f)===0?"not-allowed":"pointer",fontSize:12}
+                          color:pitchHistory.length===0?"#334155":"#f87171",
+                          padding:"9px 12px",cursor:pitchHistory.length===0?"not-allowed":"pointer",fontSize:12}
                       }, "リセット")
                   )
                 )
+
 , React.createElement('div', { style: {fontSize:11,color:"#475569",marginBottom:8},}, "または選手を直接タップ：")
                 , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:5,marginBottom:12},}
                   , curLineup.map((p,i)=>{
@@ -3055,7 +3140,34 @@ function App() {
         );
 
         
-        if(modal.step==="result") return (
+
+        if(modal.step==="strikeout_select") return (
+          React.createElement('div', {style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}, onClick:()=>setModal(null)}
+            , React.createElement('div', {style:{background:"#0d1f35",border:"1px solid #1e3a5f",borderRadius:16,padding:"24px",width:"min(90vw,320px)"}, onClick:e=>e.stopPropagation()}
+              , React.createElement('div', {style:{fontSize:14,fontWeight:700,color:"#fbbf24",marginBottom:16,textAlign:"center"}}, "⚾ 三振の種類を選択")
+              , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:10}}
+                , [
+                    {code:"K",  label:"空振り三振", short:"K",  color:"#94a3b8"},
+                    {code:"KL", label:"見逃し三振", short:"KL", color:"#64748b"},
+                    {code:"KW", label:"振り逃げ",   short:"KW", color:"#22d3ee"},
+                  ].map(({code,label,short,color})=>
+                    React.createElement('button', {key:code,
+                      onClick:()=>{ setModal(m=>({...m,step:"result"})); onPickResult(code); },
+                      style:{background:color+"20",border:`1.5px solid ${color}`,borderRadius:10,
+                        color:color,padding:"12px",cursor:"pointer",fontSize:14,fontWeight:700,
+                        display:"flex",alignItems:"center",gap:10}
+                      }
+                      , React.createElement('span', {style:{fontFamily:"'Bebas Neue',monospace",fontSize:22,minWidth:36}}, short)
+                      , React.createElement('span', null, label)
+                    )
+                  )
+              )
+              , React.createElement('button', {onClick:()=>setModal(null), style:{marginTop:14,width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#64748b",padding:"8px",cursor:"pointer",fontSize:12}}, "キャンセル")
+            )
+          )
+        );
+
+                if(modal.step==="result") return (
           React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
             , React.createElement('div', { style: S.mBox, onClick: e=>e.stopPropagation(),}
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginBottom:4,flexWrap:"wrap"},}

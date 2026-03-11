@@ -910,6 +910,14 @@ function App() {
   const [tournamentMsg, setTournamentMsg] = useState("");
   const [tournamentTab, setTournamentTab] = useState("top"); // top/teams/games/ranking
   const [selDir, setSelDir] = useState(null);
+  const [teamShareCode, setTeamShareCode] = useState(localStorage.getItem("teamShareCode")||"");
+  const [teamSharePw,   setTeamSharePw]   = useState("");
+  const [teamShareInput,setTeamShareInput]= useState("");
+  const [teamSharePwInput,setTeamSharePwInput]= useState("");
+  const [teamShareRole, setTeamShareRole] = useState(localStorage.getItem("teamShareRole")||""); // "admin"|"viewer"|""
+  const [teamShareError,setTeamShareError]= useState("");
+  const isReadOnly = teamShareRole === "viewer";
+  const isTeamConnected = teamShareRole !== "";
   const [pitchCount, setPitchCount] = useState({b:0,s:0,f:0}); // 現打席BSFカウント
   const [pitchHistory, setPitchHistory] = useState([]); // 取り消し用履歴 ["b","s","f",...]
   const [toast,  setToast]  = useState("");
@@ -929,7 +937,13 @@ function App() {
       fbPush(syncGameId, storage.currentGame);
       console.log("[HOST] push triggered, syncGameId="+syncGameId);
     }
-  },[storage, isHost, syncGameId]);
+    // チームコード管理者モード: gameが変わったらFirebaseに自動プッシュ
+    if(teamShareRole==="admin" && teamShareCode && fbInit()) {
+      try {
+        fbDB.ref("team_rooms/"+teamShareCode+"/currentGame").set({...storage.currentGame, _ts:Date.now()});
+      } catch(e) { console.error("[TEAM] push error", e); }
+    }
+  },[storage, isHost, syncGameId, teamShareRole, teamShareCode]);
 
   // viewer subscribeはstartViewing内で直接実行するためここでは不要
   useEffect(()=>{
@@ -946,6 +960,43 @@ function App() {
     showToast("配信開始！コード: "+id);
   };
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
+  // ===== チームコード接続 =====
+  const connectTeam = (code, pw) => {
+    const tc = (code||"").trim().toUpperCase();
+    if(!tc){ setTeamShareError("チームコードを入力してください"); return; }
+    if(!fbInit()){ setTeamShareError("Firebase未設定"); return; }
+    // Firebaseからチームデータを取得して管理者PWを検証
+    fbDB.ref("team_rooms/"+tc).once("value").then(snap=>{
+      const data = snap.exists() ? snap.val() : null;
+      const role = (data && pw && data.adminPw === pw) ? "admin" : "viewer";
+      setTeamShareCode(tc);
+      setTeamShareRole(role);
+      setTeamShareError("");
+      localStorage.setItem("teamShareCode", tc);
+      localStorage.setItem("teamShareRole", role);
+      showToast(role==="admin" ? "管理者として接続しました" : "閲覧モードで接続しました");
+      // リアルタイム購読開始
+      if(window.__teamShareTimer) clearInterval(window.__teamShareTimer);
+      window.__teamShareTimer = setInterval(()=>{
+        fbDB.ref("team_rooms/"+tc+"/currentGame").once("value").then(snap2=>{
+          if(!snap2||!snap2.exists()) return;
+          const g = snap2.val();
+          if(!g || typeof g !== "object") return;
+          delete g._ts;
+          setStorage(s=>({...s, currentGame: g}));
+        }).catch(()=>{});
+      }, 1500);
+    }).catch(e=>{ setTeamShareError("接続エラー: "+e.message); });
+  };
+
+  const disconnectTeam = () => {
+    if(window.__teamShareTimer) clearInterval(window.__teamShareTimer);
+    setTeamShareCode(""); setTeamShareRole(""); setTeamShareError("");
+    localStorage.removeItem("teamShareCode");
+    localStorage.removeItem("teamShareRole");
+    showToast("切断しました");
+  };
+
   const startViewing = (id)=>{
     try {
       var uid = (id||'').trim().toUpperCase();
@@ -1035,6 +1086,7 @@ function App() {
 
   
   const mutGame = useCallback((fn)=>{
+    if(isReadOnly) return;
     setStorage(s=>{
       
       const snap = JSON.parse(JSON.stringify(s.currentGame));
@@ -2045,8 +2097,8 @@ function App() {
                , undoStack.length>0&&React.createElement('span', { style: {fontSize:10,opacity:.7,marginLeft:2},}, "(", undoStack.length, ")")
             )
             , !game.finished ? (React.createElement(React.Fragment, null
-              , React.createElement('button', { onClick: changeInning, style: sBt("#16a34a"),}, "チェンジ ▶" )
-              , React.createElement('button', { onClick: saveGame,     style: sBt("#1d4ed8"),}, "💾 保存" )
+              , React.createElement('button', { onClick: ()=>{ if(isReadOnly){showToast("閲覧モードでは操作できません");return;} changeInning(); }, style: {...sBt("#16a34a"),opacity:isReadOnly?0.4:1},}, "チェンジ ▶" )
+              , React.createElement('button', { onClick: ()=>{ if(isReadOnly){showToast("閲覧モードでは操作できません");return;} saveGame(); }, style: {...sBt("#1d4ed8"),opacity:isReadOnly?0.4:1},}, "💾 保存" )
               
             , React.createElement('button', { onClick: ()=>setModal({step:"endgame"}), style: sBt("#dc2626"),}, "⚾ 試合終了" )
             )) : (React.createElement(React.Fragment, null
@@ -2078,6 +2130,17 @@ function App() {
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
 
         
+        , isReadOnly && React.createElement('div', {style:{
+              background:"#0c2340",border:"2px solid #3b82f6",borderRadius:10,
+              padding:"10px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:10
+            }}
+            , React.createElement('div', {style:{fontSize:20}}, "👁")
+            , React.createElement('div', null
+              , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#7dd3fc"}}, "閲覧モード")
+              , React.createElement('div', {style:{fontSize:11,color:"#475569"}}, "チームコード: "+teamShareCode+" — 操作はできません")
+            )
+          )
+
         , tab==="score"&&(React.createElement(React.Fragment, null
           , React.createElement('div', { style: S.card,}
             , React.createElement('div', { style: S.ct,}, "⚙️ 試合情報" )
@@ -2804,64 +2867,67 @@ function App() {
 
         , tab==="teams"&&React.createElement('div', {style:{...S.card, borderLeft:"4px solid #a78bfa", marginTop:12}}
             , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:12}}
-              , React.createElement('div', {style:S.ct}, "📡 リアルタイム共有")
+              , React.createElement('div', {style:S.ct}, "📡 チーム同期")
+              , isTeamConnected && React.createElement('div', {style:{
+                  marginLeft:"auto", fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:6,
+                  background: teamShareRole==="admin" ? "#065f46" : "#1e3a5f",
+                  color: teamShareRole==="admin" ? "#4ade80" : "#7dd3fc",
+                  border: `1px solid ${teamShareRole==="admin"?"#4ade80":"#3b82f6"}`
+                }}, teamShareRole==="admin" ? "🔑 管理者" : "👁 閲覧中")
             )
 
-            , !isHost && !isViewer && React.createElement(React.Fragment, null
-              , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:10}},
-                  "試合を配信してメンバーにリアルタイム観戦させたり、他の配信を観戦できます。")
-
-              , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:12}}
-                , React.createElement('button', {
-                    onClick: startHosting,
-                    style:{...sBt("#7c3aed"),flex:1,padding:"10px",fontSize:13,fontWeight:700}
-                  }, "📡 この試合を配信開始")
-              )
-
-              , React.createElement('div', {style:{borderTop:"1px solid #1e3a5f",paddingTop:12,marginTop:4}})
-              , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:8}}, "他の試合を観戦：")
-              , React.createElement('div', {style:{display:"flex",gap:8}}
+            , !isTeamConnected && React.createElement(React.Fragment, null
+              , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:14}},
+                "チームコードを入力してチームの試合をリアルタイムで共有。管理者パスワードを入力すると操作できます。")
+              , React.createElement('div', {style:{marginBottom:10}}
+                , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード（必須）")
                 , React.createElement('input', {
-                    value: viewerCode,
-                    onChange: e=>setViewerCode(e.target.value.toUpperCase()),
-                    placeholder:"6桁コードを入力",
-                    maxLength:6,
-                    style:{flex:1,padding:"8px 12px",borderRadius:8,background:"#0d1f35",
-                      border:"1.5px solid #3730a3",color:"#e2e8f0",fontSize:14,
-                      fontFamily:"monospace",letterSpacing:2,outline:"none"}
+                    value: teamShareInput,
+                    onChange: e=>setTeamShareInput(e.target.value.toUpperCase()),
+                    placeholder:"例: TIGERS",
+                    style:{width:"100%",padding:"9px 12px",borderRadius:8,background:"#0d1f35",
+                      border:"1.5px solid #3730a3",color:"#e2e8f0",fontSize:16,
+                      fontFamily:"monospace",letterSpacing:2,outline:"none",boxSizing:"border-box"}
                   })
-                , React.createElement('button', {
-                    onClick:()=>startViewing(viewerCode),
-                    style:{...sBt("#4f46e5"),padding:"8px 16px",fontSize:13,fontWeight:700}
-                  }, "観戦")
               )
+              , React.createElement('div', {style:{marginBottom:14}}
+                , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "管理者パスワード（任意・管理者のみ）")
+                , React.createElement('input', {
+                    type:"password",
+                    value: teamSharePwInput,
+                    onChange: e=>setTeamSharePwInput(e.target.value),
+                    placeholder:"入力しない場合は閲覧のみ",
+                    style:{width:"100%",padding:"9px 12px",borderRadius:8,background:"#0d1f35",
+                      border:"1.5px solid #1e3a5f",color:"#e2e8f0",fontSize:14,
+                      outline:"none",boxSizing:"border-box"}
+                  })
+              )
+              , teamShareError && React.createElement('div', {style:{color:"#f87171",fontSize:12,marginBottom:8}}, teamShareError)
+              , React.createElement('button', {
+                  onClick:()=>connectTeam(teamShareInput, teamSharePwInput),
+                  style:{...sBt("#7c3aed"),width:"100%",padding:"11px",fontSize:14,fontWeight:700}
+                }, "接続する")
+              , React.createElement('div', {style:{fontSize:10,color:"#475569",marginTop:10,textAlign:"center"}},
+                "チームコードを新規作成するには管理者パスワードを入力して接続してください")
             )
 
-            , isHost && React.createElement(React.Fragment, null
-              , React.createElement('div', {style:{background:"#1a0a3a",border:"2px solid #7c3aed",borderRadius:10,padding:"12px",marginBottom:12,textAlign:"center"}}
-                , React.createElement('div', {style:{fontSize:11,color:"#a78bfa",marginBottom:4}}, "📡 配信中 — 観戦コード")
-                , React.createElement('div', {style:{fontFamily:"monospace",fontSize:32,fontWeight:900,color:"#fff",letterSpacing:4}}, syncGameId)
-                , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginTop:4}}, "このコードをメンバーに共有してください")
+            , isTeamConnected && React.createElement(React.Fragment, null
+              , React.createElement('div', {style:{background:"#0a1628",borderRadius:10,border:`2px solid ${teamShareRole==="admin"?"#4ade80":"#3b82f6"}`,padding:"12px",marginBottom:12,textAlign:"center"}}
+                , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:4}}, "接続中のチームコード")
+                , React.createElement('div', {style:{fontFamily:"monospace",fontSize:28,fontWeight:900,color:"#fff",letterSpacing:4}}, teamShareCode)
                 , React.createElement('button', {
-                    onClick:()=>navigator.clipboard&&navigator.clipboard.writeText(syncGameId).then(()=>showToast("コードをコピーしました")),
+                    onClick:()=>navigator.clipboard&&navigator.clipboard.writeText(teamShareCode).then(()=>showToast("コードをコピーしました")),
                     style:{...sBt("#475569"),fontSize:11,padding:"4px 14px",marginTop:8}
                   }, "📋 コピー")
               )
+              , teamShareRole==="admin" && React.createElement('div', {style:{fontSize:12,color:"#4ade80",marginBottom:10,textAlign:"center"}},
+                "✅ 管理者モード — 全操作が同期されます")
+              , teamShareRole==="viewer" && React.createElement('div', {style:{fontSize:12,color:"#7dd3fc",marginBottom:10,textAlign:"center"}},
+                "👁 閲覧モード — 試合をリアルタイムで閲覧中")
               , React.createElement('button', {
-                  onClick: stopHosting,
+                  onClick: disconnectTeam,
                   style:{...sBt("#dc2626",true),width:"100%",padding:"10px",fontSize:13,fontWeight:700}
-                }, "⏹ 配信停止")
-            )
-
-            , isViewer && React.createElement(React.Fragment, null
-              , React.createElement('div', {style:{background:"#0a1f35",border:"2px solid #3b82f6",borderRadius:10,padding:"12px",marginBottom:12,textAlign:"center"}}
-                , React.createElement('div', {style:{fontSize:11,color:"#7dd3fc",marginBottom:4}}, "👁 観戦中")
-                , React.createElement('div', {style:{fontFamily:"monospace",fontSize:24,fontWeight:900,color:"#fff",letterSpacing:4}}, syncGameId)
-              )
-              , React.createElement('button', {
-                  onClick:()=>{ setSyncMode("off"); setSyncGameId(""); setViewerGame(null); if(window.__viewerTimer) clearInterval(window.__viewerTimer); showToast("観戦終了"); },
-                  style:{...sBt("#dc2626",true),width:"100%",padding:"10px",fontSize:13,fontWeight:700}
-                }, "⏹ 観戦終了")
+                }, "切断する")
             )
           )
 

@@ -1076,7 +1076,7 @@ function App() {
   const homeHitsTotal = sumLineupH(game.homeLineup||[]);
 
   const RBI_CODES = new Set(["H1","H2","H3","HR","BB","HBP","IBB","SAC","SF"]);
-  const commitAtBat = useCallback((team, pidx, inning, code, dir, scoredNames, newBases, newOuts, errorPos)=>{
+  const commitAtBat = useCallback((team, pidx, inning, code, dir, scoredNames, newBases, newOuts, errorPos, skipPitchAdd)=>{
     const runs = (scoredNames||[]).length;
     const batterName = (() => { try { return _optionalChain([game, 'access', _4 => _4[team+"Lineup"], 'access', _5 => _5[pidx], 'optionalAccess', _6 => _6.name])||""; } catch(e){return "";} })();
     const batterScored = (scoredNames||[]).includes(batterName);
@@ -1151,8 +1151,8 @@ function App() {
       return {...tmp,...scores,log,[batterKey]:nextPidx};
     });
     setSelDir(null);
-    // 打席結果の1球を投手に加算（IBBは加算なし。BSFは押下時に加算済み）
-    if(code !== "IBB") {
+    // 打席結果の1球を投手に加算（IBBは加算なし。BSFは押下時に加算済み。自動BB/三振は加算なし）
+    if(code !== "IBB" && !skipPitchAdd) {
       const defSide2 = team === "away" ? "home" : "away";
       mutGame(g => {
         const pitchers = [...(g[defSide2+"Pitchers"]||[])];
@@ -1333,18 +1333,18 @@ function App() {
   };
 
   
-  const onPickResult = (code) => {
+  const onPickResult = (code, skipPitch) => {
     const { newBases, runs, newOuts, batterScored, scoredNames } = applyResult(code, game.bases, game.outs, _optionalChain([mPlayer, 'optionalAccess', _18 => _18.name]));
     const base = {autoNewBases:newBases, autoRuns:runs, autoNewOuts:newOuts, batterScored, autoScoredNames:scoredNames};
     if (code === "E") {
       
       setSelDir(null);
-      setModal(m=>({...m, step:"direction", pendingCode:code, ...base, afterDir:"error_pos"}));
+      setModal(m=>({...m, step:"direction", pendingCode:code, ...base, afterDir:"error_pos", skipPitchAdd:!!skipPitch}));
     } else if (DIR_CODES.has(code)) {
       setSelDir(null);
-      setModal(m=>({...m, step:"direction", pendingCode:code, ...base}));
+      setModal(m=>({...m, step:"direction", pendingCode:code, ...base, skipPitchAdd:!!skipPitch}));
     } else {
-      setModal(m=>({...m, step:"adjust", pendingCode:code, pendingDir:null, ...base}));
+      setModal(m=>({...m, step:"adjust", pendingCode:code, pendingDir:null, ...base, skipPitchAdd:!!skipPitch}));
     }
   };
 
@@ -3153,7 +3153,7 @@ function App() {
                   " が出塁"
                 )
               , React.createElement('button', {
-                  onClick:()=>onPickResult("BB"),
+                  onClick:()=>onPickResult("BB",true),
                   style:{width:"100%",background:"#60a5fa20",border:"2px solid #60a5fa",borderRadius:10,
                     color:"#60a5fa",padding:"12px",cursor:"pointer",fontSize:15,fontWeight:700}
                 }, "✔ 四球として記録")
@@ -3173,7 +3173,7 @@ function App() {
                     {code:"KW", label:"振り逃げ",   short:"KW", color:"#22d3ee"},
                   ].map(({code,label,short,color})=>
                     React.createElement('button', {key:code,
-                      onClick:()=>{ onPickResult(code); },
+                      onClick:()=>{ onPickResult(code,true); },
                       style:{background:color+"20",border:`1.5px solid ${color}`,borderRadius:10,
                         color:color,padding:"12px",cursor:"pointer",fontSize:14,fontWeight:700,
                         display:"flex",alignItems:"center",gap:10}
@@ -3390,7 +3390,7 @@ function App() {
                   defTeamLineup: game[(modal.team==="away"?"home":"away")+"Lineup"]||[],
                   onConfirm: (adjBases,scoredNames,adjOuts,adjErrorPos)=>{
                     commitAtBat(modal.team,modal.pidx,modal.inning,
-                      modal.pendingCode,modal.pendingDir||null,scoredNames,adjBases,adjOuts,adjErrorPos||modal.errorPos||null);
+                      modal.pendingCode,modal.pendingDir||null,scoredNames,adjBases,adjOuts,adjErrorPos||modal.errorPos||null,modal.skipPitchAdd||false);
                     setModal(null);
                   },
                   onCancel: ()=>setModal(null),}

@@ -902,6 +902,7 @@ function App() {
   const isHost   = syncMode==="host";
   const [modal, setModal] = useState(null);
   const [newInnings, setNewInnings] = useState(7);
+  const [newPitchMode, setNewPitchMode] = useState("result");
   const [tournament, setTournament] = useState(null); // 現在参加中の大会データ
   const [tournamentCode, setTournamentCode] = useState(""); // 入力中のコード
   const [tournamentMsg, setTournamentMsg] = useState("");
@@ -2197,8 +2198,8 @@ function App() {
               return (React.createElement(React.Fragment, null
                 , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginBottom:10},}
                   , React.createElement('div', { style: {fontSize:11,color:"#64748b"},}, "現在の打者")
-                  , React.createElement('button', { onClick: ()=>openCurrentBatter(curTeam,game.inning),
-                    style: {background:"linear-gradient(135deg,#1d4ed8,#1e40af)",
+                  , React.createElement('button', { onClick: ()=>{ if(game.pitchMode==="result") openCurrentBatter(curTeam,game.inning); },
+                    style: {background: game.pitchMode==="result" ? "linear-gradient(135deg,#1d4ed8,#1e40af)" : "linear-gradient(135deg,#065f46,#064e3b)",
                       border:"2px solid #3b82f6",borderRadius:10,
                       color:"#fff",padding:"8px 18px",cursor:"pointer",
                       display:"flex",alignItems:"center",gap:10,flex:1,maxWidth:260},}
@@ -2216,7 +2217,7 @@ function App() {
 
                 
                 
-                , React.createElement('div', {style:{background:"#0a1628",borderRadius:10,border:"1px solid #1e3a5f",padding:"10px 12px",marginBottom:10}}
+                , game.pitchMode==="pitch" && React.createElement('div', {style:{background:"#0a1628",borderRadius:10,border:"1px solid #1e3a5f",padding:"10px 12px",marginBottom:10}})
 
                   , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:12,marginBottom:10}}
                     , ["B","S","O"].map(type => {
@@ -2357,12 +2358,12 @@ function App() {
                   )
                 )
 
-, React.createElement('div', { style: {fontSize:11,color:"#475569",marginBottom:8},}, "または選手を直接タップ：")
+, React.createElement('div', { style: {fontSize:11,color:"#475569",marginBottom:8},}, game.pitchMode==="pitch" ? "投球入力後、選手タップで打席結果を記録：" : "または選手を直接タップ：")
                 , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:5,marginBottom:12},}
                   , curLineup.map((p,i)=>{
                     const isCurrent = i===curBatterIdx;
                     return (
-                      React.createElement('button', { key: p.id, onClick: ()=>openNew(curTeam,i,game.inning),
+                      React.createElement('button', { key: p.id, onClick: ()=>{ if(game.pitchMode==="result") openNew(curTeam,i,game.inning); },
                         style: {background:isCurrent?"#1e3a5f":"#0d1a2e",
                           border:`1px solid ${isCurrent?"#3b82f6":"#1e3a5f"}`,
                           borderRadius:7, color:isCurrent?"#93c5fd":"#64748b",
@@ -2375,7 +2376,7 @@ function App() {
                     );
                   })
                 )
-              ));
+              )
             })()
             , React.createElement('div', { style: {borderTop:"1px solid #1e3a5f",paddingTop:10},}
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginBottom:6,flexWrap:"wrap"},}
@@ -2427,14 +2428,22 @@ function App() {
             , game.log.length===0
               ?React.createElement('div', { style: {color:"#475569",fontSize:13},}, "まだ記録なし")
               :game.log.slice(0,12).map((e,i)=>(
-                React.createElement('div', { key: i, style: {display:"flex",gap:10,padding:"6px 8px",borderBottom:"1px solid #0f2040",
+                React.createElement('div', { key: i, style: {display:"flex",gap:10,padding:"6px 8px",
+                  borderBottom:"1px solid #0f2040",
                   borderRadius:6,
-                  background: (e.runs&&e.runs>0) ? "rgba(251,191,36,0.08)" : "transparent",
-                  border: (e.runs&&e.runs>0) ? "1px solid rgba(251,191,36,0.3)" : "1px solid transparent",
-                  opacity: i===0?1:0.75},}
-                  , React.createElement('span', { style: {fontSize:11,color:"#7db8e8",flexShrink:0},}, e.ts)
-                  , React.createElement('span', { style: {fontSize:13, color:(e.runs&&e.runs>0)?"#fde68a":"#e2e8f0"},}, e.msg)
-                  , (e.runs&&e.runs>0)&&React.createElement('span', {style:{fontSize:11,color:"#fbbf24",fontWeight:700,marginLeft:"auto",flexShrink:0}}, "+", e.runs, "点")
+                  background: (e.runs&&e.runs>0) ? "rgba(251,191,36,0.12)" : "transparent",
+                  border: (e.runs&&e.runs>0) ? "1px solid rgba(251,191,36,0.5)" : "1px solid transparent",
+                  opacity: i===0?1:0.8},}
+                  , React.createElement('span', { style: {fontSize:11,color:(e.runs&&e.runs>0)?"#fbbf24":"#7db8e8",flexShrink:0},}, e.ts)
+                  , React.createElement('span', { style: {
+                      fontSize:13,
+                      fontWeight:(e.runs&&e.runs>0)?700:400,
+                      color:(e.runs&&e.runs>0)?"#fde047":"#e2e8f0"
+                    },}, e.msg)
+                  , (e.runs&&e.runs>0)&&React.createElement('span', {style:{
+                      fontSize:12, color:"#fff", fontWeight:900, marginLeft:"auto", flexShrink:0,
+                      background:"#b45309", borderRadius:6, padding:"1px 7px"
+                    }}, "+", e.runs, "点")
                   , i===0&&!(e.runs&&e.runs>0)&&React.createElement('span', { style: {fontSize:10,color:"#f59e0b",marginLeft:"auto",flexShrink:0},}, "最新")
                 )
               ))
@@ -2653,7 +2662,7 @@ function App() {
                               , React.createElement('span', {style:{
                                   fontSize:15, fontWeight:700,
                                   color:(p.pitchCount||0)>=100?"#f87171":(p.pitchCount||0)>=80?"#fbbf24":"#4ade80"
-                                }}, p.pitchCount||0)
+                                }}, game.pitchMode==="pitch" ? (p.pitchCount||0) : "—")
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}, h)
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hr)
@@ -2955,9 +2964,29 @@ function App() {
                   })
                 , React.createElement('span', { style: {fontSize:12,color:"#94a3b8"},}, "回")
               )
+              , React.createElement('div', {style:{marginBottom:16}}
+                , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:8,textAlign:"center"}}, "📋 記録モード")
+                , React.createElement('div', {style:{display:"flex",gap:8}}
+                  , ["result","pitch"].map(mode=>
+                      React.createElement('button', {key:mode,
+                        onClick:()=>setNewPitchMode(mode),
+                        style:{
+                          flex:1, padding:"10px 8px", borderRadius:8, fontSize:12, fontWeight:700, cursor:"pointer",
+                          background: newPitchMode===mode ? (mode==="result"?"#1d4ed8":"#065f46") : "#0d1f35",
+                          border: `2px solid ${newPitchMode===mode?(mode==="result"?"#3b82f6":"#10b981"):"#1e3a5f"}`,
+                          color: newPitchMode===mode ? "#fff" : "#64748b",
+                        }
+                      }
+                      , mode==="result" ? "🎯 打席結果のみ" : "⚾ 一球ごと記録"
+                    )
+                  )
+                , React.createElement('div', {style:{fontSize:10,color:"#475569",marginTop:6,textAlign:"center"}},
+                    newPitchMode==="result" ? "打席結果モーダルが自動で開きます" : "B/S/Fボタンで投球を入力してから打席結果を選択"
+                  )
+              )
               , React.createElement('button', { onClick: ()=>{
                 saveGame();
-                setStorage(s=>({...s,currentGame:newGame(newInnings),undoStack:[]}));
+                setStorage(s=>({...s,currentGame:newGame(newInnings,newPitchMode),undoStack:[]}));
                 setTab("score");
                 setModal(null);
                 showToast(`新試合を開始しました（${newInnings}回制）`);
@@ -2965,7 +2994,7 @@ function App() {
 
               )
               , React.createElement('button', { onClick: ()=>{
-                setStorage(s=>({...s,currentGame:newGame(newInnings),undoStack:[]}));
+                setStorage(s=>({...s,currentGame:newGame(newInnings,newPitchMode),undoStack:[]}));
                 setTab("score");
                 setModal(null);
                 showToast(`新試合を開始しました（${newInnings}回制）`);
@@ -2975,6 +3004,7 @@ function App() {
               , React.createElement('button', { onClick: ()=>setModal(null), style: S.cBtn,}, "キャンセル")
             )
           )
+        )
         );
 
         

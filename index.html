@@ -2802,6 +2802,69 @@ function App() {
                 )
           )
 
+        , tab==="teams"&&React.createElement('div', {style:{...S.card, borderLeft:"4px solid #a78bfa", marginTop:12}}
+            , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:12}}
+              , React.createElement('div', {style:S.ct}, "📡 リアルタイム共有")
+            )
+
+            , !isHost && !isViewer && React.createElement(React.Fragment, null
+              , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:10}},
+                  "試合を配信してメンバーにリアルタイム観戦させたり、他の配信を観戦できます。")
+
+              , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:12}}
+                , React.createElement('button', {
+                    onClick: startHosting,
+                    style:{...sBt("#7c3aed"),flex:1,padding:"10px",fontSize:13,fontWeight:700}
+                  }, "📡 この試合を配信開始")
+              )
+
+              , React.createElement('div', {style:{borderTop:"1px solid #1e3a5f",paddingTop:12,marginTop:4}})
+              , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:8}}, "他の試合を観戦：")
+              , React.createElement('div', {style:{display:"flex",gap:8}}
+                , React.createElement('input', {
+                    value: viewerCode,
+                    onChange: e=>setViewerCode(e.target.value.toUpperCase()),
+                    placeholder:"6桁コードを入力",
+                    maxLength:6,
+                    style:{flex:1,padding:"8px 12px",borderRadius:8,background:"#0d1f35",
+                      border:"1.5px solid #3730a3",color:"#e2e8f0",fontSize:14,
+                      fontFamily:"monospace",letterSpacing:2,outline:"none"}
+                  })
+                , React.createElement('button', {
+                    onClick:()=>startViewing(viewerCode),
+                    style:{...sBt("#4f46e5"),padding:"8px 16px",fontSize:13,fontWeight:700}
+                  }, "観戦")
+              )
+            )
+
+            , isHost && React.createElement(React.Fragment, null
+              , React.createElement('div', {style:{background:"#1a0a3a",border:"2px solid #7c3aed",borderRadius:10,padding:"12px",marginBottom:12,textAlign:"center"}}
+                , React.createElement('div', {style:{fontSize:11,color:"#a78bfa",marginBottom:4}}, "📡 配信中 — 観戦コード")
+                , React.createElement('div', {style:{fontFamily:"monospace",fontSize:32,fontWeight:900,color:"#fff",letterSpacing:4}}, syncGameId)
+                , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginTop:4}}, "このコードをメンバーに共有してください")
+                , React.createElement('button', {
+                    onClick:()=>navigator.clipboard&&navigator.clipboard.writeText(syncGameId).then(()=>showToast("コードをコピーしました")),
+                    style:{...sBt("#475569"),fontSize:11,padding:"4px 14px",marginTop:8}
+                  }, "📋 コピー")
+              )
+              , React.createElement('button', {
+                  onClick: stopHosting,
+                  style:{...sBt("#dc2626",true),width:"100%",padding:"10px",fontSize:13,fontWeight:700}
+                }, "⏹ 配信停止")
+            )
+
+            , isViewer && React.createElement(React.Fragment, null
+              , React.createElement('div', {style:{background:"#0a1f35",border:"2px solid #3b82f6",borderRadius:10,padding:"12px",marginBottom:12,textAlign:"center"}}
+                , React.createElement('div', {style:{fontSize:11,color:"#7dd3fc",marginBottom:4}}, "👁 観戦中")
+                , React.createElement('div', {style:{fontFamily:"monospace",fontSize:24,fontWeight:900,color:"#fff",letterSpacing:4}}, syncGameId)
+              )
+              , React.createElement('button', {
+                  onClick:()=>{ setSyncMode("off"); setSyncGameId(""); setViewerGame(null); if(window.__viewerTimer) clearInterval(window.__viewerTimer); showToast("観戦終了"); },
+                  style:{...sBt("#dc2626",true),width:"100%",padding:"10px",fontSize:13,fontWeight:700}
+                }, "⏹ 観戦終了")
+            )
+          )
+
         )))
 
       , modal&&(()=>{

@@ -2615,22 +2615,22 @@ function App() {
                     , React.createElement('thead', null
                       , React.createElement('tr', null
                         , React.createElement('th', {style:{...S.th, textAlign:"left", minWidth:80}}, "投手名")
-                        , React.createElement('th', {style:S.th}, "球数")
                         , React.createElement('th', {style:S.th}, "投球回")
+                        , React.createElement('th', {style:S.th}, "球数")
                         , React.createElement('th', {style:S.th}, "被安打")
-                        , React.createElement('th', {style:S.th}, "自責点")
-                        , React.createElement('th', {style:S.th}, "四球")
-                        , React.createElement('th', {style:S.th}, "三振")
-                        , React.createElement('th', {style:S.th}, "失点")
-                        , React.createElement('th', {style:S.th}, "死球")
                         , React.createElement('th', {style:S.th}, "被本塁打")
+                        , React.createElement('th', {style:S.th}, "三振")
+                        , React.createElement('th', {style:S.th}, "四球")
+                        , React.createElement('th', {style:S.th}, "死球")
+                        , React.createElement('th', {style:S.th}, "失点")
+                        , React.createElement('th', {style:S.th}, "自責点")
                         , React.createElement('th', {style:S.th}, "防御率")
                       )
                     )
                     , React.createElement('tbody', null
                       , pitchers.map((p,i) => {
                           const isCur = i===curPIdx;
-                          const auto = (pStats[side]||[])[i]||{};
+                          const auto = (pitcherStats[side]||[])[i]||{};
                           const rawIp = auto.autoIp||0;
                           const ipDisp = Math.floor(rawIp/10)+"回"+(rawIp%10>0?(rawIp%10)+"/3":"");
                           const ipNum = Math.floor(rawIp/10)+(rawIp%10)/3;
@@ -2639,6 +2639,7 @@ function App() {
                           const k   = auto.autoK||0;
                           const hbp = auto.autoHbp||0;
                           const hr  = auto.autoHr||0;
+                          const runs = auto.autoRuns||0;
                           const er  = p.manualOverride ? (p.autoEr!==undefined?p.autoEr:(p.er||0)) : (auto.autoEr||0);
                           const era = ipNum>0 ? (er*9/ipNum).toFixed(2) : (er>0?"∞":"—");
                           return React.createElement('tr', {key:p.id,
@@ -2647,15 +2648,19 @@ function App() {
                               , isCur&&React.createElement('span', {style:{color:color,fontSize:9,fontWeight:700}}, "▶ ")
                               , React.createElement('span', {style:{color:isCur?color:"#e2e8f0",fontWeight:isCur?700:400}}, p.name)
                             )
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, ipDisp||"0回")
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}
                               , React.createElement('span', {style:{
                                   fontSize:15, fontWeight:700,
                                   color:(p.pitchCount||0)>=100?"#f87171":(p.pitchCount||0)>=80?"#fbbf24":"#4ade80"
                                 }}, p.pitchCount||0)
                             )
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, ipDisp||"0回")
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}, h)
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, auto.autoRuns||0)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hr)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, k)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, bb)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hbp)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, runs)
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}
                               , React.createElement('input', {type:"number", min:0,
                                   value:er,
@@ -2663,10 +2668,6 @@ function App() {
                                   style:{width:36,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:12,outline:"none"}})
                             )
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, bb)
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, k)
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hbp)
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hr)
                             , React.createElement('td', {style:{...S.td, textAlign:"center", color:era==="∞"?"#f87171":era==="—"?"#475569":"#e2e8f0"}}, era)
                           );
                         })

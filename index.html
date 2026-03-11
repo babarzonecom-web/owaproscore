@@ -940,10 +940,12 @@ function App() {
     // チームコード管理者モード: gameが変わったらFirebaseに自動プッシュ
     if(teamShareRole==="admin" && teamShareCode && fbInit()) {
       try {
-        fbDB.ref("team_rooms/"+teamShareCode+"/currentGame").set({...storage.currentGame, _ts:Date.now()});
+        const payload = {...storage.currentGame, _ts:Date.now()};
+        fbDB.ref("team_rooms/"+teamShareCode+"/currentGame").set(payload);
+        console.log("[TEAM ADMIN] pushed game to", teamShareCode);
       } catch(e) { console.error("[TEAM] push error", e); }
     }
-  },[storage, isHost, syncGameId, teamShareRole, teamShareCode]);
+  },[storage.currentGame, isHost, syncGameId, teamShareRole, teamShareCode]);
 
   // viewer subscribeはstartViewing内で直接実行するためここでは不要
   useEffect(()=>{
@@ -965,27 +967,40 @@ function App() {
     const tc = (code||"").trim().toUpperCase();
     if(!tc){ setTeamShareError("チームコードを入力してください"); return; }
     if(!fbInit()){ setTeamShareError("Firebase未設定"); return; }
-    // Firebaseからチームデータを取得して管理者PWを検証
     fbDB.ref("team_rooms/"+tc).once("value").then(snap=>{
       const data = snap.exists() ? snap.val() : null;
-      const role = (data && pw && data.adminPw === pw) ? "admin" : "viewer";
+      let role = "viewer";
+      if(pw) {
+        if(!data) {
+          // 新規チームコード作成：管理者PWを登録
+          fbDB.ref("team_rooms/"+tc).set({ adminPw: pw, createdAt: Date.now() });
+          role = "admin";
+        } else if(data.adminPw === pw) {
+          role = "admin";
+        } else {
+          setTeamShareError("管理者パスワードが違います");
+          return;
+        }
+      }
       setTeamShareCode(tc);
       setTeamShareRole(role);
       setTeamShareError("");
       localStorage.setItem("teamShareCode", tc);
       localStorage.setItem("teamShareRole", role);
-      showToast(role==="admin" ? "管理者として接続しました" : "閲覧モードで接続しました");
-      // リアルタイム購読開始
-      if(window.__teamShareTimer) clearInterval(window.__teamShareTimer);
-      window.__teamShareTimer = setInterval(()=>{
-        fbDB.ref("team_rooms/"+tc+"/currentGame").once("value").then(snap2=>{
-          if(!snap2||!snap2.exists()) return;
-          const g = snap2.val();
-          if(!g || typeof g !== "object") return;
-          delete g._ts;
-          setStorage(s=>({...s, currentGame: g}));
-        }).catch(()=>{});
-      }, 1500);
+      showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
+      // 閲覧モード：リアルタイム購読開始
+      if(role === "viewer") {
+        if(window.__teamShareTimer) clearInterval(window.__teamShareTimer);
+        window.__teamShareTimer = setInterval(()=>{
+          fbDB.ref("team_rooms/"+tc+"/currentGame").once("value").then(snap2=>{
+            if(!snap2||!snap2.exists()) return;
+            const g = snap2.val();
+            if(!g || typeof g !== "object") return;
+            delete g._ts;
+            setStorage(s=>({...s, currentGame: g}));
+          }).catch(()=>{});
+        }, 1500);
+      }
     }).catch(e=>{ setTeamShareError("接続エラー: "+e.message); });
   };
 
@@ -1086,15 +1101,14 @@ function App() {
 
   
   const mutGame = useCallback((fn)=>{
-    if(isReadOnly) return;
+    if(teamShareRole==="viewer") return; // 閲覧モードは操作不可
     setStorage(s=>{
-      
       const snap = JSON.parse(JSON.stringify(s.currentGame));
       const newGame = fn(s.currentGame);
       const newUndoStack = [snap, ...(s.undoStack||[])];
       return {...s, currentGame:newGame, undoStack:newUndoStack};
     });
-  },[]);
+  },[teamShareRole]);
 
   
   const undoPlay = useCallback(()=>{

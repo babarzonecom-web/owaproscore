@@ -1035,7 +1035,11 @@ function App() {
                     if(!g || typeof g !== "object") return;
                     delete g._ts;
                     console.log("[TEAM] viewer applying game data");
-                    setStorage(function(s){ return {...s, currentGame: g}; });
+                    const cleanGame = JSON.parse(JSON.stringify(g));
+                    // setTimeout で React のレンダリングサイクル外から呼ばないように
+                    setTimeout(function(){
+                      setStorage(function(s){ return {...s, currentGame: cleanGame}; });
+                    }, 0);
                   } catch(e3){ console.error("[TEAM] snapshot error", e3); }
                 });
               } catch(e4){ console.error("[TEAM] subscribe error", e4); }

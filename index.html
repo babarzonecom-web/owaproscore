@@ -910,18 +910,18 @@ function App() {
   const [tournamentMsg, setTournamentMsg] = useState("");
   const [tournamentTab, setTournamentTab] = useState("top"); // top/teams/games/ranking
   const [selDir, setSelDir] = useState(null);
-  const [teamShareCode, setTeamShareCode] = useState("");
+  const [teamShareCode, setTeamShareCode] = useState(localStorage.getItem("tsCode")||"");
   const [teamSharePw,   setTeamSharePw]   = useState("");
-  const [teamShareInput,setTeamShareInput]= useState("");
+  const [teamShareInput,setTeamShareInput]= useState(localStorage.getItem("tsCode")||"");
   const [teamSharePwInput,setTeamSharePwInput]= useState("");
-  const [teamShareRole, setTeamShareRole] = useState(""); // "admin"|"viewer"|""
+  const [teamShareRole, setTeamShareRole] = useState(localStorage.getItem("tsRole")||""); // "admin"|"viewer"|""
   const [teamShareError,setTeamShareError]= useState("");
   const isReadOnly = teamShareRole === "viewer";
   const isTeamConnected = teamShareRole !== "";
-  // windowグローバル初期化
+  // windowグローバル初期化（localStorage復元）
   if(typeof window.__teamShareRole === "undefined") {
-    window.__teamShareCode = "";
-    window.__teamShareRole = "";
+    window.__teamShareCode = localStorage.getItem("tsCode")||"";
+    window.__teamShareRole = localStorage.getItem("tsRole")||"";
     window.__teamAdminPushing = false;
   }
   const [pitchCount, setPitchCount] = useState({b:0,s:0,f:0}); // 現打席BSFカウント
@@ -937,10 +937,37 @@ function App() {
 
   // 起動時にチーム接続情報をクリア（毎回手動接続）
   useEffect(()=>{
-    localStorage.removeItem("teamShareCode");
-    localStorage.removeItem("teamShareRole");
-  },[]);
   useEffect(()=>lsSave(storage),[storage]);
+
+  // 起動時: localStorage に接続情報があればFirebase購読を自動再開
+  useEffect(()=>{
+    const savedCode = localStorage.getItem("tsCode");
+    const savedRole = localStorage.getItem("tsRole");
+    if(!savedCode || !savedRole) return;
+    let cancelled = false;
+    const timer = setTimeout(()=>{
+      if(cancelled || !fbInit()) return;
+      window.__teamShareCode = savedCode;
+      window.__teamShareRole = savedRole;
+      window.__teamAdminPushing = false;
+      if(window.__teamShareRef) { try{window.__teamShareRef.off();}catch(e){} }
+      const ref = fbDB.ref("team_rooms/"+savedCode+"/currentGame");
+      window.__teamShareRef = ref;
+      ref.on("value", function(snap){
+        if(cancelled) return;
+        try {
+          if(!snap||!snap.exists()) return;
+          const g = snap.val();
+          if(!g||typeof g!=="object") return;
+          delete g._ts;
+          if(window.__teamAdminPushing) return;
+          setStorage(function(s){ return {...s, currentGame:g}; });
+        } catch(e){}
+      });
+      console.log("[TEAM] Auto-reconnected as", savedRole, "to", savedCode);
+    }, 1000);
+    return ()=>{ cancelled=true; clearTimeout(timer); };
+  },[]);
 
   useEffect(()=>{
     if(isHost && syncGameId) {
@@ -1019,8 +1046,8 @@ function App() {
           setTeamShareCode(tc);
           setTeamShareRole(role);
           setTeamShareError("");
-          localStorage.setItem("teamShareCode", tc);
-          localStorage.setItem("teamShareRole", role);
+          localStorage.setItem("tsCode", tc);
+          localStorage.setItem("tsRole", role);
           showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
           console.log("[TEAM] Connected role="+role+" code="+tc+" window.role="+window.__teamShareRole);
 
@@ -1034,10 +1061,11 @@ function App() {
                 try {
                   console.log("[TEAM] snapshot received, exists="+snap2.exists()+" role="+window.__teamShareRole);
                   if(!snap2 || !snap2.exists()) return;
+                  // 管理者は自分のデータを受け取っても無視（自分が書いたものが戻ってくるだけ）
+                  if(window.__teamShareRole === "admin") return;
                   const g = snap2.val();
                   if(!g || typeof g !== "object") return;
                   delete g._ts;
-                  if(window.__teamAdminPushing) return; // 自分のpush直後は無視
                   console.log("[TEAM] applying game data");
                   setStorage(function(s){ return {...s, currentGame: g}; });
                 } catch(e3){ console.error("[TEAM] snapshot error", e3); }
@@ -1061,8 +1089,8 @@ function App() {
     window.__teamShareRole = "";
     window.__teamAdminPushing = false;
     setTeamShareCode(""); setTeamShareRole(""); setTeamShareError("");
-    localStorage.removeItem("teamShareCode");
-    localStorage.removeItem("teamShareRole");
+    localStorage.removeItem("tsCode");
+    localStorage.removeItem("tsRole");
     showToast("切断しました");
   };
 
@@ -1944,6 +1972,62 @@ function App() {
     var thS = {color:'#64748b',fontSize:11,padding:'4px 4px',textAlign:'center',borderBottom:'1px solid #1e3a5f',minWidth:20};
     var tdS = {fontSize:12,padding:'4px 4px',textAlign:'center',borderBottom:'1px solid #0f1e35',minWidth:20};
     var tdB = Object.assign({},tdS,{fontWeight:900,fontSize:15,color:'#fff'});
+
+    // ===== 起動時接続画面（未接続なら表示） =====
+    if(!isTeamConnected) {
+      return React.createElement('div', {style:{
+          background:"#080f1e", height:"100vh", display:"flex", flexDirection:"column",
+          alignItems:"center", justifyContent:"center", padding:"24px", color:"white", fontFamily:"sans-serif"
+        }}
+        , React.createElement('div', {style:{fontSize:48, marginBottom:12}}, "⚾")
+        , React.createElement('div', {style:{fontSize:22, fontWeight:900, color:"#fbbf24", marginBottom:4}}, "草野球スコアブック")
+        , React.createElement('div', {style:{fontSize:12, color:"#475569", marginBottom:32}}, "チームコードを入力して開始してください")
+
+        , React.createElement('div', {style:{width:"100%", maxWidth:360}}
+          , React.createElement('div', {style:{marginBottom:16}}
+            , React.createElement('div', {style:{fontSize:12, color:"#94a3b8", marginBottom:6}}, "チームコード（必須）")
+            , React.createElement('input', {
+                value: teamShareInput,
+                onChange: e => setTeamShareInput(e.target.value.toUpperCase()),
+                onKeyDown: e => { if(e.key==="Enter") connectTeam(teamShareInput, teamSharePwInput); },
+                placeholder: "例: TIGERS",
+                autoCapitalize: "characters",
+                style:{
+                  width:"100%", padding:"12px 16px", borderRadius:10, fontSize:20,
+                  background:"#0d1f35", border:"2px solid #3730a3", color:"#fff",
+                  fontFamily:"monospace", letterSpacing:3, outline:"none", boxSizing:"border-box",
+                  textTransform:"uppercase"
+                }
+              })
+          )
+          , React.createElement('div', {style:{marginBottom:20}}
+            , React.createElement('div', {style:{fontSize:12, color:"#94a3b8", marginBottom:6}}, "管理者パスワード（記録者のみ・任意）")
+            , React.createElement('input', {
+                type:"password",
+                value: teamSharePwInput,
+                onChange: e => setTeamSharePwInput(e.target.value),
+                onKeyDown: e => { if(e.key==="Enter") connectTeam(teamShareInput, teamSharePwInput); },
+                placeholder: "入力しない場合は閲覧のみ",
+                style:{
+                  width:"100%", padding:"12px 16px", borderRadius:10, fontSize:15,
+                  background:"#0d1f35", border:"1.5px solid #1e3a5f", color:"#fff",
+                  outline:"none", boxSizing:"border-box"
+                }
+              })
+          )
+          , teamShareError && React.createElement('div', {style:{color:"#f87171", fontSize:13, marginBottom:12, textAlign:"center"}}, teamShareError)
+          , React.createElement('button', {
+              onClick: () => connectTeam(teamShareInput, teamSharePwInput),
+              style:{
+                width:"100%", padding:"14px", borderRadius:10, fontSize:16, fontWeight:700,
+                background:"#7c3aed", color:"#fff", border:"none", cursor:"pointer"
+              }
+            }, "接続して開始")
+          , React.createElement('div', {style:{fontSize:11, color:"#334155", marginTop:16, textAlign:"center", lineHeight:1.6}},
+            "チームコードは管理者が決めた任意の文字列です。\n初めて使う場合はチームコードとパスワードを決めて入力してください。")
+        )
+      );
+    }
 
     return React.createElement('div', {style:{background:'#080f1e',height:'100vh',maxWidth:'100vw',color:'white',fontFamily:'sans-serif',display:'flex',flexDirection:'column',overflow:'hidden'}},
 

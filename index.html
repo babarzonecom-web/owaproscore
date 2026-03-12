@@ -1080,31 +1080,7 @@ function App() {
       }, 1000);
     } catch(e){ showToast("エラー: "+e.message); }
   };
-  // Firebaseチーム共有の監視（マウント時に開始・SDK読み込み待ちリトライ）
-  useEffect(() => {
-    setTeamSyncStatus("syncing");
-    let unsub = null;
-    let retryCount = 0;
-    const maxRetry = 10;
-
-    const tryStart = () => {
-      unsub = fbWatchTeams((fbTeams) => {
-        setStorage(s => ({...s, teams: fbTeams}));
-        setTeamSyncStatus("ok");
-      });
-      if (unsub === null) {
-        // Firebase SDKがまだ準備できていない→リトライ
-        retryCount++;
-        if (retryCount < maxRetry) {
-          setTimeout(tryStart, 800);
-        } else {
-          setTeamSyncStatus("error");
-        }
-      }
-    };
-    tryStart();
-    return () => { if (unsub) unsub(); };
-  }, []);
+  // fbWatchTeams useEffect 無効化（クラッシュ原因のため）
 
   const startViewingTeam = (tid)=>{
     const id = (tid||"").trim();

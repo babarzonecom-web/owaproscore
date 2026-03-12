@@ -937,6 +937,13 @@ function App() {
 
   useEffect(()=>lsSave(storage),[storage]);
 
+  // setStorageをwindowグローバルに公開（ポーリングコールバックから直接呼べるように）
+  useEffect(()=>{
+    window.__setStorage = setStorage;
+    console.log("[TEAM] __setStorage registered");
+    return function(){ window.__setStorage = null; };
+  }, [setStorage]);
+
   // 閲覧モード：localStorageが更新されたらstorageを再ロード
   useEffect(()=>{
     const handler = function(){
@@ -982,11 +989,16 @@ function App() {
           console.log("[TEAM] auto REST poll new data ts="+ts);
           var obj = JSON.parse(JSON.stringify(data));
           delete obj._ts;
-          var existing = localStorage.getItem("bb_v7");
-          var existObj = existing ? JSON.parse(existing) : {};
-          existObj.currentGame = obj;
-          localStorage.setItem("bb_v7", JSON.stringify(existObj));
-          window.dispatchEvent(new Event("teamgameupdate"));
+          if(window.__setStorage) {
+            window.__setStorage(function(s){ return Object.assign({}, s, {currentGame: obj}); });
+            console.log("[TEAM] auto poll applied OK");
+          } else {
+            var existing = localStorage.getItem("bb_v7");
+            var existObj = existing ? JSON.parse(existing) : {};
+            existObj.currentGame = obj;
+            localStorage.setItem("bb_v7", JSON.stringify(existObj));
+            window.dispatchEvent(new Event("teamgameupdate"));
+          }
         } catch(pe){ console.error("[TEAM] auto poll apply error", pe&&pe.message||pe); }
       }).catch(function(fe){ console.error("[TEAM] auto fetch error", fe&&fe.message||fe); });
     };
@@ -5590,12 +5602,19 @@ function App() {
                   var str = JSON.stringify(data);
                   var obj = JSON.parse(str);
                   delete obj._ts;
-                  var existing = localStorage.getItem("bb_v7");
-                  var existObj = existing ? JSON.parse(existing) : {};
-                  existObj.currentGame = obj;
-                  localStorage.setItem("bb_v7", JSON.stringify(existObj));
-                  window.dispatchEvent(new Event("teamgameupdate"));
-                  console.log("[TEAM] REST poll applied OK");
+                  // window.__setStorageで直接React stateを更新
+                  if(window.__setStorage) {
+                    window.__setStorage(function(s){ return Object.assign({}, s, {currentGame: obj}); });
+                    console.log("[TEAM] REST poll applied via __setStorage OK");
+                  } else {
+                    // fallback: localStorage経由
+                    var existing = localStorage.getItem("bb_v7");
+                    var existObj = existing ? JSON.parse(existing) : {};
+                    existObj.currentGame = obj;
+                    localStorage.setItem("bb_v7", JSON.stringify(existObj));
+                    window.dispatchEvent(new Event("teamgameupdate"));
+                    console.log("[TEAM] REST poll applied via localStorage OK");
+                  }
                 } catch(pe){ console.error("[TEAM] poll apply error", pe&&pe.message||pe); }
               }).catch(function(fe){ console.error("[TEAM] fetch error", fe&&fe.message||fe); });
             };

@@ -935,39 +935,7 @@ function App() {
   const myTeam     = storage.myTeam||null;
   const opponents  = storage.opponents||[];
 
-  // 起動時にチーム接続情報をクリア（毎回手動接続）
-  useEffect(()=>{
   useEffect(()=>lsSave(storage),[storage]);
-
-  // 起動時: localStorage に接続情報があればFirebase購読を自動再開
-  useEffect(()=>{
-    const savedCode = localStorage.getItem("tsCode");
-    const savedRole = localStorage.getItem("tsRole");
-    if(!savedCode || !savedRole) return;
-    let cancelled = false;
-    const timer = setTimeout(()=>{
-      if(cancelled || !fbInit()) return;
-      window.__teamShareCode = savedCode;
-      window.__teamShareRole = savedRole;
-      window.__teamAdminPushing = false;
-      if(window.__teamShareRef) { try{window.__teamShareRef.off();}catch(e){} }
-      const ref = fbDB.ref("team_rooms/"+savedCode+"/currentGame");
-      window.__teamShareRef = ref;
-      ref.on("value", function(snap){
-        if(cancelled) return;
-        try {
-          if(!snap||!snap.exists()) return;
-          const g = snap.val();
-          if(!g||typeof g!=="object") return;
-          delete g._ts;
-          if(window.__teamAdminPushing) return;
-          setStorage(function(s){ return {...s, currentGame:g}; });
-        } catch(e){}
-      });
-      console.log("[TEAM] Auto-reconnected as", savedRole, "to", savedCode);
-    }, 1000);
-    return ()=>{ cancelled=true; clearTimeout(timer); };
-  },[]);
 
   useEffect(()=>{
     if(isHost && syncGameId) {
@@ -5561,41 +5529,8 @@ function App() {
   const myTeam     = storage.myTeam||null;
   const opponents  = storage.opponents||[];
 
-  // 起動時にチーム接続情報をクリア（毎回手動接続）
-  useEffect(()=>{
-  useEffect(()=>lsSave(storage),[storage]);
-
-  // 起動時: localStorage に接続情報があればFirebase購読を自動再開
-  useEffect(()=>{
-    const savedCode = localStorage.getItem("tsCode");
-    const savedRole = localStorage.getItem("tsRole");
-    if(!savedCode || !savedRole) return;
-    let cancelled = false;
-    const timer = setTimeout(()=>{
-      if(cancelled || !fbInit()) return;
-      window.__teamShareCode = savedCode;
-      window.__teamShareRole = savedRole;
-      window.__teamAdminPushing = false;
-      if(window.__teamShareRef) { try{window.__teamShareRef.off();}catch(e){} }
-      const ref = fbDB.ref("team_rooms/"+savedCode+"/currentGame");
-      window.__teamShareRef = ref;
-      ref.on("value", function(snap){
-        if(cancelled) return;
-        try {
-          if(!snap||!snap.exists()) return;
-          const g = snap.val();
-          if(!g||typeof g!=="object") return;
-          delete g._ts;
-          if(window.__teamAdminPushing) return;
-          setStorage(function(s){ return {...s, currentGame:g}; });
-        } catch(e){}
-      });
-      console.log("[TEAM] Auto-reconnected as", savedRole, "to", savedCode);
-    }, 1000);
-    return ()=>{ cancelled=true; clearTimeout(timer); };
-  },[]);
-
-  useEffect(()=>{
+    useEffect(()=>lsSave(storage),[storage]);
+ useEffect(()=>{
     if(isHost && syncGameId) {
       if(!fbInit()){ showToast("Firebase未設定"); return; }
       fbPush(syncGameId, storage.currentGame);

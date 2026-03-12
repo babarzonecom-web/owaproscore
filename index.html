@@ -1051,27 +1051,28 @@ function App() {
           showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
           console.log("[TEAM] Connected role="+role+" code="+tc+" window.role="+window.__teamShareRole);
 
-          // Firebase リアルタイム購読を少し遅らせて開始（React state更新完了後）
-          setTimeout(function(){
-            try {
-              if(!fbDB) return;
-              const ref = fbDB.ref("team_rooms/"+tc+"/currentGame");
-              window.__teamShareRef = ref;
-              ref.on("value", function(snap2){
-                try {
-                  console.log("[TEAM] snapshot received, exists="+snap2.exists()+" role="+window.__teamShareRole);
-                  if(!snap2 || !snap2.exists()) return;
-                  // 管理者は自分のデータを受け取っても無視（自分が書いたものが戻ってくるだけ）
-                  if(window.__teamShareRole === "admin") return;
-                  const g = snap2.val();
-                  if(!g || typeof g !== "object") return;
-                  delete g._ts;
-                  console.log("[TEAM] applying game data");
-                  setStorage(function(s){ return {...s, currentGame: g}; });
-                } catch(e3){ console.error("[TEAM] snapshot error", e3); }
-              });
-            } catch(e4){ console.error("[TEAM] subscribe error", e4); }
-          }, 300);
+          // 閲覧者のみFirebase購読（管理者は購読しない）
+          if(role === "viewer") {
+            setTimeout(function(){
+              try {
+                if(!fbDB) return;
+                const ref = fbDB.ref("team_rooms/"+tc+"/currentGame");
+                window.__teamShareRef = ref;
+                ref.on("value", function(snap2){
+                  try {
+                    console.log("[TEAM] viewer snapshot, exists="+snap2.exists());
+                    if(!snap2 || !snap2.exists()) return;
+                    if(window.__teamShareRole !== "viewer") return;
+                    const g = snap2.val();
+                    if(!g || typeof g !== "object") return;
+                    delete g._ts;
+                    console.log("[TEAM] viewer applying game data");
+                    setStorage(function(s){ return {...s, currentGame: g}; });
+                  } catch(e3){ console.error("[TEAM] snapshot error", e3); }
+                });
+              } catch(e4){ console.error("[TEAM] subscribe error", e4); }
+            }, 300);
+          }
 
         } catch(e5){ setTeamShareError("接続エラー: "+e5.message); }
       }).catch(function(e){ setTeamShareError("接続エラー: "+e.message); });

@@ -1037,6 +1037,19 @@ function App() {
                   var str = JSON.stringify(data);
                   var obj = JSON.parse(str);
                   delete obj._ts;
+                  // Firebaseがarrayをobjectに変換するのを元に戻す
+                  var fixArrays = function(o) {
+                    if(!o || typeof o !== "object") return o;
+                    if(Array.isArray(o)) return o.map(fixArrays);
+                    // 0,1,2...の連続キーのみのオブジェクトは配列に変換
+                    var keys = Object.keys(o);
+                    var isArr = keys.length > 0 && keys.every(function(k,i){ return k === String(i); });
+                    if(isArr) return keys.map(function(k){ return fixArrays(o[k]); });
+                    var result = {};
+                    keys.forEach(function(k){ result[k] = fixArrays(o[k]); });
+                    return result;
+                  };
+                  obj = fixArrays(obj);
                   // window.__setStorageで直接React stateを更新
                   if(window.__setStorage) {
                     window.__setStorage(function(s){ return Object.assign({}, s, {currentGame: obj}); });

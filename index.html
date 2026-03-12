@@ -941,19 +941,22 @@ function App() {
   useEffect(()=>{
     const handler = function(){
       try {
+        console.log("[TEAM] teamgameupdate FIRED");
         const fresh = lsLoad();
         if(fresh && fresh.currentGame) {
-          console.log("[TEAM] teamgameupdate received, keys="+Object.keys(fresh.currentGame).slice(0,5).join(","));
+          const keys = Object.keys(fresh.currentGame).slice(0,5).join(",");
+          console.log("[TEAM] teamgameupdate applying keys="+keys);
           setStorage(function(s){
-            const merged = Object.assign({}, s, { currentGame: fresh.currentGame });
-            return merged;
+            return Object.assign({}, s, { currentGame: fresh.currentGame });
           });
+          console.log("[TEAM] setStorage called");
         } else {
-          console.log("[TEAM] teamgameupdate: no currentGame in fresh");
+          console.log("[TEAM] teamgameupdate: no currentGame");
         }
-      } catch(e){ console.error("[TEAM] reload error", e&&e.message||e); }
+      } catch(e){ console.error("[TEAM] handler error", e&&e.message||e); }
     };
     window.addEventListener("teamgameupdate", handler);
+    console.log("[TEAM] teamgameupdate listener registered");
     return function(){ window.removeEventListener("teamgameupdate", handler); };
   }, []);
 

@@ -1055,14 +1055,24 @@ function App() {
                     return result;
                   };
                   obj = fixArrays(obj);
-                  // Firebaseが空配列を削除するため、必須配列フィールドをデフォルト補完
-                  if(!Array.isArray(obj.bases)) obj.bases = [null,null,null];
-                  if(!Array.isArray(obj.awayLineup)) obj.awayLineup = [];
-                  if(!Array.isArray(obj.homeLineup)) obj.homeLineup = [];
-                  if(!Array.isArray(obj.awayPitchers)) obj.awayPitchers = [];
-                  if(!Array.isArray(obj.homePitchers)) obj.homePitchers = [];
-                  if(!Array.isArray(obj.awayPitcherLog)) obj.awayPitcherLog = [];
-                  if(!Array.isArray(obj.homePitcherLog)) obj.homePitcherLog = [];
+                  // Firebaseが空配列を削除するため、必須フィールドをデフォルト補完
+                  var _fa = function(x,def){ return Array.isArray(x)?x:(x?Object.values(x):def); };
+                  obj.bases = _fa(obj.bases, [null,null,null]);
+                  obj.awayLineup = _fa(obj.awayLineup, []);
+                  obj.homeLineup = _fa(obj.homeLineup, []);
+                  obj.awayPitchers = _fa(obj.awayPitchers, []);
+                  obj.homePitchers = _fa(obj.homePitchers, []);
+                  obj.awayPitcherLog = _fa(obj.awayPitcherLog, []);
+                  obj.homePitcherLog = _fa(obj.homePitcherLog, []);
+                  obj.log = _fa(obj.log, []);
+                  obj.runs = _fa(obj.runs, []);
+                  obj.defenseLog = _fa(obj.defenseLog, []);
+                  obj.awayScore = _fa(obj.awayScore, []);
+                  obj.homeScore = _fa(obj.homeScore, []);
+                  // lineupの各playerのatBatsとeachAtBatsを補完
+                  var _fixPlayer = function(p){ if(!p) return p; if(!p.atBats||typeof p.atBats!=="object") p.atBats={}; return p; };
+                  obj.awayLineup = obj.awayLineup.map(_fixPlayer);
+                  obj.homeLineup = obj.homeLineup.map(_fixPlayer);
                   // window.__setStorageで直接React stateを更新
                   if(window.__setStorage) {
                     window.__setStorage(function(s){ return Object.assign({}, s, {currentGame: obj}); });

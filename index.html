@@ -918,6 +918,12 @@ function App() {
   const [teamShareError,setTeamShareError]= useState("");
   const isReadOnly = teamShareRole === "viewer";
   const isTeamConnected = teamShareRole !== "";
+  // ページロード時にwindowグローバルを初期化（localStorage復元時）
+  if(typeof window.__teamShareRole === "undefined") {
+    window.__teamShareCode = localStorage.getItem("teamShareCode")||"";
+    window.__teamShareRole = localStorage.getItem("teamShareRole")||"";
+    window.__teamAdminPushing = false;
+  }
   const [pitchCount, setPitchCount] = useState({b:0,s:0,f:0}); // 現打席BSFカウント
   const [pitchHistory, setPitchHistory] = useState([]); // 取り消し用履歴 ["b","s","f",...]
   const [toast,  setToast]  = useState("");
@@ -935,17 +941,8 @@ function App() {
     if(isHost && syncGameId) {
       if(!fbInit()){ showToast("Firebase未設定"); return; }
       fbPush(syncGameId, storage.currentGame);
-      console.log("[HOST] push triggered, syncGameId="+syncGameId);
     }
-    // チームコード管理者モード: gameが変わったらFirebaseに自動プッシュ
-    if(teamShareRole==="admin" && teamShareCode && fbInit()) {
-      try {
-        const payload = {...storage.currentGame, _ts:Date.now()};
-        fbDB.ref("team_rooms/"+teamShareCode+"/currentGame").set(payload);
-        console.log("[TEAM ADMIN] pushed game to", teamShareCode);
-      } catch(e) { console.error("[TEAM] push error", e); }
-    }
-  },[storage.currentGame, isHost, syncGameId, teamShareRole, teamShareCode]);
+  },[storage, isHost, syncGameId]);
 
   // viewer subscribeはstartViewing内で直接実行するためここでは不要
   useEffect(()=>{
@@ -953,6 +950,35 @@ function App() {
   },[isViewer, syncGameId]);
 
   const showToast = (msg)=>{setToast(msg);setTimeout(()=>setToast(""),2600);};
+
+  // マウント時: localStorage に接続情報があればFirebase購読を自動再開
+  useEffect(()=>{
+    const savedCode = localStorage.getItem("teamShareCode");
+    const savedRole = localStorage.getItem("teamShareRole");
+    if(!savedCode || !savedRole) return;
+    // 少し待ってFirebase SDKが準備できてから
+    const timer = setTimeout(()=>{
+      if(!fbInit()) return;
+      window.__teamShareCode = savedCode;
+      window.__teamShareRole = savedRole;
+      window.__teamAdminPushing = false;
+      const ref = fbDB.ref("team_rooms/"+savedCode+"/currentGame");
+      window.__teamShareRef = ref;
+      ref.on("value", snap=>{
+        if(!snap||!snap.exists()) return;
+        const g = snap.val();
+        if(!g || typeof g !== "object") return;
+        delete g._ts;
+        if(savedRole === "viewer") {
+          setStorage(s=>({...s, currentGame: g}));
+        } else if(!window.__teamAdminPushing) {
+          setStorage(s=>({...s, currentGame: g}));
+        }
+      });
+      console.log("[TEAM] Auto-reconnected as", savedRole, "to", savedCode);
+    }, 1500);
+    return ()=>clearTimeout(timer);
+  },[]);
 
   const startHosting = ()=>{
     if(!fbInit()){showToast("Firebase未設定");return;}
@@ -972,7 +998,7 @@ function App() {
       let role = "viewer";
       if(pw) {
         if(!data) {
-          // 新規チームコード作成：管理者PWを登録
+          // 新規チームコード：管理者PWを登録
           fbDB.ref("team_rooms/"+tc).set({ adminPw: pw, createdAt: Date.now() });
           role = "admin";
         } else if(data.adminPw === pw) {
@@ -982,30 +1008,50 @@ function App() {
           return;
         }
       }
+      // グローバルに保持（mutGame内から参照するため）
+      window.__teamShareCode = tc;
+      window.__teamShareRole = role;
       setTeamShareCode(tc);
       setTeamShareRole(role);
       setTeamShareError("");
       localStorage.setItem("teamShareCode", tc);
       localStorage.setItem("teamShareRole", role);
       showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
-      // 閲覧モード：リアルタイム購読開始
-      if(role === "viewer") {
-        if(window.__teamShareTimer) clearInterval(window.__teamShareTimer);
-        window.__teamShareTimer = setInterval(()=>{
-          fbDB.ref("team_rooms/"+tc+"/currentGame").once("value").then(snap2=>{
-            if(!snap2||!snap2.exists()) return;
-            const g = snap2.val();
-            if(!g || typeof g !== "object") return;
-            delete g._ts;
-            setStorage(s=>({...s, currentGame: g}));
-          }).catch(()=>{});
-        }, 1500);
+      // 既存の購読を解除
+      if(window.__teamShareRef) {
+        try { window.__teamShareRef.off("value"); } catch(e) {}
       }
+      // Firebase リアルタイム購読（.on で即時反映）
+      const ref = fbDB.ref("team_rooms/"+tc+"/currentGame");
+      window.__teamShareRef = ref;
+      window.__teamAdminPushing = false;
+      ref.on("value", snap2=>{
+        if(!snap2||!snap2.exists()) return;
+        const g = snap2.val();
+        if(!g || typeof g !== "object") return;
+        delete g._ts;
+        if(role === "viewer") {
+          // 閲覧者：常に反映
+          setStorage(s=>({...s, currentGame: g}));
+        } else {
+          // 管理者：自分のpush直後は無視（無限ループ防止）、それ以外は反映
+          if(!window.__teamAdminPushing) {
+            setStorage(s=>({...s, currentGame: g}));
+          }
+        }
+      });
     }).catch(e=>{ setTeamShareError("接続エラー: "+e.message); });
   };
 
   const disconnectTeam = () => {
-    if(window.__teamShareTimer) clearInterval(window.__teamShareTimer);
+    if(window.__teamShareRef) {
+      try { window.__teamShareRef.off("value"); } catch(e) {}
+      window.__teamShareRef = null;
+    }
+    if(window.__teamShareTimer) { clearInterval(window.__teamShareTimer); window.__teamShareTimer = null; }
+    window.__teamShareCode = "";
+    window.__teamShareRole = "";
+    window.__teamAdminPushing = false;
     setTeamShareCode(""); setTeamShareRole(""); setTeamShareError("");
     localStorage.removeItem("teamShareCode");
     localStorage.removeItem("teamShareRole");
@@ -1101,14 +1147,31 @@ function App() {
 
   
   const mutGame = useCallback((fn)=>{
-    if(teamShareRole==="viewer") return; // 閲覧モードは操作不可
+    // window経由で常に最新のroleを参照（stateのクロージャ問題を回避）
+    if(window.__teamShareRole === "viewer") {
+      showToast("👁 閲覧モードでは操作できません");
+      return;
+    }
     setStorage(s=>{
       const snap = JSON.parse(JSON.stringify(s.currentGame));
       const newGame = fn(s.currentGame);
       const newUndoStack = [snap, ...(s.undoStack||[])];
+      // 管理者モード：変更を即座にFirebaseへプッシュ
+      if(window.__teamShareRole === "admin" && window.__teamShareCode) {
+        try {
+          if(fbInit()) {
+            window.__teamAdminPushing = true;
+            fbDB.ref("team_rooms/"+window.__teamShareCode+"/currentGame")
+              .set({...newGame, _ts:Date.now()})
+              .then(()=>{ setTimeout(()=>{ window.__teamAdminPushing = false; }, 2000); })
+              .catch(()=>{ window.__teamAdminPushing = false; });
+            console.log("[TEAM ADMIN] pushed to", window.__teamShareCode);
+          }
+        } catch(e) { console.error("[TEAM] push error", e); window.__teamAdminPushing = false; }
+      }
       return {...s, currentGame:newGame, undoStack:newUndoStack};
     });
-  },[teamShareRole]);
+  },[]);
 
   
   const undoPlay = useCallback(()=>{
@@ -2934,10 +2997,15 @@ function App() {
                     style:{...sBt("#475569"),fontSize:11,padding:"4px 14px",marginTop:8}
                   }, "📋 コピー")
               )
-              , teamShareRole==="admin" && React.createElement('div', {style:{fontSize:12,color:"#4ade80",marginBottom:10,textAlign:"center"}},
-                "✅ 管理者モード — 全操作が同期されます")
-              , teamShareRole==="viewer" && React.createElement('div', {style:{fontSize:12,color:"#7dd3fc",marginBottom:10,textAlign:"center"}},
-                "👁 閲覧モード — 試合をリアルタイムで閲覧中")
+              , teamShareRole==="admin" && React.createElement('div', {style:{fontSize:12,color:"#4ade80",marginBottom:6,textAlign:"center"}},
+                "✅ 管理者モード — スコア操作が自動同期されます")
+              , teamShareRole==="viewer" && React.createElement('div', {style:{fontSize:12,color:"#7dd3fc",marginBottom:6,textAlign:"center"}},
+                "👁 閲覧モード — リアルタイムで試合を閲覧中")
+              , React.createElement('div', {style:{background:"#060f1e",borderRadius:8,padding:"8px 10px",marginBottom:10,fontSize:10,color:"#475569",fontFamily:"monospace"}}
+                , "window role: "+(window.__teamShareRole||"未設定")
+                , " / code: "+(window.__teamShareCode||"未設定")
+                , " / ref: "+(window.__teamShareRef?"購読中":"なし")
+              )
               , React.createElement('button', {
                   onClick: disconnectTeam,
                   style:{...sBt("#dc2626",true),width:"100%",padding:"10px",fontSize:13,fontWeight:700}

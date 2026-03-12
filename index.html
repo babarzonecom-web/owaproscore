@@ -1046,8 +1046,10 @@ function App() {
                     console.log("[TEAM] viewer snapshot, exists="+snap2.exists());
                     if(!snap2 || !snap2.exists()) return;
                     if(window.__teamShareRole !== "viewer") return;
-                    const g = snap2.val();
-                    if(!g || typeof g !== "object") return;
+                    const gRaw = snap2.val();
+                    if(!gRaw || typeof gRaw !== "object") return;
+                    // val()の戻り値をコピーして_tsを除去（delete直接はNG）
+                    const g = Object.assign({}, gRaw);
                     delete g._ts;
                     console.log("[TEAM] viewer applying game data");
                     // localStorageに直接書いてstorageをトリガー（Reactのstate経由を避ける）

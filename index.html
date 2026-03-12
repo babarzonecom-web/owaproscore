@@ -943,10 +943,15 @@ function App() {
       try {
         const fresh = lsLoad();
         if(fresh && fresh.currentGame) {
-          console.log("[TEAM] teamgameupdate received, reloading storage");
-          setStorage(function(s){ return {...s, currentGame: fresh.currentGame}; });
+          console.log("[TEAM] teamgameupdate received, keys="+Object.keys(fresh.currentGame).slice(0,5).join(","));
+          setStorage(function(s){
+            const merged = Object.assign({}, s, { currentGame: fresh.currentGame });
+            return merged;
+          });
+        } else {
+          console.log("[TEAM] teamgameupdate: no currentGame in fresh");
         }
-      } catch(e){ console.error("[TEAM] reload error", e.message); }
+      } catch(e){ console.error("[TEAM] reload error", e&&e.message||e); }
     };
     window.addEventListener("teamgameupdate", handler);
     return function(){ window.removeEventListener("teamgameupdate", handler); };

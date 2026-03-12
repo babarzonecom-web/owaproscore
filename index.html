@@ -1034,40 +1034,38 @@ function App() {
           showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
           console.log("[TEAM] Connected role="+role+" code="+tc+" window.role="+window.__teamShareRole);
 
-          // 閲覧者のみFirebase購読（管理者は購読しない）
+          // 閲覧者のみポーリング（ref.onは使わない）
           if(role === "viewer") {
-            setTimeout(function(){
-              try {
-                if(!fbDB) return;
-                const ref = fbDB.ref("team_rooms/"+tc+"/currentGame");
-                window.__teamShareRef = ref;
-                ref.on("value", function(snap2){
-                  try {
-                    console.log("[TEAM] viewer snapshot, exists="+snap2.exists());
-                    if(!snap2 || !snap2.exists()) return;
-                    if(window.__teamShareRole !== "viewer") return;
-                    const gRaw = snap2.val();
-                    if(!gRaw || typeof gRaw !== "object") return;
-                    // val()の戻り値をコピーして_tsを除去（delete直接はNG）
-                    const g = Object.assign({}, gRaw);
-                    delete g._ts;
-                    console.log("[TEAM] viewer applying game data");
-                    // localStorageに直接書いてstorageをトリガー（Reactのstate経由を避ける）
-                    try {
-                      const raw = JSON.stringify(g);
-                      console.log("[TEAM] raw length="+raw.length);
-                      const existing = localStorage.getItem("bb_v7");
-                      const existObj = existing ? JSON.parse(existing) : {};
-                      existObj.currentGame = g;
-                      localStorage.setItem("bb_v7", JSON.stringify(existObj));
-                      console.log("[TEAM] localStorage written OK");
-                      // storageイベントをトリガーして再描画
-                      window.dispatchEvent(new Event("teamgameupdate"));
-                    } catch(je){ console.error("[TEAM] write error:", je.message||je); }
-                  } catch(e3){ console.error("[TEAM] snapshot error", e3); }
-                });
-              } catch(e4){ console.error("[TEAM] subscribe error", e4); }
-            }, 300);
+            var lastTs = 0;
+            var pollRef = fbDB.ref("team_rooms/"+tc+"/currentGame");
+            window.__teamShareRef = pollRef;
+            var poll = function(){
+              if(window.__teamShareRole !== "viewer") return;
+              pollRef.once("value").then(function(snap2){
+                try {
+                  if(!snap2 || !snap2.exists()) return;
+                  var data = snap2.toJSON ? snap2.toJSON() : null;
+                  if(!data) return;
+                  var ts = data._ts || 0;
+                  if(ts <= lastTs) return; // 変化なし
+                  lastTs = ts;
+                  console.log("[TEAM] poll got new data ts="+ts);
+                  var str = JSON.stringify(data);
+                  // _ts除去
+                  var obj = JSON.parse(str);
+                  delete obj._ts;
+                  var existing = localStorage.getItem("bb_v7");
+                  var existObj = existing ? JSON.parse(existing) : {};
+                  existObj.currentGame = obj;
+                  localStorage.setItem("bb_v7", JSON.stringify(existObj));
+                  window.dispatchEvent(new Event("teamgameupdate"));
+                  console.log("[TEAM] poll applied OK");
+                } catch(pe){ console.error("[TEAM] poll error", pe && pe.message || pe); }
+              });
+            };
+            poll(); // 初回即実行
+            window.__teamPollTimer = setInterval(poll, 3000); // 3秒ごと
+            console.log("[TEAM] polling started");
           }
 
         } catch(e5){ setTeamShareError("接続エラー: "+e5.message); }
@@ -1082,6 +1080,7 @@ function App() {
       window.__teamShareRef = null;
     }
     if(window.__teamShareTimer) { clearInterval(window.__teamShareTimer); window.__teamShareTimer = null; }
+    if(window.__teamPollTimer) { clearInterval(window.__teamPollTimer); window.__teamPollTimer = null; }
     window.__teamShareCode = "";
     window.__teamShareRole = "";
     window.__teamAdminPushing = false;

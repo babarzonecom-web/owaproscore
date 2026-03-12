@@ -970,15 +970,17 @@ function App() {
 
       setTeamShareError("接続中...");
 
-      fbDB.ref("team_rooms/"+tc).once("value").then(function(snap){
+      // Firebase SDKのonce()の代わりにREST APIを使用
+      fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+".json", {cache:"no-store"}).then(function(res){ return res.json(); }).then(function(data){
         try {
-          const data = snap.exists() ? snap.val() : null;
+          // null or object
+          if(data === undefined) data = null;
           let role = "viewer";
 
           if(pw && pw.trim()) {
             if(!data) {
               // 新規チームコード：管理者PWを登録
-              fbDB.ref("team_rooms/"+tc).set({ adminPw: pw.trim(), createdAt: Date.now() });
+              fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+".json",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({adminPw:pw.trim(),createdAt:Date.now()})});
               role = "admin";
             } else if(data.adminPw === pw.trim()) {
               role = "admin";
@@ -998,7 +1000,7 @@ function App() {
             try {
               const currentGame = JSON.parse(localStorage.getItem("bb_v7")||"{}").currentGame;
               if(currentGame && fbInit()) {
-                fbDB.ref("team_rooms/"+tc+"/currentGame").set({...currentGame, _ts:Date.now()});
+                fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/currentGame.json",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({},currentGame,{_ts:Date.now()}))});
                 console.log("[TEAM] Admin initial push done");
               }
             } catch(e2){ console.error("[TEAM] initial push error", e2); }
@@ -1061,7 +1063,10 @@ function App() {
         } catch(e5){ setTeamShareError("接続エラー: "+e5.message); }
       }).catch(function(e){ setTeamShareError("接続エラー: "+e.message); });
 
-    } catch(e){ setTeamShareError("予期しないエラー: "+e.message); }
+    } catch(e){ 
+      console.error("[connectTeam] outer catch:", e&&e.message||e, e&&e.stack||"");
+      setTeamShareError("予期しないエラー: "+(e&&e.message||e)); 
+    }
   };
 
   const disconnectTeam = () => {
@@ -1159,10 +1164,11 @@ function App() {
         try {
           if(fbInit()) {
             window.__teamAdminPushing = true;
-            fbDB.ref("team_rooms/"+window.__teamShareCode+"/currentGame")
-              .set({...newGame, _ts:Date.now()})
-              .then(()=>{ setTimeout(()=>{ window.__teamAdminPushing = false; }, 2000); })
-              .catch(()=>{ window.__teamAdminPushing = false; });
+            fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json",{
+                method:"PUT",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify(Object.assign({},newGame,{_ts:Date.now()}))
+              }).then(function(){ setTimeout(function(){ window.__teamAdminPushing=false; },2000); })
+              .catch(function(){ window.__teamAdminPushing=false; });
             console.log("[TEAM ADMIN] pushed to", window.__teamShareCode);
           }
         } catch(e) { console.error("[TEAM] push error", e); window.__teamAdminPushing = false; }

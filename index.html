@@ -966,11 +966,9 @@ function App() {
     try {
       const tc = (code||"").trim().toUpperCase();
       if(!tc){ setTeamShareError("チームコードを入力してください"); return; }
-      if(!fbInit()){ setTeamShareError("Firebase未設定 — ネットワークを確認してください"); return; }
-
       setTeamShareError("接続中...");
 
-      // Firebase SDKのonce()の代わりにREST APIを使用
+      // REST APIで直接アクセス（Firebase SDK不使用）
       fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+".json", {cache:"no-store"}).then(function(res){ return res.json(); }).then(function(data){
         try {
           // null or object

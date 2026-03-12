@@ -910,18 +910,18 @@ function App() {
   const [tournamentMsg, setTournamentMsg] = useState("");
   const [tournamentTab, setTournamentTab] = useState("top"); // top/teams/games/ranking
   const [selDir, setSelDir] = useState(null);
-  const [teamShareCode, setTeamShareCode] = useState(localStorage.getItem("teamShareCode")||"");
+  const [teamShareCode, setTeamShareCode] = useState("");
   const [teamSharePw,   setTeamSharePw]   = useState("");
   const [teamShareInput,setTeamShareInput]= useState("");
   const [teamSharePwInput,setTeamSharePwInput]= useState("");
-  const [teamShareRole, setTeamShareRole] = useState(localStorage.getItem("teamShareRole")||""); // "admin"|"viewer"|""
+  const [teamShareRole, setTeamShareRole] = useState(""); // "admin"|"viewer"|""
   const [teamShareError,setTeamShareError]= useState("");
   const isReadOnly = teamShareRole === "viewer";
   const isTeamConnected = teamShareRole !== "";
-  // ページロード時にwindowグローバルを初期化（localStorage復元時）
+  // windowグローバル初期化
   if(typeof window.__teamShareRole === "undefined") {
-    window.__teamShareCode = localStorage.getItem("teamShareCode")||"";
-    window.__teamShareRole = localStorage.getItem("teamShareRole")||"";
+    window.__teamShareCode = "";
+    window.__teamShareRole = "";
     window.__teamAdminPushing = false;
   }
   const [pitchCount, setPitchCount] = useState({b:0,s:0,f:0}); // 現打席BSFカウント
@@ -935,6 +935,11 @@ function App() {
   const myTeam     = storage.myTeam||null;
   const opponents  = storage.opponents||[];
 
+  // 起動時にチーム接続情報をクリア（毎回手動接続）
+  useEffect(()=>{
+    localStorage.removeItem("teamShareCode");
+    localStorage.removeItem("teamShareRole");
+  },[]);
   useEffect(()=>lsSave(storage),[storage]);
 
   useEffect(()=>{
@@ -951,34 +956,7 @@ function App() {
 
   const showToast = (msg)=>{setToast(msg);setTimeout(()=>setToast(""),2600);};
 
-  // マウント時: localStorage に接続情報があればFirebase購読を自動再開
-  useEffect(()=>{
-    const savedCode = localStorage.getItem("teamShareCode");
-    const savedRole = localStorage.getItem("teamShareRole");
-    if(!savedCode || !savedRole) return;
-    // 少し待ってFirebase SDKが準備できてから
-    const timer = setTimeout(()=>{
-      if(!fbInit()) return;
-      window.__teamShareCode = savedCode;
-      window.__teamShareRole = savedRole;
-      window.__teamAdminPushing = false;
-      const ref = fbDB.ref("team_rooms/"+savedCode+"/currentGame");
-      window.__teamShareRef = ref;
-      ref.on("value", snap=>{
-        if(!snap||!snap.exists()) return;
-        const g = snap.val();
-        if(!g || typeof g !== "object") return;
-        delete g._ts;
-        if(savedRole === "viewer") {
-          setStorage(s=>({...s, currentGame: g}));
-        } else if(!window.__teamAdminPushing) {
-          setStorage(s=>({...s, currentGame: g}));
-        }
-      });
-      console.log("[TEAM] Auto-reconnected as", savedRole, "to", savedCode);
-    }, 1500);
-    return ()=>clearTimeout(timer);
-  },[]);
+  // 自動再接続は削除（手動接続のみ）
 
   const startHosting = ()=>{
     if(!fbInit()){showToast("Firebase未設定");return;}

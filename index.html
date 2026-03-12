@@ -998,6 +998,17 @@ function App() {
           window.__teamShareRole = role;
           window.__teamAdminPushing = false;
 
+          // 管理者の場合：現在のゲームデータを即座にFirebaseへ書き込む
+          if(role === "admin") {
+            try {
+              const currentGame = JSON.parse(localStorage.getItem("bb_v7")||"{}").currentGame;
+              if(currentGame && fbInit()) {
+                fbDB.ref("team_rooms/"+tc+"/currentGame").set({...currentGame, _ts:Date.now()});
+                console.log("[TEAM] Admin initial push done");
+              }
+            } catch(e2){ console.error("[TEAM] initial push error", e2); }
+          }
+
           // 既存の購読を解除
           if(window.__teamShareRef) {
             try { window.__teamShareRef.off(); } catch(e2) {}
@@ -1433,12 +1444,14 @@ function App() {
   },[mutGame]);
 
   
-  const openNew     = (team,pidx,inning) => { setSelDir(null); setTab("score"); setModal({team,pidx,inning,step:"result"}); };
-  const openSB      = (team,pidx)        => setModal({team,pidx,step:"sb"});
-  const openEdit    = (team,pidx,inning) => { setSelDir(null); setTab("score"); setModal({team,pidx,inning,step:"edit_list"}); };
-  const openSpecial = (team)             => setModal({team,step:"special"});
+  const _viewerBlock = () => { showToast("👁 閲覧モードでは操作できません"); return true; };
+  const openNew     = (team,pidx,inning) => { if(window.__teamShareRole==="viewer"&&_viewerBlock()) return; setSelDir(null); setTab("score"); setModal({team,pidx,inning,step:"result"}); };
+  const openSB      = (team,pidx)        => { if(window.__teamShareRole==="viewer"&&_viewerBlock()) return; setModal({team,pidx,step:"sb"}); };
+  const openEdit    = (team,pidx,inning) => { if(window.__teamShareRole==="viewer"&&_viewerBlock()) return; setSelDir(null); setTab("score"); setModal({team,pidx,inning,step:"edit_list"}); };
+  const openSpecial = (team)             => { if(window.__teamShareRole==="viewer"&&_viewerBlock()) return; setModal({team,step:"special"}); };
   
   const openCurrentBatter = (team,inning) => {
+    if(window.__teamShareRole==="viewer"&&_viewerBlock()) return;
     const batterKey = team+"BatterIdx";
     const idx = game[batterKey]||0;
     setSelDir(null);
@@ -2148,8 +2161,8 @@ function App() {
                , undoStack.length>0&&React.createElement('span', { style: {fontSize:10,opacity:.7,marginLeft:2},}, "(", undoStack.length, ")")
             )
             , !game.finished ? (React.createElement(React.Fragment, null
-              , React.createElement('button', { onClick: ()=>{ if(isReadOnly){showToast("閲覧モードでは操作できません");return;} changeInning(); }, style: {...sBt("#16a34a"),opacity:isReadOnly?0.4:1},}, "チェンジ ▶" )
-              , React.createElement('button', { onClick: ()=>{ if(isReadOnly){showToast("閲覧モードでは操作できません");return;} saveGame(); }, style: {...sBt("#1d4ed8"),opacity:isReadOnly?0.4:1},}, "💾 保存" )
+              , React.createElement('button', { onClick: ()=>{ if(window.__teamShareRole==="viewer"){showToast("👁 閲覧モードでは操作できません");return;} changeInning(); }, style: {...sBt("#16a34a"),opacity:window.__teamShareRole==="viewer"?0.4:1},}, "チェンジ ▶" )
+              , React.createElement('button', { onClick: ()=>{ if(window.__teamShareRole==="viewer"){showToast("👁 閲覧モードでは操作できません");return;} saveGame(); }, style: {...sBt("#1d4ed8"),opacity:window.__teamShareRole==="viewer"?0.4:1},}, "💾 保存" )
               
             , React.createElement('button', { onClick: ()=>setModal({step:"endgame"}), style: sBt("#dc2626"),}, "⚾ 試合終了" )
             )) : (React.createElement(React.Fragment, null

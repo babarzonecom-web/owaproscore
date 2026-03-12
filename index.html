@@ -990,57 +990,73 @@ function App() {
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
   // ===== チームコード接続 =====
   const connectTeam = (code, pw) => {
-    const tc = (code||"").trim().toUpperCase();
-    if(!tc){ setTeamShareError("チームコードを入力してください"); return; }
-    if(!fbInit()){ setTeamShareError("Firebase未設定"); return; }
-    fbDB.ref("team_rooms/"+tc).once("value").then(snap=>{
-      const data = snap.exists() ? snap.val() : null;
-      let role = "viewer";
-      if(pw) {
-        if(!data) {
-          // 新規チームコード：管理者PWを登録
-          fbDB.ref("team_rooms/"+tc).set({ adminPw: pw, createdAt: Date.now() });
-          role = "admin";
-        } else if(data.adminPw === pw) {
-          role = "admin";
-        } else {
-          setTeamShareError("管理者パスワードが違います");
-          return;
-        }
-      }
-      // グローバルに保持（mutGame内から参照するため）
-      window.__teamShareCode = tc;
-      window.__teamShareRole = role;
-      setTeamShareCode(tc);
-      setTeamShareRole(role);
-      setTeamShareError("");
-      localStorage.setItem("teamShareCode", tc);
-      localStorage.setItem("teamShareRole", role);
-      showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
-      // 既存の購読を解除
-      if(window.__teamShareRef) {
-        try { window.__teamShareRef.off("value"); } catch(e) {}
-      }
-      // Firebase リアルタイム購読（.on で即時反映）
-      const ref = fbDB.ref("team_rooms/"+tc+"/currentGame");
-      window.__teamShareRef = ref;
-      window.__teamAdminPushing = false;
-      ref.on("value", snap2=>{
-        if(!snap2||!snap2.exists()) return;
-        const g = snap2.val();
-        if(!g || typeof g !== "object") return;
-        delete g._ts;
-        if(role === "viewer") {
-          // 閲覧者：常に反映
-          setStorage(s=>({...s, currentGame: g}));
-        } else {
-          // 管理者：自分のpush直後は無視（無限ループ防止）、それ以外は反映
-          if(!window.__teamAdminPushing) {
-            setStorage(s=>({...s, currentGame: g}));
+    try {
+      const tc = (code||"").trim().toUpperCase();
+      if(!tc){ setTeamShareError("チームコードを入力してください"); return; }
+      if(!fbInit()){ setTeamShareError("Firebase未設定 — ネットワークを確認してください"); return; }
+
+      setTeamShareError("接続中...");
+
+      fbDB.ref("team_rooms/"+tc).once("value").then(function(snap){
+        try {
+          const data = snap.exists() ? snap.val() : null;
+          let role = "viewer";
+
+          if(pw && pw.trim()) {
+            if(!data) {
+              // 新規チームコード：管理者PWを登録
+              fbDB.ref("team_rooms/"+tc).set({ adminPw: pw.trim(), createdAt: Date.now() });
+              role = "admin";
+            } else if(data.adminPw === pw.trim()) {
+              role = "admin";
+            } else {
+              setTeamShareError("管理者パスワードが違います");
+              return;
+            }
           }
-        }
-      });
-    }).catch(e=>{ setTeamShareError("接続エラー: "+e.message); });
+
+          // windowグローバルに保存（mutGame内から参照）
+          window.__teamShareCode = tc;
+          window.__teamShareRole = role;
+          window.__teamAdminPushing = false;
+
+          // 既存の購読を解除
+          if(window.__teamShareRef) {
+            try { window.__teamShareRef.off(); } catch(e2) {}
+            window.__teamShareRef = null;
+          }
+
+          // state更新
+          setTeamShareCode(tc);
+          setTeamShareRole(role);
+          setTeamShareError("");
+          localStorage.setItem("teamShareCode", tc);
+          localStorage.setItem("teamShareRole", role);
+          showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
+
+          // Firebase リアルタイム購読を少し遅らせて開始（React state更新完了後）
+          setTimeout(function(){
+            try {
+              if(!fbDB) return;
+              const ref = fbDB.ref("team_rooms/"+tc+"/currentGame");
+              window.__teamShareRef = ref;
+              ref.on("value", function(snap2){
+                try {
+                  if(!snap2 || !snap2.exists()) return;
+                  const g = snap2.val();
+                  if(!g || typeof g !== "object") return;
+                  delete g._ts;
+                  if(window.__teamAdminPushing) return; // 自分のpush直後は無視
+                  setStorage(function(s){ return {...s, currentGame: g}; });
+                } catch(e3){ console.error("[TEAM] snapshot error", e3); }
+              });
+            } catch(e4){ console.error("[TEAM] subscribe error", e4); }
+          }, 300);
+
+        } catch(e5){ setTeamShareError("接続エラー: "+e5.message); }
+      }).catch(function(e){ setTeamShareError("接続エラー: "+e.message); });
+
+    } catch(e){ setTeamShareError("予期しないエラー: "+e.message); }
   };
 
   const disconnectTeam = () => {

@@ -937,6 +937,21 @@ function App() {
 
   useEffect(()=>lsSave(storage),[storage]);
 
+  // 閲覧モード：localStorageが更新されたらstorageを再ロード
+  useEffect(()=>{
+    const handler = function(){
+      try {
+        const fresh = lsLoad();
+        if(fresh && fresh.currentGame) {
+          console.log("[TEAM] teamgameupdate received, reloading storage");
+          setStorage(function(s){ return {...s, currentGame: fresh.currentGame}; });
+        }
+      } catch(e){ console.error("[TEAM] reload error", e.message); }
+    };
+    window.addEventListener("teamgameupdate", handler);
+    return function(){ window.removeEventListener("teamgameupdate", handler); };
+  }, []);
+
   useEffect(()=>{
     if(isHost && syncGameId) {
       if(!fbInit()){ showToast("Firebase未設定"); return; }
@@ -1035,16 +1050,18 @@ function App() {
                     if(!g || typeof g !== "object") return;
                     delete g._ts;
                     console.log("[TEAM] viewer applying game data");
+                    // localStorageに直接書いてstorageをトリガー（Reactのstate経由を避ける）
                     try {
-                      const cleanGame = JSON.parse(JSON.stringify(g));
-                      console.log("[TEAM] cleanGame keys: "+Object.keys(cleanGame).join(","));
-                      console.log("[TEAM] innings="+cleanGame.innings+" awayTeam="+cleanGame.awayTeam);
-                      setTimeout(function(){
-                        try {
-                          setStorage(function(s){ return {...s, currentGame: cleanGame}; });
-                        } catch(se){ console.error("[TEAM] setStorage error:", se.message||se); }
-                      }, 0);
-                    } catch(je){ console.error("[TEAM] JSON error:", je.message); }
+                      const raw = JSON.stringify(g);
+                      console.log("[TEAM] raw length="+raw.length);
+                      const existing = localStorage.getItem("bb_v7");
+                      const existObj = existing ? JSON.parse(existing) : {};
+                      existObj.currentGame = g;
+                      localStorage.setItem("bb_v7", JSON.stringify(existObj));
+                      console.log("[TEAM] localStorage written OK");
+                      // storageイベントをトリガーして再描画
+                      window.dispatchEvent(new Event("teamgameupdate"));
+                    } catch(je){ console.error("[TEAM] write error:", je.message||je); }
                   } catch(e3){ console.error("[TEAM] snapshot error", e3); }
                 });
               } catch(e4){ console.error("[TEAM] subscribe error", e4); }

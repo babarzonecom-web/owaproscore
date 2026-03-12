@@ -4582,5 +4582,33 @@ try {
   document.getElementById('root').innerHTML = '<div style="color:white;padding:20px"><h2>エラー</h2><pre style="font-size:11px;white-space:pre-wrap;color:#f87171">' + (e.stack||e.message) + '</pre></div>';
 }
 </script>
+<div id="__debug_console" style="position:fixed;bottom:0;left:0;right:0;max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.92);color:#4ade80;font-family:monospace;font-size:11px;padding:8px;z-index:99999;border-top:2px solid #22c55e;">
+  <div style="color:#fbbf24;font-weight:700;margin-bottom:4px;">🐛 Debug Console <button onclick="document.getElementById('__debug_console').style.display='none'" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:8px;font-size:10px">閉じる</button></div>
+  <div id="__debug_log"></div>
+</div>
+<script>
+(function(){
+  const log = function(type, args){
+    const el = document.getElementById('__debug_log');
+    if(!el) return;
+    const line = document.createElement('div');
+    line.style.color = type==='error' ? '#f87171' : type==='warn' ? '#fbbf24' : '#4ade80';
+    line.style.borderBottom = '1px solid #1a3a1a';
+    line.style.padding = '2px 0';
+    line.textContent = '['+type.toUpperCase()+'] ' + Array.from(args).map(a=>{ try{return typeof a==='object'?JSON.stringify(a):String(a);}catch(e){return String(a);} }).join(' ');
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  };
+  const _log = console.log.bind(console);
+  const _err = console.error.bind(console);
+  const _warn = console.warn.bind(console);
+  console.log = function(){ log('log', arguments); _log.apply(console, arguments); };
+  console.error = function(){ log('error', arguments); _err.apply(console, arguments); };
+  console.warn = function(){ log('warn', arguments); _warn.apply(console, arguments); };
+  window.addEventListener('error', function(e){ log('error', [e.message + ' (' + e.filename + ':' + e.lineno + ')']); });
+  window.addEventListener('unhandledrejection', function(e){ log('error', ['Unhandled Promise: ' + (e.reason&&e.reason.message||e.reason)]); });
+  console.log('Debug console ready');
+})();
+</script>
 </body>
 </html>

@@ -952,6 +952,59 @@ function App() {
     return function(){ window.removeEventListener("teamgameupdate", handler); };
   }, []);
 
+  // リロード後にviewerポーリングを自動再開
+  useEffect(()=>{
+    const savedCode = localStorage.getItem("tsCode");
+    const savedRole = localStorage.getItem("tsRole");
+    if(savedCode && savedRole === "viewer" && fbInit()) {
+      console.log("[TEAM] auto-restart polling for", savedCode);
+      var lastTs = 0;
+      var pollRef = fbDB.ref("team_rooms/"+savedCode+"/currentGame");
+      window.__teamShareRef = pollRef;
+      window.__teamPollTimer = setInterval(function(){
+        if(window.__teamShareRole !== "viewer") { clearInterval(window.__teamPollTimer); return; }
+        pollRef.once("value").then(function(snap){
+          try {
+            if(!snap||!snap.exists()) return;
+            var data = snap.toJSON ? snap.toJSON() : null;
+            if(!data) return;
+            var ts = data._ts||0;
+            if(ts <= lastTs) return;
+            lastTs = ts;
+            console.log("[TEAM] auto-poll new data ts="+ts);
+            var obj = JSON.parse(JSON.stringify(data));
+            delete obj._ts;
+            var existing = localStorage.getItem("bb_v7");
+            var existObj = existing ? JSON.parse(existing) : {};
+            existObj.currentGame = obj;
+            localStorage.setItem("bb_v7", JSON.stringify(existObj));
+            window.dispatchEvent(new Event("teamgameupdate"));
+          } catch(pe){ console.error("[TEAM] auto-poll error", pe&&pe.message||pe); }
+        });
+      }, 3000);
+      // 初回即実行
+      pollRef.once("value").then(function(snap){
+        try {
+          if(!snap||!snap.exists()) return;
+          var data = snap.toJSON ? snap.toJSON() : null;
+          if(!data) return;
+          lastTs = data._ts||0;
+          var obj = JSON.parse(JSON.stringify(data));
+          delete obj._ts;
+          var existing = localStorage.getItem("bb_v7");
+          var existObj = existing ? JSON.parse(existing) : {};
+          existObj.currentGame = obj;
+          localStorage.setItem("bb_v7", JSON.stringify(existObj));
+          window.dispatchEvent(new Event("teamgameupdate"));
+          console.log("[TEAM] auto-poll initial OK");
+        } catch(pe){ console.error("[TEAM] auto-poll init error", pe&&pe.message||pe); }
+      });
+    }
+    return function(){
+      if(window.__teamPollTimer){ clearInterval(window.__teamPollTimer); window.__teamPollTimer=null; }
+    };
+  }, []);
+
   useEffect(()=>{
     if(isHost && syncGameId) {
       if(!fbInit()){ showToast("Firebase未設定"); return; }
@@ -976,119 +1029,6 @@ function App() {
     showToast("配信開始！コード: "+id);
   };
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
-  // ===== チームコード接続 =====
-  const connectTeam = (code, pw) => {
-    try {
-      const tc = (code||"").trim().toUpperCase();
-      if(!tc){ setTeamShareError("チームコードを入力してください"); return; }
-      if(!fbInit()){ setTeamShareError("Firebase未設定 — ネットワークを確認してください"); return; }
-
-      setTeamShareError("接続中...");
-
-      fbDB.ref("team_rooms/"+tc).once("value").then(function(snap){
-        try {
-          const data = snap.exists() ? snap.val() : null;
-          let role = "viewer";
-
-          if(pw && pw.trim()) {
-            if(!data) {
-              // 新規チームコード：管理者PWを登録
-              fbDB.ref("team_rooms/"+tc).set({ adminPw: pw.trim(), createdAt: Date.now() });
-              role = "admin";
-            } else if(data.adminPw === pw.trim()) {
-              role = "admin";
-            } else {
-              setTeamShareError("管理者パスワードが違います");
-              return;
-            }
-          }
-
-          // windowグローバルに保存（mutGame内から参照）
-          window.__teamShareCode = tc;
-          window.__teamShareRole = role;
-          window.__teamAdminPushing = false;
-
-          // 管理者の場合：現在のゲームデータを即座にFirebaseへ書き込む
-          if(role === "admin") {
-            try {
-              const currentGame = JSON.parse(localStorage.getItem("bb_v7")||"{}").currentGame;
-              if(currentGame && fbInit()) {
-                fbDB.ref("team_rooms/"+tc+"/currentGame").set({...currentGame, _ts:Date.now()});
-                console.log("[TEAM] Admin initial push done");
-              }
-            } catch(e2){ console.error("[TEAM] initial push error", e2); }
-          }
-
-          // 既存の購読を解除
-          if(window.__teamShareRef) {
-            try { window.__teamShareRef.off(); } catch(e2) {}
-            window.__teamShareRef = null;
-          }
-
-          // state更新
-          setTeamShareCode(tc);
-          setTeamShareRole(role);
-          setTeamShareError("");
-          localStorage.setItem("tsCode", tc);
-          localStorage.setItem("tsRole", role);
-          showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
-          console.log("[TEAM] Connected role="+role+" code="+tc+" window.role="+window.__teamShareRole);
-
-          // 閲覧者のみポーリング（ref.onは使わない）
-          if(role === "viewer") {
-            var lastTs = 0;
-            var pollRef = fbDB.ref("team_rooms/"+tc+"/currentGame");
-            window.__teamShareRef = pollRef;
-            var poll = function(){
-              if(window.__teamShareRole !== "viewer") return;
-              pollRef.once("value").then(function(snap2){
-                try {
-                  if(!snap2 || !snap2.exists()) return;
-                  var data = snap2.toJSON ? snap2.toJSON() : null;
-                  if(!data) return;
-                  var ts = data._ts || 0;
-                  if(ts <= lastTs) return; // 変化なし
-                  lastTs = ts;
-                  console.log("[TEAM] poll got new data ts="+ts);
-                  var str = JSON.stringify(data);
-                  // _ts除去
-                  var obj = JSON.parse(str);
-                  delete obj._ts;
-                  var existing = localStorage.getItem("bb_v7");
-                  var existObj = existing ? JSON.parse(existing) : {};
-                  existObj.currentGame = obj;
-                  localStorage.setItem("bb_v7", JSON.stringify(existObj));
-                  window.dispatchEvent(new Event("teamgameupdate"));
-                  console.log("[TEAM] poll applied OK");
-                } catch(pe){ console.error("[TEAM] poll error", pe && pe.message || pe); }
-              });
-            };
-            poll(); // 初回即実行
-            window.__teamPollTimer = setInterval(poll, 3000); // 3秒ごと
-            console.log("[TEAM] polling started");
-          }
-
-        } catch(e5){ setTeamShareError("接続エラー: "+e5.message); }
-      }).catch(function(e){ setTeamShareError("接続エラー: "+e.message); });
-
-    } catch(e){ setTeamShareError("予期しないエラー: "+e.message); }
-  };
-
-  const disconnectTeam = () => {
-    if(window.__teamShareRef) {
-      try { window.__teamShareRef.off("value"); } catch(e) {}
-      window.__teamShareRef = null;
-    }
-    if(window.__teamShareTimer) { clearInterval(window.__teamShareTimer); window.__teamShareTimer = null; }
-    if(window.__teamPollTimer) { clearInterval(window.__teamPollTimer); window.__teamPollTimer = null; }
-    window.__teamShareCode = "";
-    window.__teamShareRole = "";
-    window.__teamAdminPushing = false;
-    setTeamShareCode(""); setTeamShareRole(""); setTeamShareError("");
-    localStorage.removeItem("tsCode");
-    localStorage.removeItem("tsRole");
-    showToast("切断しました");
-  };
 
   const startViewing = (id)=>{
     try {

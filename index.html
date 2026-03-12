@@ -964,40 +964,19 @@ function App() {
     console.log("[TEAM] auto-restart check: code="+savedCode+" role="+savedRole);
     if(!savedCode || savedRole !== "viewer") return;
     // Firebase SDKロード完了を待ってから開始
-    const startPoll = function() {
-      if(!fbInit()) { setTimeout(startPoll, 500); return; }
-      console.log("[TEAM] auto-restart polling for", savedCode);
-      var lastTs = 0;
-      var pollRef = fbDB.ref("team_rooms/"+savedCode+"/currentGame");
-      window.__teamShareRef = pollRef;
-      window.__teamPollTimer = setInterval(function(){
-        if(window.__teamShareRole !== "viewer") { clearInterval(window.__teamPollTimer); return; }
-        pollRef.once("value").then(function(snap){
-          try {
-            if(!snap||!snap.exists()) return;
-            var data = snap.toJSON ? snap.toJSON() : null;
-            if(!data) return;
-            var ts = data._ts||0;
-            if(ts <= lastTs) return;
-            lastTs = ts;
-            console.log("[TEAM] auto-poll new data ts="+ts);
-            var obj = JSON.parse(JSON.stringify(data));
-            delete obj._ts;
-            var existing = localStorage.getItem("bb_v7");
-            var existObj = existing ? JSON.parse(existing) : {};
-            existObj.currentGame = obj;
-            localStorage.setItem("bb_v7", JSON.stringify(existObj));
-            window.dispatchEvent(new Event("teamgameupdate"));
-          } catch(pe){ console.error("[TEAM] auto-poll error", pe&&pe.message||pe); }
-        });
-      }, 3000);
-      // 初回即実行
-      pollRef.once("value").then(function(snap){
+    // REST APIポーリング（Firebase SDK不使用）
+    var lastTs = 0;
+    var restUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+savedCode+"/currentGame.json";
+    window.__teamShareRef = restUrl;
+    var poll = function(){
+      if(window.__teamShareRole !== "viewer") return;
+      fetch(restUrl, {cache:"no-store"}).then(function(res){ return res.json(); }).then(function(data){
         try {
-          if(!snap||!snap.exists()) return;
-          var data = snap.toJSON ? snap.toJSON() : null;
-          if(!data) return;
-          lastTs = data._ts||0;
+          if(!data || typeof data !== "object") return;
+          var ts = data._ts || 0;
+          if(ts <= lastTs) return;
+          lastTs = ts;
+          console.log("[TEAM] auto REST poll new data ts="+ts);
           var obj = JSON.parse(JSON.stringify(data));
           delete obj._ts;
           var existing = localStorage.getItem("bb_v7");
@@ -1005,11 +984,12 @@ function App() {
           existObj.currentGame = obj;
           localStorage.setItem("bb_v7", JSON.stringify(existObj));
           window.dispatchEvent(new Event("teamgameupdate"));
-          console.log("[TEAM] auto-poll initial OK");
-        } catch(pe){ console.error("[TEAM] auto-poll init error", pe&&pe.message||pe); }
-      });
-    }; // startPoll end
-    setTimeout(startPoll, 800);
+        } catch(pe){ console.error("[TEAM] auto poll apply error", pe&&pe.message||pe); }
+      }).catch(function(fe){ console.error("[TEAM] auto fetch error", fe&&fe.message||fe); });
+    };
+    poll();
+    window.__teamPollTimer = setInterval(poll, 3000);
+    console.log("[TEAM] auto REST polling started for "+savedCode);
     return function(){
       if(window.__teamPollTimer){ clearInterval(window.__teamPollTimer); window.__teamPollTimer=null; }
     };
@@ -5591,25 +5571,34 @@ function App() {
 
           // 閲覧者のみFirebase購読（管理者は購読しない）
           if(role === "viewer") {
-            setTimeout(function(){
-              try {
-                if(!fbDB) return;
-                const ref = fbDB.ref("team_rooms/"+tc+"/currentGame");
-                window.__teamShareRef = ref;
-                ref.on("value", function(snap2){
-                  try {
-                    console.log("[TEAM] viewer snapshot, exists="+snap2.exists());
-                    if(!snap2 || !snap2.exists()) return;
-                    if(window.__teamShareRole !== "viewer") return;
-                    const g = snap2.val();
-                    if(!g || typeof g !== "object") return;
-                    delete g._ts;
-                    console.log("[TEAM] viewer applying game data");
-                    setStorage(function(s){ return {...s, currentGame: g}; });
-                  } catch(e3){ console.error("[TEAM] snapshot error", e3); }
-                });
-              } catch(e4){ console.error("[TEAM] subscribe error", e4); }
-            }, 300);
+            // Firebase SDKを使わずREST APIでポーリング
+            var lastTs = 0;
+            var restUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/currentGame.json";
+            window.__teamShareRef = restUrl;
+            var poll = function(){
+              if(window.__teamShareRole !== "viewer") return;
+              fetch(restUrl, {cache:"no-store"}).then(function(res){ return res.json(); }).then(function(data){
+                try {
+                  if(!data || typeof data !== "object") return;
+                  var ts = data._ts || 0;
+                  if(ts <= lastTs) return;
+                  lastTs = ts;
+                  console.log("[TEAM] REST poll new data ts="+ts);
+                  var str = JSON.stringify(data);
+                  var obj = JSON.parse(str);
+                  delete obj._ts;
+                  var existing = localStorage.getItem("bb_v7");
+                  var existObj = existing ? JSON.parse(existing) : {};
+                  existObj.currentGame = obj;
+                  localStorage.setItem("bb_v7", JSON.stringify(existObj));
+                  window.dispatchEvent(new Event("teamgameupdate"));
+                  console.log("[TEAM] REST poll applied OK");
+                } catch(pe){ console.error("[TEAM] poll apply error", pe&&pe.message||pe); }
+              }).catch(function(fe){ console.error("[TEAM] fetch error", fe&&fe.message||fe); });
+            };
+            poll();
+            window.__teamPollTimer = setInterval(poll, 3000);
+            console.log("[TEAM] REST polling started for "+tc);
           }
 
         } catch(e5){ setTeamShareError("接続エラー: "+e5.message); }

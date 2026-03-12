@@ -956,7 +956,11 @@ function App() {
   useEffect(()=>{
     const savedCode = localStorage.getItem("tsCode");
     const savedRole = localStorage.getItem("tsRole");
-    if(savedCode && savedRole === "viewer" && fbInit()) {
+    console.log("[TEAM] auto-restart check: code="+savedCode+" role="+savedRole);
+    if(!savedCode || savedRole !== "viewer") return;
+    // Firebase SDKロード完了を待ってから開始
+    const startPoll = function() {
+      if(!fbInit()) { setTimeout(startPoll, 500); return; }
       console.log("[TEAM] auto-restart polling for", savedCode);
       var lastTs = 0;
       var pollRef = fbDB.ref("team_rooms/"+savedCode+"/currentGame");
@@ -999,7 +1003,8 @@ function App() {
           console.log("[TEAM] auto-poll initial OK");
         } catch(pe){ console.error("[TEAM] auto-poll init error", pe&&pe.message||pe); }
       });
-    }
+    }; // startPoll end
+    setTimeout(startPoll, 800);
     return function(){
       if(window.__teamPollTimer){ clearInterval(window.__teamPollTimer); window.__teamPollTimer=null; }
     };

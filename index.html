@@ -1011,6 +1011,7 @@ function App() {
           localStorage.setItem("teamShareCode", tc);
           localStorage.setItem("teamShareRole", role);
           showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
+          console.log("[TEAM] Connected role="+role+" code="+tc+" window.role="+window.__teamShareRole);
 
           // Firebase リアルタイム購読を少し遅らせて開始（React state更新完了後）
           setTimeout(function(){
@@ -1020,11 +1021,13 @@ function App() {
               window.__teamShareRef = ref;
               ref.on("value", function(snap2){
                 try {
+                  console.log("[TEAM] snapshot received, exists="+snap2.exists()+" role="+window.__teamShareRole);
                   if(!snap2 || !snap2.exists()) return;
                   const g = snap2.val();
                   if(!g || typeof g !== "object") return;
                   delete g._ts;
                   if(window.__teamAdminPushing) return; // 自分のpush直後は無視
+                  console.log("[TEAM] applying game data");
                   setStorage(function(s){ return {...s, currentGame: g}; });
                 } catch(e3){ console.error("[TEAM] snapshot error", e3); }
               });
@@ -1118,6 +1121,7 @@ function App() {
   
   const mutGame = useCallback((fn)=>{
     // window経由で常に最新のroleを参照（stateのクロージャ問題を回避）
+    console.log("[mutGame] called, window.__teamShareRole="+window.__teamShareRole);
     if(window.__teamShareRole === "viewer") {
       showToast("👁 閲覧モードでは操作できません");
       return;

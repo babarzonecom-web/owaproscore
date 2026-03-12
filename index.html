@@ -1035,11 +1035,16 @@ function App() {
                     if(!g || typeof g !== "object") return;
                     delete g._ts;
                     console.log("[TEAM] viewer applying game data");
-                    const cleanGame = JSON.parse(JSON.stringify(g));
-                    // setTimeout で React のレンダリングサイクル外から呼ばないように
-                    setTimeout(function(){
-                      setStorage(function(s){ return {...s, currentGame: cleanGame}; });
-                    }, 0);
+                    try {
+                      const cleanGame = JSON.parse(JSON.stringify(g));
+                      console.log("[TEAM] cleanGame keys: "+Object.keys(cleanGame).join(","));
+                      console.log("[TEAM] innings="+cleanGame.innings+" awayTeam="+cleanGame.awayTeam);
+                      setTimeout(function(){
+                        try {
+                          setStorage(function(s){ return {...s, currentGame: cleanGame}; });
+                        } catch(se){ console.error("[TEAM] setStorage error:", se.message||se); }
+                      }, 0);
+                    } catch(je){ console.error("[TEAM] JSON error:", je.message); }
                   } catch(e3){ console.error("[TEAM] snapshot error", e3); }
                 });
               } catch(e4){ console.error("[TEAM] subscribe error", e4); }
@@ -9220,7 +9225,7 @@ try {
   console.log = function(){ log('log', arguments); _log.apply(console, arguments); };
   console.error = function(){ log('error', arguments); _err.apply(console, arguments); };
   console.warn = function(){ log('warn', arguments); _warn.apply(console, arguments); };
-  window.addEventListener('error', function(e){ log('error', [e.message + ' (' + e.filename + ':' + e.lineno + ')']); });
+  window.addEventListener('error', function(e){ log('error', [e.message + ' (' + e.filename + ':' + e.lineno + ':' + e.colno + ') stack:' + (e.error&&e.error.stack?e.error.stack.slice(0,200):'')]); });
   window.addEventListener('unhandledrejection', function(e){ log('error', ['Unhandled Promise: ' + (e.reason&&e.reason.message||e.reason)]); });
   console.log('Debug console ready');
 })();

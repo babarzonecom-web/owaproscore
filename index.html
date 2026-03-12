@@ -937,12 +937,8 @@ function App() {
 
   useEffect(()=>lsSave(storage),[storage]);
 
-  // setStorageをwindowグローバルに公開（ポーリングコールバックから直接呼べるように）
-  useEffect(()=>{
-    window.__setStorage = setStorage;
-    console.log("[TEAM] __setStorage registered");
-    return function(){ window.__setStorage = null; };
-  }, [setStorage]);
+  // setStorageをwindowグローバルに公開（毎レンダリング時に更新）
+  window.__setStorage = setStorage;
 
   // 閲覧モード：localStorageが更新されたらstorageを再ロード
   useEffect(()=>{

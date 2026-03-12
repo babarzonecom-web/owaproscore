@@ -509,7 +509,7 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
 const norm   = (e) => (typeof e==="object"&&e!==null)?e:{code:e};
 const eShort = (e) => { const n=norm(e); return (_optionalChain([rOf, 'call', _2 => _2(n.code), 'optionalAccess', _3 => _3.short])||n.code)+(n.dir?`(${n.dir})`:""); };
 const eRuns  = (list) => list.reduce((s,e)=>s+(norm(e).runs||0),0);
-const toList = (ab,inn) => Array.isArray(ab[inn])?ab[inn]:(ab[inn]?[ab[inn]]:[]);
+const toList = (ab,inn) => { if(!ab||ab[inn]==null) return []; return Array.isArray(ab[inn])?ab[inn]:[ab[inn]]; };
 
 const makePlayer  = (i) => ({ id:i, name:`選手${i}`, pos:"", atBats:{}, rbi:0, sb:0, cs:0 });
 const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:0,
@@ -598,7 +598,9 @@ const computePitcherStats = (g) => {
     const offTeam = defTeam==="away" ? "home" : "away";
     const pitchers = g[defTeam+"Pitchers"];
     const pitcherLog = g[defTeam+"PitcherLog"]||[];
-    const lineup = g[offTeam+"Lineup"];
+    const rawLineup = g[offTeam+"Lineup"];
+    // Firebase配列->オブジェクト変換の防御: 配列に正規化
+    const lineup = Array.isArray(rawLineup) ? rawLineup : (rawLineup ? Object.values(rawLineup) : []);
 
     
     
@@ -618,6 +620,7 @@ const computePitcherStats = (g) => {
         // このイニング・ハーフの累積アウト数を打席順に付与
         let outsInHalf = 0;
         lineup.forEach((p,pi)=>{
+          if(!p.atBats) p.atBats={};
           toList(p.atBats,inn).forEach((e,ei)=>{
             const ne = norm(e);
             const outsAtAb = outsInHalf;
@@ -631,7 +634,10 @@ const computePitcherStats = (g) => {
     });
 
     
-    const stats = pitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, _outsGot:0}));
+    // pitchersが配列でない場合の防御
+    const safePitchers = Array.isArray(pitchers) ? pitchers : (pitchers ? Object.values(pitchers) : []);
+    if(!safePitchers.length) { result[defTeam]=[]; return; }
+    const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, _outsGot:0}));
 
     
     

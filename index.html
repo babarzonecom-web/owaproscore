@@ -4626,8 +4626,30 @@ const S = {
   },
 };
 
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = {err: null}; }
+  static getDerivedStateFromError(e) { return {err: e}; }
+  componentDidCatch(e, info) {
+    console.error("[REACT ERROR]", e && e.message || e);
+    console.error("[REACT STACK]", e && e.stack ? e.stack.slice(0, 300) : "no stack");
+    console.error("[COMPONENT STACK]", info && info.componentStack ? info.componentStack.slice(0, 300) : "");
+  }
+  render() {
+    if(this.state.err) {
+      return React.createElement('div', {style:{color:'white',padding:20,background:'#1a1a2e',minHeight:'100vh'}},
+        React.createElement('h2', null, '⚠️ レンダリングエラー'),
+        React.createElement('pre', {style:{fontSize:11,color:'#f87171',whiteSpace:'pre-wrap'}}, 
+          (this.state.err.message||'') + '\n' + (this.state.err.stack||'').slice(0,500))
+      );
+    }
+    return this.props.children;
+  }
+}
+
 try {
-  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    React.createElement(ErrorBoundary, null, React.createElement(App))
+  );
 } catch(e) {
   document.getElementById('root').innerHTML = '<div style="color:white;padding:20px;font-size:14px"><h2>起動エラー</h2><pre style="white-space:pre-wrap;font-size:11px">' + (e.stack||e.message) + '</pre></div>';
 }

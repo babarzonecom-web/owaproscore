@@ -1031,7 +1031,7 @@ function App() {
           // 閲覧者のみFirebase購読（管理者は購読しない）
           if(role === "viewer") {
             // Firebase SDKを使わずREST APIでポーリング
-            var lastTs = 0;
+            var lastTs = -1; // -1=初回は必ず取得
             var restUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/currentGame.json";
             window.__teamShareRef = restUrl;
             var poll = function(){
@@ -1093,7 +1093,7 @@ function App() {
               }).catch(function(fe){ console.error("[TEAM] fetch error", fe&&fe.message||fe); });
             };
             poll();
-            window.__teamPollTimer = setInterval(poll, 3000);
+            window.__teamPollTimer = setInterval(poll, 1000); // 1秒ポーリング
             console.log("[TEAM] REST polling started for "+tc);
           }
 
@@ -2447,7 +2447,45 @@ function App() {
               const isPitchMode = (game.pitchMode||"result")==="pitch";
               return (React.createElement(React.Fragment, null
 
-                , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginBottom:10},}
+                , (() => {
+                  // 前の打者の直近打席結果を表示
+                  const prevIdx = curBatterIdx > 0 ? curBatterIdx - 1 : curLineup.length - 1;
+                  const prevPlayer = curLineup[prevIdx];
+                  if(!prevPlayer) return null;
+                  // 今のイニングの打席を取得
+                  const prevAb = prevPlayer.atBats && prevPlayer.atBats[game.inning];
+                  const prevEntries = prevAb ? (Array.isArray(prevAb)?prevAb:[prevAb]) : [];
+                  // 前のイニングも含めて最新1打席を探す
+                  let lastEntry = null;
+                  if(prevEntries.length > 0) {
+                    lastEntry = prevEntries[prevEntries.length-1];
+                  } else {
+                    // 前のイニングを遡る
+                    for(let inn = game.inning-1; inn >= 1; inn--) {
+                      const ab = prevPlayer.atBats && prevPlayer.atBats[inn];
+                      const entries = ab ? (Array.isArray(ab)?ab:[ab]) : [];
+                      if(entries.length > 0) { lastEntry = entries[entries.length-1]; break; }
+                    }
+                  }
+                  if(!lastEntry) return null;
+                  const ne = (typeof lastEntry==="object"&&lastEntry!==null)?lastEntry:{code:lastEntry};
+                  const resultCode = ne.code||"";
+                  const resultColor = ["H","2B","3B","HR"].includes(resultCode)?"#4ade80":
+                    ["BB","HBP"].includes(resultCode)?"#60a5fa":
+                    resultCode==="E"?"#f87171":"#94a3b8";
+                  return React.createElement('div', {
+                    style:{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"6px 12px",
+                      marginBottom:8,display:"flex",alignItems:"center",gap:8,fontSize:12}},
+                    React.createElement('span',{style:{color:"#64748b"}},"前打者"),
+                    React.createElement('span',{style:{color:"#e2e8f0",fontWeight:700}},
+                      prevPlayer.name||("選手"+(prevIdx+1))),
+                    React.createElement('span',{style:{color:resultColor,fontWeight:900,fontSize:14}}, resultCode),
+                    ne.dir ? React.createElement('span',{style:{color:"#94a3b8",fontSize:11}}, "("+ne.dir+")") : null,
+                    ne.runs ? React.createElement('span',{style:{color:"#fbbf24",fontSize:11}}, ne.runs+"点") : null
+                  );
+                })()
+
+              , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginBottom:10},}
                   , React.createElement('div', { style: {fontSize:11,color:"#64748b"},}, "現在の打者")
                   , React.createElement('button', { onClick: ()=>openCurrentBatter(curTeam,game.inning),
                     style: {background:"linear-gradient(135deg,#1d4ed8,#1e40af)",

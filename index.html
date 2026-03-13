@@ -717,6 +717,7 @@ const newGame = (innings=7, pitchMode="result") => ({
   awayPitchers:makePitchers(), homePitchers:makePitchers(),
   defenseLog:[], 
   outs:0, bases:[null,null,null], inning:1, half:"top", log:[], runs:[], 
+  pitchCount:{b:0,s:0,f:0},
   finished:false, endReason:"", endInning:null, endNote:"",
   awayBatterIdx:0, homeBatterIdx:0, 
   awayPitcherIdx:0, homePitcherIdx:0, 
@@ -931,6 +932,8 @@ function App() {
     window.__teamAdminPushing = false;
   }
   const [pitchCount, setPitchCount] = useState({b:0,s:0,f:0}); // 現打席BSFカウント
+  // pitchCountをwindowグローバルに常時同期（mutGame内から参照）
+  window.__currentPitchCount = pitchCount;
   const [pitchHistory, setPitchHistory] = useState([]); // 取り消し用履歴 ["b","s","f",...]
   const [toast,  setToast]  = useState("");
 
@@ -1192,6 +1195,10 @@ function App() {
     setStorage(s=>{
       const snap = JSON.parse(JSON.stringify(s.currentGame));
       const newGame = fn(s.currentGame);
+      // pitchCountをgameに埋め込んで同期（閲覧者側で表示するため）
+      if(newGame && window.__currentPitchCount !== undefined) {
+        newGame.pitchCount = window.__currentPitchCount;
+      }
       const newUndoStack = [snap, ...(s.undoStack||[])];
       // 管理者モード：変更を即座にFirebaseへプッシュ
       if(window.__teamShareRole === "admin" && window.__teamShareCode) {
@@ -2464,8 +2471,8 @@ function App() {
                   , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:12,marginBottom:10}}
                     , ["B","S","O"].map(type => {
                         const cfg = {
-                          B:{count:pitchCount.b, max:4, color:"#4ade80"},
-                          S:{count:pitchCount.s, max:3, color:"#fbbf24"},
+                          B:{count:isReadOnly?(game.pitchCount||{b:0}).b:pitchCount.b, max:4, color:"#4ade80"},
+                          S:{count:isReadOnly?(game.pitchCount||{s:0}).s:pitchCount.s, max:3, color:"#fbbf24"},
                           O:{count:game.outs,    max:3, color:"#f87171"},
                         }[type];
                         return React.createElement('div', {key:type, style:{display:"flex",alignItems:"center",gap:5}}

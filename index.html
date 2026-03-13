@@ -867,6 +867,15 @@ const fbTournamentAddGame = (code, game) => {
 };
 
 const SKEY = "bb_v7";
+const TEAM_KEY = "bb_teams_v1"; // バージョンに依存しない別キーでチームデータを保存
+
+// チームデータの読み書きヘルパー
+const lsLoadTeams = () => {
+  try { return JSON.parse(localStorage.getItem(TEAM_KEY)||"{}"); } catch(e){ return {}; }
+};
+const lsSaveTeams = (d) => {
+  try { localStorage.setItem(TEAM_KEY, JSON.stringify(d)); } catch(e){}
+};
 const lsLoad = () => { 
   try {
     const raw = localStorage.getItem(SKEY);
@@ -889,9 +898,11 @@ function App() {
     if(!s.currentGame.pitchMode) s.currentGame.pitchMode="result";
     if(!s.history)     s.history=[];
     if(!s.undoStack)   s.undoStack=[];
-    if(!s.teams)       s.teams=[];   
-    if(!s.myTeam)      s.myTeam=null;
-    if(!s.opponents)   s.opponents=[];
+    // チームデータはバージョン独立キーから読み込む（バージョンアップでリセットされない）
+    const teamData = lsLoadTeams();
+    if(!s.teams)     s.teams     = teamData.teams     || [];
+    if(!s.myTeam)    s.myTeam    = teamData.myTeam    || null;
+    if(!s.opponents) s.opponents = teamData.opponents || [];
     return s;
   });
   const [tab,   setTab]   = useState("score");
@@ -944,7 +955,11 @@ function App() {
   const myTeam     = storage.myTeam||null;
   const opponents  = storage.opponents||[];
 
-    useEffect(()=>lsSave(storage),[storage]);
+    useEffect(()=>{
+    lsSave(storage);
+    // チームデータはバージョン独立キーにも保存（バージョンアップ後も維持）
+    lsSaveTeams({teams:storage.teams, myTeam:storage.myTeam, opponents:storage.opponents});
+  },[storage]);
   window.__setStorage = setStorage;
  useEffect(()=>{
     if(isHost && syncGameId) {
@@ -1185,7 +1200,7 @@ function App() {
   };
 
   
-  const mutGame = useCallback((fn)=>{
+  const mutGame = useCallback((fn, newPitchCount)=>{
     // window経由で常に最新のroleを参照（stateのクロージャ問題を回避）
     console.log("[mutGame] called, window.__teamShareRole="+window.__teamShareRole);
     if(window.__teamShareRole === "viewer") {
@@ -1195,9 +1210,9 @@ function App() {
     setStorage(s=>{
       const snap = JSON.parse(JSON.stringify(s.currentGame));
       const newGame = fn(s.currentGame);
-      // pitchCountをgameに埋め込んで同期（閲覧者側で表示するため）
-      if(newGame && window.__currentPitchCount !== undefined) {
-        newGame.pitchCount = window.__currentPitchCount;
+      // pitchCountを直接引数 > windowグローバル の順で埋め込む
+      if(newGame) {
+        newGame.pitchCount = newPitchCount || window.__currentPitchCount || {b:0,s:0,f:0};
       }
       const newUndoStack = [snap, ...(s.undoStack||[])];
       // 管理者モード：変更を即座にFirebaseへプッシュ
@@ -2470,18 +2485,33 @@ function App() {
                   if(!lastEntry) return null;
                   const ne = (typeof lastEntry==="object"&&lastEntry!==null)?lastEntry:{code:lastEntry};
                   const resultCode = ne.code||"";
-                  const resultColor = ["H","2B","3B","HR"].includes(resultCode)?"#4ade80":
-                    ["BB","HBP"].includes(resultCode)?"#60a5fa":
-                    resultCode==="E"?"#f87171":"#94a3b8";
+                  const CODE_JP = {
+                    "H":"ヒット","2B":"二塁打","3B":"三塁打","HR":"本塁打",
+                    "BB":"四球","HBP":"死球","IBB":"故意四球",
+                    "K":"三振","KL":"見逃三振",
+                    "GO":"ゴロアウト","FO":"フライアウト","LO":"ライナーアウト",
+                    "FF":"飛球","SAC":"犠打","SF":"犠飛",
+                    "DP":"併殺打","E":"エラー","FC":"フィルダースチョイス",
+                    "SB":"盗塁","CS":"盗塁死","WP":"暴投","PB":"捕逸","BK":"ボーク"
+                  };
+                  const isHit = ["H","2B","3B","HR"].includes(resultCode);
+                  const isWalk = ["BB","HBP","IBB"].includes(resultCode);
+                  const isOut = ["K","KL","GO","FO","LO","FF","SAC","SF","DP"].includes(resultCode);
+                  const resultColor = isHit?"#4ade80":isWalk?"#60a5fa":isOut?"#f87171":resultCode==="E"?"#fb923c":"#94a3b8";
+                  const resultLabel = CODE_JP[resultCode] || resultCode;
                   return React.createElement('div', {
-                    style:{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"6px 12px",
-                      marginBottom:8,display:"flex",alignItems:"center",gap:8,fontSize:12}},
-                    React.createElement('span',{style:{color:"#64748b"}},"前打者"),
-                    React.createElement('span',{style:{color:"#e2e8f0",fontWeight:700}},
+                    style:{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",
+                      borderRadius:8,padding:"6px 12px",marginBottom:8,
+                      display:"flex",alignItems:"center",gap:8,fontSize:12}},
+                    React.createElement('span',{style:{color:"#64748b",fontSize:11}},"前打者"),
+                    React.createElement('span',{style:{color:"#cbd5e1",fontWeight:700}},
                       prevPlayer.name||("選手"+(prevIdx+1))),
-                    React.createElement('span',{style:{color:resultColor,fontWeight:900,fontSize:14}}, resultCode),
-                    ne.dir ? React.createElement('span',{style:{color:"#94a3b8",fontSize:11}}, "("+ne.dir+")") : null,
-                    ne.runs ? React.createElement('span',{style:{color:"#fbbf24",fontSize:11}}, ne.runs+"点") : null
+                    React.createElement('span',{style:{
+                      color:resultColor,fontWeight:900,fontSize:13,
+                      background:resultColor+"22",padding:"2px 8px",borderRadius:6,
+                      border:"1px solid "+resultColor+"44"}}, resultLabel),
+                    ne.dir ? React.createElement('span',{style:{color:"#94a3b8",fontSize:11}}, ne.dir) : null,
+                    ne.runs ? React.createElement('span',{style:{color:"#fbbf24",fontSize:11,fontWeight:700}}, ne.runs+"点") : null
                   );
                 })()
 
@@ -2545,14 +2575,15 @@ function App() {
                         onClick:()=>{
                           if(!isPitchMode) return;
                           const defSide = curTeam==="away"?"home":"away";
-                          setPitchCount(p=>({...p,b:p.b+1}));
+                          const newBallCount = {...pitchCount, b:pitchCount.b+1};
+                          setPitchCount(newBallCount);
                           setPitchHistory(h=>[...h,"b"]);
                           mutGame(g=>{
                             const pitchers=[...g[defSide+"Pitchers"]||[]];
                             const pidx=g[defSide+"PitcherIdx"]||0;
                             if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
                             return{...g,[defSide+"Pitchers"]:pitchers};
-                          });
+                          }, newBallCount);
                           if(pitchCount.b+1>=4){
                             const batterIdx=game[curTeam+"BatterIdx"]||0;
                             setTimeout(()=>{
@@ -2566,15 +2597,16 @@ function App() {
                         onClick:()=>{
                           if(!isPitchMode) return;
                           const defSide = curTeam==="away"?"home":"away";
-                          setPitchCount(p=>({...p,s:p.s+1}));
+                          const newStrikeCount = {...pitchCount, s:pitchCount.s+1};
+                          setPitchCount(newStrikeCount);
                           setPitchHistory(h=>[...h,"s"]);
                           mutGame(g=>{
                             const pitchers=[...g[defSide+"Pitchers"]||[]];
                             const pidx=g[defSide+"PitcherIdx"]||0;
                             if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
                             return{...g,[defSide+"Pitchers"]:pitchers};
-                          });
-                          if(pitchCount.s+1>=3){
+                          }, newStrikeCount);
+                          if(newStrikeCount.s>=3){
                             const batterIdx=game[curTeam+"BatterIdx"]||0;
                             setTimeout(()=>{
                               setModal({team:curTeam,pidx:batterIdx,inning:game.inning,step:"strikeout_select"});
@@ -2588,14 +2620,15 @@ function App() {
                           if(!isPitchMode) return;
                           const defSide = curTeam==="away"?"home":"away";
                           const newS = pitchCount.s < 2 ? pitchCount.s+1 : pitchCount.s;
-                          setPitchCount(p=>({...p,f:p.f+1,s:newS}));
+                          const newFoulCount = {...pitchCount, f:pitchCount.f+1, s:newS};
+                          setPitchCount(newFoulCount);
                           setPitchHistory(h=>[...h,"f"]);
                           mutGame(g=>{
                             const pitchers=[...g[defSide+"Pitchers"]||[]];
                             const pidx=g[defSide+"PitcherIdx"]||0;
                             if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
                             return{...g,[defSide+"Pitchers"]:pitchers};
-                          });
+                          }, newFoulCount);
                         },
                         style:{background:"#94a3b820",border:"1.5px solid #94a3b8",borderRadius:8,color:"#94a3b8",padding:"9px 0",cursor:isPitchMode?"pointer":"not-allowed",fontSize:13,fontWeight:700,flex:1,opacity:isPitchMode?1:0.3}
                       }, "ファウル")

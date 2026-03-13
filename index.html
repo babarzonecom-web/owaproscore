@@ -2487,18 +2487,18 @@ function App() {
                   if(!lastEntry) return null;
                   const ne = (typeof lastEntry==="object"&&lastEntry!==null)?lastEntry:{code:lastEntry};
                   const resultCode = ne.code||ne.result||(typeof ne==="string"?ne:"")||"";
-                  console.log("[前打者] entry=", JSON.stringify(lastEntry), "code=", resultCode);
+                  console.log("[前打者] prevIdx="+prevIdx+" name="+prevPlayer.name+" allEntries="+JSON.stringify(prevEntries)+" lastEntry="+JSON.stringify(lastEntry)+" code="+resultCode);
                   const CODE_JP = {
-                    "H":"ヒット","2B":"二塁打","3B":"三塁打","HR":"本塁打",
-                    "BB":"四球","HBP":"死球","IBB":"故意四球",
+                    "H1":"ヒット","H2":"二塁打","H3":"三塁打","HR":"本塁打",
+                    "BB":"四球","HBP":"死球","IBB":"故意四球","KW":"振り逃げ",
                     "K":"三振","KL":"見逃三振",
                     "GO":"ゴロアウト","FO":"フライアウト","LO":"ライナーアウト",
                     "FF":"飛球","SAC":"犠打","SF":"犠飛",
-                    "DP":"併殺打","E":"エラー","FC":"フィルダースチョイス",
+                    "DP":"併殺打","E":"エラー","FC":"野選",
                     "SB":"盗塁","CS":"盗塁死","WP":"暴投","PB":"捕逸","BK":"ボーク"
                   };
-                  const isHit = ["H","2B","3B","HR"].includes(resultCode);
-                  const isWalk = ["BB","HBP","IBB"].includes(resultCode);
+                  const isHit = ["H1","H2","H3","HR"].includes(resultCode);
+                  const isWalk = ["BB","HBP","IBB","KW"].includes(resultCode);
                   const isOut = ["K","KL","GO","FO","LO","FF","SAC","SF","DP"].includes(resultCode);
                   const resultColor = isHit?"#4ade80":isWalk?"#60a5fa":isOut?"#f87171":resultCode==="E"?"#fb923c":"#94a3b8";
                   const resultLabel = CODE_JP[resultCode] || resultCode;

@@ -1207,30 +1207,32 @@ function App() {
       showToast("👁 閲覧モードでは操作できません");
       return;
     }
+    // pitchCountを先に確定（非同期setState回避）
+    const resolvedPitchCount = newPitchCount || window.__currentPitchCount || {b:0,s:0,f:0};
     setStorage(s=>{
       const snap = JSON.parse(JSON.stringify(s.currentGame));
-      const newGame = fn(s.currentGame);
-      // pitchCountを直接引数 > windowグローバル の順で埋め込む
-      if(newGame) {
-        newGame.pitchCount = newPitchCount || window.__currentPitchCount || {b:0,s:0,f:0};
-      }
+      const updatedGame = fn(s.currentGame);
+      if(updatedGame) updatedGame.pitchCount = resolvedPitchCount;
       const newUndoStack = [snap, ...(s.undoStack||[])];
-      // 管理者モード：変更を即座にFirebaseへプッシュ
-      if(window.__teamShareRole === "admin" && window.__teamShareCode) {
-        try {
-          if(fbInit()) {
-            window.__teamAdminPushing = true;
-            fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json",{
-                method:"PUT",headers:{"Content-Type":"application/json"},
-                body:JSON.stringify(Object.assign({},newGame,{_ts:Date.now()}))
-              }).then(function(){ setTimeout(function(){ window.__teamAdminPushing=false; },2000); })
-              .catch(function(){ window.__teamAdminPushing=false; });
-            console.log("[TEAM ADMIN] pushed to", window.__teamShareCode);
-          }
-        } catch(e) { console.error("[TEAM] push error", e); window.__teamAdminPushing = false; }
-      }
-      return {...s, currentGame:newGame, undoStack:newUndoStack};
+      // Firebase pushをsetStorage外で実行するためwindowに保存
+      if(updatedGame) window.__pendingPush = updatedGame;
+      return {...s, currentGame:updatedGame, undoStack:newUndoStack};
     });
+    // setStorageの外でFirebase push（Reactの純粋関数制約を回避）
+    if(window.__teamShareRole === "admin" && window.__teamShareCode) {
+      setTimeout(function(){
+        const game = window.__pendingPush;
+        if(!game) return;
+        window.__pendingPush = null;
+        window.__teamAdminPushing = true;
+        fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json",{
+          method:"PUT",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(Object.assign({},game,{_ts:Date.now()}))
+        }).then(function(){ setTimeout(function(){ window.__teamAdminPushing=false; },2000); })
+          .catch(function(){ window.__teamAdminPushing=false; });
+        console.log("[TEAM ADMIN] pushed to", window.__teamShareCode);
+      }, 0);
+    }
   },[]);
 
   
@@ -2311,7 +2313,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , [["score","📊 スコア"],["lineup","👕 打順"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
+        , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
             borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
@@ -2484,7 +2486,8 @@ function App() {
                   }
                   if(!lastEntry) return null;
                   const ne = (typeof lastEntry==="object"&&lastEntry!==null)?lastEntry:{code:lastEntry};
-                  const resultCode = ne.code||"";
+                  const resultCode = ne.code||ne.result||(typeof ne==="string"?ne:"")||"";
+                  console.log("[前打者] entry=", JSON.stringify(lastEntry), "code=", resultCode);
                   const CODE_JP = {
                     "H":"ヒット","2B":"二塁打","3B":"三塁打","HR":"本塁打",
                     "BB":"四球","HBP":"死球","IBB":"故意四球",
@@ -4519,7 +4522,7 @@ function PosSelector({ value, onChange }) {
           borderRadius:5,color:"#7dd3fc",fontSize:11,fontWeight:700,
           padding:"4px 6px",cursor:"pointer",minWidth:32,textAlign:"center",
           touchAction:"manipulation"},}
-        , value||"—"
+        , value||""
       )
       , open&&(React.createElement(React.Fragment, null
         , React.createElement('div', { style: {position:"fixed",inset:0,zIndex:9998}, onClick: ()=>setOpen(false),})

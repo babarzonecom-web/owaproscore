@@ -1,4 +1,4 @@
-// v1001-nocache
+// v1002-nocache
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(

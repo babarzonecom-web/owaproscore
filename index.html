@@ -976,17 +976,7 @@ function App() {
     lsSave(slim);
   },[storage]);
   window.__setStorage = setStorage;
- useEffect(()=>{
-    if(isHost && syncGameId) {
-      if(!fbInit()){ showToast("Firebase未設定"); return; }
-      fbPush(syncGameId, storage.currentGame);
-    }
-  },[storage, isHost, syncGameId]);
 
-  // viewer subscribeはstartViewing内で直接実行するためここでは不要
-  useEffect(()=>{
-    if(!isViewer || !syncGameId) return;
-  },[isViewer, syncGameId]);
 
   const showToast = (msg)=>{setToast(msg);setTimeout(()=>setToast(""),2600);};
 
@@ -1036,7 +1026,7 @@ function App() {
           if(role === "admin") {
             try {
               const currentGame = JSON.parse(localStorage.getItem("bb_v7")||"{}").currentGame;
-              if(currentGame && fbInit()) {
+              if(currentGame) {
                 fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/currentGame.json",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({},currentGame,{_ts:Date.now()}))});
                 console.log("[TEAM] Admin initial push done");
               }

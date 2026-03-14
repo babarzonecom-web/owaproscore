@@ -934,6 +934,7 @@ function App() {
   const [selDir, setSelDir] = useState(null);
   const [teamShareCode, setTeamShareCode] = useState(localStorage.getItem("tsCode")||"");
   const [teamSharePw,   setTeamSharePw]   = useState("");
+  const [statTab, setStatTab] = useState("batter");
   const [teamShareInput,setTeamShareInput]= useState(localStorage.getItem("tsCode")||"");
   const [teamSharePwInput,setTeamSharePwInput]= useState("");
   const [teamShareRole, setTeamShareRole] = useState(localStorage.getItem("tsRole")||""); // "admin"|"viewer"|""
@@ -3017,6 +3018,158 @@ function App() {
             })
 
         ))
+
+        , tab==="history"&&(React.createElement(React.Fragment, null
+          , React.createElement('div', {style:{padding:"12px 10px"}},
+            React.createElement('div', {style:{fontSize:13,color:"#7db8e8",fontWeight:700,marginBottom:10}}, "🗂 試合履歴")
+            , (storage.history||[]).length===0
+              ? React.createElement('div', {style:{color:"#475569",textAlign:"center",padding:40}}, "まだ試合記録がありません")
+              : (storage.history||[]).map((g,gi)=>{
+                  const aScore = (g.awayScore||[]).reduce((s,v)=>s+(v||0),0);
+                  const hScore = (g.homeScore||[]).reduce((s,v)=>s+(v||0),0);
+                  const winner = aScore>hScore?g.awayTeam:hScore>aScore?g.homeTeam:null;
+                  const resultColor = aScore>hScore?"#4ade80":hScore>aScore?"#f87171":"#94a3b8";
+                  return React.createElement('div', {key:gi,
+                    style:{background:"#0a1e35",border:"1px solid #1e3a5f",borderRadius:10,
+                      padding:"10px 14px",marginBottom:8}},
+                    React.createElement('div', {style:{display:"flex",justifyContent:"space-between",
+                      alignItems:"center",marginBottom:6}},
+                      React.createElement('span', {style:{color:"#94a3b8",fontSize:11}}, (g.date||"")+(g.venue?" 📍"+g.venue:"")),
+                      React.createElement('span', {style:{color:resultColor,fontSize:11,fontWeight:700}},
+                        winner?winner+"勝":"引き分け")
+                    ),
+                    React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}},
+                      React.createElement('span', {style:{color:"#fbbf24",fontWeight:700,fontSize:13,flex:1,textAlign:"right"}}, g.awayTeam||""),
+                      React.createElement('span', {style:{color:"#e2e8f0",fontWeight:900,fontSize:20,minWidth:70,textAlign:"center"}},
+                        aScore+" - "+hScore),
+                      React.createElement('span', {style:{color:"#60a5fa",fontWeight:700,fontSize:13,flex:1}}, g.homeTeam||"")
+                    ),
+                    React.createElement('div', {style:{display:"flex",gap:6}},
+                      React.createElement('button', {
+                        onClick:()=>loadGame(g),
+                        style:{flex:1,padding:"5px 0",background:"#1d4ed820",border:"1px solid #3b82f6",
+                          borderRadius:6,color:"#60a5fa",fontSize:11,cursor:"pointer",fontWeight:700}},
+                        "📂 この試合を開く"),
+                      React.createElement('button', {
+                        onClick:()=>delHistory(g.id||gi),
+                        style:{padding:"5px 10px",background:"#dc262620",border:"1px solid #dc2626",
+                          borderRadius:6,color:"#f87171",fontSize:11,cursor:"pointer"}},
+                        "🗑")
+                    )
+                  );
+                })
+          )
+        ))
+
+        , tab==="stats"&&(()=>{
+          const hist = (storage.history||[]).filter(g=>g.finished!==false);
+          const myName = storage.myTeam && storage.myTeam.name;
+          const batterMap = {}, pitcherMap = {};
+          let wins=0,losses=0,draws=0,totalRuns=0,totalLost=0;
+          hist.forEach(g=>{
+            const aScore=(g.awayScore||[]).reduce((s,v)=>s+(v||0),0);
+            const hScore=(g.homeScore||[]).reduce((s,v)=>s+(v||0),0);
+            let myLineup=null,myScore=0,oppScore=0;
+            if(myName){
+              if(g.awayTeam===myName){myLineup=g.awayLineup||[];myScore=aScore;oppScore=hScore;}
+              else if(g.homeTeam===myName){myLineup=g.homeLineup||[];myScore=hScore;oppScore=aScore;}
+            }
+            if(!myLineup){myLineup=[...(g.awayLineup||[]),...(g.homeLineup||[])];myScore=Math.max(aScore,hScore);oppScore=Math.min(aScore,hScore);}
+            totalRuns+=myScore; totalLost+=oppScore;
+            if(myScore>oppScore)wins++; else if(myScore<oppScore)losses++; else draws++;
+            myLineup.forEach(p=>{
+              if(!p||!p.name)return;
+              const nm=p.name;
+              if(!batterMap[nm])batterMap[nm]={name:nm,ab:0,h:0,h2:0,h3:0,hr:0,bb:0,hbp:0,k:0,rbi:0,run:0,sb:0,tb:0,games:0};
+              const bm=batterMap[nm]; bm.games++;
+              bm.rbi+=(p.rbi||0); bm.run+=(p.run||0); bm.sb+=(p.sb||0);
+              Object.values(p.atBats||{}).flat().forEach(e=>{
+                const ne=(typeof e==="object"&&e)?e:{code:e}; const code=ne.code||""; if(!code)return;
+                if(!["BB","HBP","IBB","SAC","SF","SB","CS","WP","PB","BK","KW"].includes(code))bm.ab++;
+                if(["H1","H2","H3","HR"].includes(code)){bm.h++;bm.tb+=code==="H1"?1:code==="H2"?2:code==="H3"?3:4;if(code==="H2")bm.h2++;if(code==="H3")bm.h3++;if(code==="HR")bm.hr++;}
+                if(code==="BB"||code==="IBB")bm.bb++; if(code==="HBP")bm.hbp++;
+                if(["K","KL","KW"].includes(code))bm.k++;
+              });
+            });
+            ["away","home"].forEach(side=>{
+              (g[side+"Pitchers"]||[]).forEach(p=>{
+                if(!p||!p.name)return;
+                const nm=p.name;
+                if(!pitcherMap[nm])pitcherMap[nm]={name:nm,games:0,ip:0,h:0,er:0,bb:0,k:0};
+                const pm=pitcherMap[nm]; pm.games++;
+                pm.ip+=(p.autoIp||p.ip||0); pm.h+=(p.autoH||p.h||0); pm.er+=(p.autoEr||p.er||0);
+                pm.bb+=(p.autoBb||p.bb||0); pm.k+=(p.autoK||p.k||0);
+              });
+            });
+          });
+          const batters=Object.values(batterMap).filter(b=>b.ab>0).sort((a,b)=>b.ab-a.ab);
+          const pitchers=Object.values(pitcherMap).filter(p=>p.ip>0).sort((a,b)=>b.ip-a.ip);
+          const fmt=v=>v>=1?"1.000":v>0?v.toFixed(3).replace(/^0/,""):".000";
+          return React.createElement('div',{style:{padding:"10px 8px"}},
+            React.createElement('div',{style:{background:"linear-gradient(135deg,#0a1e35,#0d2a47)",border:"1px solid #1e4570",borderRadius:12,padding:"12px 16px",marginBottom:12}},
+              React.createElement('div',{style:{fontSize:12,color:"#7db8e8",fontWeight:700,marginBottom:8}},"🏆 チーム成績（"+hist.length+"試合）"),
+              React.createElement('div',{style:{display:"flex",gap:16,flexWrap:"wrap",alignItems:"flex-end"}},
+                [["勝",wins,"#4ade80"],["敗",losses,"#f87171"],["分",draws,"#94a3b8"]].map(([l,v,col])=>
+                  React.createElement('div',{key:l,style:{textAlign:"center"}},
+                    React.createElement('div',{style:{fontSize:24,fontWeight:900,color:col}},v),
+                    React.createElement('div',{style:{fontSize:10,color:"#64748b"}},l))),
+                React.createElement('div',{style:{width:1,background:"#1e3a5f",alignSelf:"stretch",margin:"0 4px"}}),
+                [["得点",totalRuns,"#fbbf24"],["失点",totalLost,"#60a5fa"]].map(([l,v,col])=>
+                  React.createElement('div',{key:l,style:{textAlign:"center"}},
+                    React.createElement('div',{style:{fontSize:24,fontWeight:900,color:col}},v),
+                    React.createElement('div',{style:{fontSize:10,color:"#64748b"}},l))),
+                React.createElement('div',{style:{textAlign:"center"}},
+                  React.createElement('div',{style:{fontSize:20,fontWeight:900,color:"#a78bfa"}},
+                    (wins+losses+draws)>0?((wins/(wins+losses+draws))*100).toFixed(0)+"%":"—"),
+                  React.createElement('div',{style:{fontSize:10,color:"#64748b"}},"勝率"))
+              )
+            ),
+            React.createElement('div',{style:{display:"flex",gap:0,marginBottom:10,background:"#0a1628",borderRadius:8,padding:3}},
+              [["batter","⚔️ 打者"],["pitcher","⚾ 投手"]].map(([t,l])=>
+                React.createElement('button',{key:t,onClick:()=>setStatTab(t),
+                  style:{flex:1,padding:"7px 0",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,
+                    background:statTab===t?"#1d4ed8":"transparent",color:statTab===t?"#fff":"#64748b"}},l)
+              )
+            ),
+            statTab==="batter"&&(batters.length===0
+              ?React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:30}},"記録がありません")
+              :React.createElement('div',{style:{overflowX:"auto"}},
+                React.createElement('table',{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+                  React.createElement('thead',null,React.createElement('tr',null,
+                    ["選手","試","打","安","二","三","本","打点","得","盗","四死","三振","打率","出塁","OPS"].map(h=>
+                      React.createElement('th',{key:h,style:{padding:"4px 2px",color:"#7db8e8",fontWeight:700,textAlign:"center",borderBottom:"1px solid #1e3a5f",whiteSpace:"nowrap"}},h)))),
+                  React.createElement('tbody',null,batters.map((b,i)=>{
+                    const avg=b.ab>0?b.h/b.ab:0,obp=(b.ab+b.bb+b.hbp)>0?(b.h+b.bb+b.hbp)/(b.ab+b.bb+b.hbp):0,slg=b.ab>0?b.tb/b.ab:0,ops=obp+slg;
+                    return React.createElement('tr',{key:b.name,style:{background:i%2?"rgba(255,255,255,0.02)":"transparent"}},
+                      [b.name,b.games,b.ab,b.h,b.h2,b.h3,b.hr,b.rbi,b.run,b.sb,b.bb+b.hbp,b.k,
+                       React.createElement('span',{style:{color:avg>=0.3?"#4ade80":"#e2e8f0",fontWeight:avg>=0.3?700:400}},fmt(avg)),
+                       fmt(obp),
+                       React.createElement('span',{style:{color:ops>=0.8?"#fbbf24":"#e2e8f0",fontWeight:ops>=0.8?700:400}},fmt(ops))
+                      ].map((v,j)=>React.createElement('td',{key:j,style:{padding:"5px 2px",textAlign:j===0?"left":"center",color:j===0?"#e2e8f0":"#94a3b8",borderBottom:"1px solid #0d1f35"}},v)));
+                  }))
+                )
+              )
+            ),
+            statTab==="pitcher"&&(pitchers.length===0
+              ?React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:30}},"記録がありません")
+              :React.createElement('div',{style:{overflowX:"auto"}},
+                React.createElement('table',{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+                  React.createElement('thead',null,React.createElement('tr',null,
+                    ["投手","試","投球回","被安","自責","四球","奪三振","防御率"].map(h=>
+                      React.createElement('th',{key:h,style:{padding:"4px 2px",color:"#7db8e8",fontWeight:700,textAlign:"center",borderBottom:"1px solid #1e3a5f",whiteSpace:"nowrap"}},h)))),
+                  React.createElement('tbody',null,pitchers.map((p,i)=>{
+                    const eraV=p.ip>0?p.er*27/p.ip:null;
+                    return React.createElement('tr',{key:p.name,style:{background:i%2?"rgba(255,255,255,0.02)":"transparent"}},
+                      [p.name,p.games,Math.floor(p.ip)+(p.ip%1>0?"."+(Math.round((p.ip%1)*3)):""),
+                       p.h,p.er,p.bb,p.k,
+                       React.createElement('span',{style:{color:eraV!==null&&eraV<3?"#4ade80":eraV>5?"#f87171":"#e2e8f0",fontWeight:eraV!==null&&eraV<3?700:400}},eraV!==null?eraV.toFixed(2):"—")
+                      ].map((v,j)=>React.createElement('td',{key:j,style:{padding:"5px 2px",textAlign:j===0?"left":"center",color:j===0?"#e2e8f0":"#94a3b8",borderBottom:"1px solid #0d1f35"}},v)));
+                  }))
+                )
+              )
+            )
+          );
+        })())
 
         , tab==="teams"&&(React.createElement(React.Fragment, null
 

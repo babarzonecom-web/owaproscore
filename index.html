@@ -867,7 +867,16 @@ const fbTournamentAddGame = (code, game) => {
 };
 
 const SKEY = "bb_v7";
-const TEAM_KEY = "bb_teams_v1"; // バージョンに依存しない別キーでチームデータを保存
+const TEAM_KEY    = "bb_teams_v1";   // チームデータ独立キー
+const HISTORY_KEY = "bb_history_v1"; // 試合履歴独立キー
+
+// 履歴の読み書きヘルパー
+const lsLoadHistory = () => {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]"); } catch(e){ return []; }
+};
+const lsSaveHistory = (arr) => {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify((arr||[]).slice(0,50))); } catch(e){}
+};
 
 // チームデータの読み書きヘルパー
 const lsLoadTeams = () => {
@@ -898,11 +907,13 @@ function App() {
     if(!s.currentGame.pitchMode) s.currentGame.pitchMode="result";
     if(!s.history)     s.history=[];
     if(!s.undoStack)   s.undoStack=[];
-    // チームデータはバージョン独立キーから読み込む（バージョンアップでリセットされない）
+    // チームデータはバージョン独立キーから読み込む
     const teamData = lsLoadTeams();
     if(!s.teams)     s.teams     = teamData.teams     || [];
     if(!s.myTeam)    s.myTeam    = teamData.myTeam    || null;
     if(!s.opponents) s.opponents = teamData.opponents || [];
+    // 履歴もバージョン独立キーから読み込む
+    if(!s.history || s.history.length===0) s.history = lsLoadHistory();
     return s;
   });
   const [tab,   setTab]   = useState("score");
@@ -957,9 +968,12 @@ function App() {
   const opponents  = storage.opponents||[];
 
     useEffect(()=>{
-    lsSave(storage);
-    // チームデータはバージョン独立キーにも保存（バージョンアップ後も維持）
+    // 履歴・チームは独立キーに保存（バージョンアップ後も維持）
+    lsSaveHistory(storage.history);
     lsSaveTeams({teams:storage.teams, myTeam:storage.myTeam, opponents:storage.opponents});
+    // bb_v7 には履歴・チームを除いた軽量データのみ保存（500KB制限対策）
+    const {history:_h, teams:_t, myTeam:_m, opponents:_o, ...slim} = storage;
+    lsSave(slim);
   },[storage]);
   window.__setStorage = setStorage;
  useEffect(()=>{
@@ -1639,13 +1653,14 @@ function App() {
   const applyTeamToLineup = (side, team) => {
     mutGame(g=>{
       const lk = side+"Lineup";
-      const members = team.members||[];
+      const members = (team.members||[]).slice(0,9); // 最大9人まで
       const newLineup = members.map((m,i)=>({
         ...makePlayer(i+1),
         name: typeof m==="string" ? m : (m.name||`選手${i+1}`),
-        pos: typeof m==="object" && m.pos ? m.pos : String(i+1),
+        pos: typeof m==="object" && m.pos ? m.pos : "",
       }));
-      while(newLineup.length < DEFAULT_PLAYERS){
+      // 9人未満なら9人になるまで空選手を追加
+      while(newLineup.length < 9){
         newLineup.push(makePlayer(newLineup.length+1));
       }
       const updated = {...g, [lk]:newLineup, [side+"Team"]:team.name};
@@ -1898,7 +1913,11 @@ function App() {
 
   
   const saveGame=()=>{
-    setStorage(s=>({...s,history:[{...s.currentGame,savedAt:new Date().toLocaleString("ja-JP")},...s.history.slice(0,19)]}));
+    setStorage(s=>{
+      const newHist=[{...s.currentGame,savedAt:new Date().toLocaleString("ja-JP")},...(s.history||[]).slice(0,49)];
+      lsSaveHistory(newHist);
+      return {...s,history:newHist};
+    });
     showToast("保存しました");
   };
 
@@ -1917,7 +1936,9 @@ function App() {
         fbSaveTeamGame(matchedTeam.id, g);
       }
 
-      return {...s, history:[finished,...s.history.slice(0,19)]};
+      const newHist=[finished,...(s.history||[]).slice(0,49)];
+      lsSaveHistory(newHist);
+      return {...s, history:newHist};
     });
     showToast(reason==="cold"?`コールドゲーム（${endInning}回）`:reason==="mercy"?"コールド成立":"⚾ 試合終了");
   },[mutGame]);

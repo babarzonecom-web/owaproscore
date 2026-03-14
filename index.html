@@ -3052,109 +3052,112 @@ function App() {
           )
         )
 
-        , tab==="stats"&&React.createElement(React.Fragment, null,
-          React.createElement('div', {style:{padding:"10px 8px"}},
-            (function(){
-              var hist=(storage.history||[]).filter(function(g){return g.finished!==false;});
-              var myName=storage.myTeam&&storage.myTeam.name;
-              var bMap={}, pMap={}, wins=0, losses=0, draws=0, tRuns=0, tLost=0;
-              hist.forEach(function(g){
-                var aS=(g.awayScore||[]).reduce(function(s,v){return s+(v||0);},0);
-                var hS=(g.homeScore||[]).reduce(function(s,v){return s+(v||0);},0);
-                var myL=null, myS=0, opS=0;
-                if(myName){
-                  if(g.awayTeam===myName){myL=g.awayLineup||[];myS=aS;opS=hS;}
-                  else if(g.homeTeam===myName){myL=g.homeLineup||[];myS=hS;opS=aS;}
-                }
-                if(!myL){myL=[].concat(g.awayLineup||[],g.homeLineup||[]);myS=Math.max(aS,hS);opS=Math.min(aS,hS);}
-                tRuns+=myS; tLost+=opS;
-                if(myS>opS)wins++; else if(myS<opS)losses++; else draws++;
-                myL.forEach(function(p){
-                  if(!p||!p.name)return;
-                  var nm=p.name;
-                  if(!bMap[nm])bMap[nm]={name:nm,ab:0,h:0,h2:0,h3:0,hr:0,bb:0,hbp:0,k:0,rbi:0,run:0,sb:0,tb:0,games:0};
-                  var bm=bMap[nm]; bm.games++;
-                  bm.rbi+=(p.rbi||0); bm.run+=(p.run||0); bm.sb+=(p.sb||0);
-                  [].concat.apply([],Object.values(p.atBats||{})).forEach(function(e){
-                    var ne=(typeof e==="object"&&e)?e:{code:e}; var code=ne.code||""; if(!code)return;
-                    if(["BB","HBP","IBB","SAC","SF","SB","CS","WP","PB","BK","KW"].indexOf(code)<0)bm.ab++;
-                    if(["H1","H2","H3","HR"].indexOf(code)>=0){bm.h++;bm.tb+=code==="H1"?1:code==="H2"?2:code==="H3"?3:4;if(code==="H2")bm.h2++;if(code==="H3")bm.h3++;if(code==="HR")bm.hr++;}
-                    if(code==="BB"||code==="IBB")bm.bb++; if(code==="HBP")bm.hbp++;
-                    if(code==="K"||code==="KL"||code==="KW")bm.k++;
-                  });
-                });
-                ["away","home"].forEach(function(side){
-                  (g[side+"Pitchers"]||[]).forEach(function(p){
-                    if(!p||!p.name)return;
-                    var nm=p.name;
-                    if(!pMap[nm])pMap[nm]={name:nm,games:0,ip:0,h:0,er:0,bb:0,k:0};
-                    var pm=pMap[nm]; pm.games++;
-                    pm.ip+=(p.autoIp||p.ip||0); pm.h+=(p.autoH||p.h||0);
-                    pm.er+=(p.autoEr||p.er||0); pm.bb+=(p.autoBb||p.bb||0); pm.k+=(p.autoK||p.k||0);
-                  });
-                });
+        , tab==="stats"&&(function(){
+          var hist=(storage.history||[]).filter(function(g){return g&&g.finished!==false;});
+          var myName=storage.myTeam&&storage.myTeam.name;
+          var bMap={}, pMap={}, wins=0, losses=0, draws=0, tRuns=0, tLost=0;
+          hist.forEach(function(g){
+            var aS=(g.awayScore||[]).reduce(function(s,v){return s+(v||0);},0);
+            var hS=(g.homeScore||[]).reduce(function(s,v){return s+(v||0);},0);
+            var myL=null, myS=0, opS=0;
+            if(myName){
+              if(g.awayTeam===myName){myL=g.awayLineup||[];myS=aS;opS=hS;}
+              else if(g.homeTeam===myName){myL=g.homeLineup||[];myS=hS;opS=aS;}
+            }
+            if(!myL){myL=[].concat(g.awayLineup||[],g.homeLineup||[]);myS=Math.max(aS,hS);opS=Math.min(aS,hS);}
+            tRuns+=myS; tLost+=opS;
+            if(myS>opS)wins++; else if(myS<opS)losses++; else draws++;
+            myL.forEach(function(p){
+              if(!p||!p.name)return;
+              var nm=p.name;
+              if(!bMap[nm])bMap[nm]={name:nm,ab:0,h:0,h2:0,h3:0,hr:0,bb:0,hbp:0,k:0,rbi:0,run:0,sb:0,tb:0,games:0};
+              var bm=bMap[nm]; bm.games++;
+              bm.rbi+=(p.rbi||0); bm.run+=(p.run||0); bm.sb+=(p.sb||0);
+              [].concat.apply([],Object.values(p.atBats||{})).forEach(function(e){
+                var ne=(typeof e==="object"&&e)?e:{code:e}; var code=ne.code||""; if(!code)return;
+                if(["BB","HBP","IBB","SAC","SF","SB","CS","WP","PB","BK","KW"].indexOf(code)<0)bm.ab++;
+                if(["H1","H2","H3","HR"].indexOf(code)>=0){bm.h++;bm.tb+=code==="H1"?1:code==="H2"?2:code==="H3"?3:4;if(code==="H2")bm.h2++;if(code==="H3")bm.h3++;if(code==="HR")bm.hr++;}
+                if(code==="BB"||code==="IBB")bm.bb++; if(code==="HBP")bm.hbp++;
+                if(code==="K"||code==="KL"||code==="KW")bm.k++;
               });
-              var batters=Object.values(bMap).filter(function(b){return b.ab>0;}).sort(function(a,b){return b.ab-a.ab;});
-              var pitchers=Object.values(pMap).filter(function(p){return p.ip>0;}).sort(function(a,b){return b.ip-a.ip;});
-              var fmt=function(v){return v>=1?"1.000":v>0?v.toFixed(3).replace(/^0/,""):".000";};
-              return [
-                React.createElement('div', {key:"banner",style:{background:"#0a1e35",border:"1px solid #1e4570",borderRadius:12,padding:"12px 16px",marginBottom:12}},
-                  React.createElement('div', {style:{fontSize:12,color:"#7db8e8",fontWeight:700,marginBottom:8}}, "🏆 チーム成績（"+hist.length+"試合）"),
-                  React.createElement('div', {style:{display:"flex",gap:14,flexWrap:"wrap",alignItems:"flex-end"}},
-                    [["勝",wins,"#4ade80"],["敗",losses,"#f87171"],["分",draws,"#94a3b8"],["得点",tRuns,"#fbbf24"],["失点",tLost,"#60a5fa"]].map(function(x){
-                      return React.createElement('div', {key:x[0],style:{textAlign:"center"}},
-                        React.createElement('div',{style:{fontSize:22,fontWeight:900,color:x[2]}},x[1]),
-                        React.createElement('div',{style:{fontSize:10,color:"#64748b"}},x[0]));
-                    }),
-                    React.createElement('div',{style:{textAlign:"center"}},
-                      React.createElement('div',{style:{fontSize:20,fontWeight:900,color:"#a78bfa"}},(wins+losses+draws)>0?((wins/(wins+losses+draws))*100).toFixed(0)+"%":"—"),
-                      React.createElement('div',{style:{fontSize:10,color:"#64748b"}},"勝率"))
-                  )
-                ),
-                React.createElement('div', {key:"tabs",style:{display:"flex",marginBottom:10,background:"#0a1628",borderRadius:8,padding:3}},
-                  [["batter","⚔️ 打者"],["pitcher","⚾ 投手"]].map(function(x){
-                    return React.createElement('button',{key:x[0],onClick:function(){setStatTab(x[0]);},
-                      style:{flex:1,padding:"7px 0",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,
-                        background:statTab===x[0]?"#1d4ed8":"transparent",color:statTab===x[0]?"#fff":"#64748b"}},x[1]);
-                  })
-                ),
-                statTab==="batter"&&React.createElement('div',{key:"bt",style:{overflowX:"auto"}},
-                  batters.length===0
+            });
+            ["away","home"].forEach(function(side){
+              (g[side+"Pitchers"]||[]).forEach(function(p){
+                if(!p||!p.name)return;
+                var nm=p.name;
+                if(!pMap[nm])pMap[nm]={name:nm,games:0,ip:0,h:0,er:0,bb:0,k:0};
+                var pm=pMap[nm]; pm.games++;
+                pm.ip+=(p.autoIp||p.ip||0); pm.h+=(p.autoH||p.h||0);
+                pm.er+=(p.autoEr||p.er||0); pm.bb+=(p.autoBb||p.bb||0); pm.k+=(p.autoK||p.k||0);
+              });
+            });
+          });
+          var batters=Object.values(bMap).filter(function(b){return b.ab>0;}).sort(function(a,b){return b.ab-a.ab;});
+          var pitchers=Object.values(pMap).filter(function(p){return p.ip>0;}).sort(function(a,b){return b.ip-a.ip;});
+          var fmt=function(v){return v>=1?"1.000":v>0?v.toFixed(3).replace(/^0/,""):".000";};
+          var total=wins+losses+draws;
+          return React.createElement('div',{style:{padding:"10px 8px"}},
+            React.createElement('div',{style:{background:"#0a1e35",border:"1px solid #1e4570",borderRadius:12,padding:"12px 16px",marginBottom:12}},
+              React.createElement('div',{style:{fontSize:12,color:"#7db8e8",fontWeight:700,marginBottom:8}},"🏆 チーム成績（"+hist.length+"試合）"),
+              React.createElement('div',{style:{display:"flex",gap:14,flexWrap:"wrap"}},
+                [["勝",wins,"#4ade80"],["敗",losses,"#f87171"],["分",draws,"#94a3b8"],["得点",tRuns,"#fbbf24"],["失点",tLost,"#60a5fa"]].map(function(x){
+                  return React.createElement('div',{key:x[0],style:{textAlign:"center"}},
+                    React.createElement('div',{style:{fontSize:22,fontWeight:900,color:x[2]}},x[1]),
+                    React.createElement('div',{style:{fontSize:10,color:"#64748b"}},x[0]));
+                }).concat([React.createElement('div',{key:"wr",style:{textAlign:"center"}},
+                  React.createElement('div',{style:{fontSize:20,fontWeight:900,color:"#a78bfa"}},total>0?((wins/total)*100).toFixed(0)+"%":"—"),
+                  React.createElement('div',{style:{fontSize:10,color:"#64748b"}},"勝率"))])
+              )
+            ),
+            React.createElement('div',{style:{display:"flex",marginBottom:10,background:"#0a1628",borderRadius:8,padding:3}},
+              [["batter","⚔️ 打者"],["pitcher","⚾ 投手"]].map(function(x){
+                return React.createElement('button',{key:x[0],onClick:function(){setStatTab(x[0]);},
+                  style:{flex:1,padding:"7px 0",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,
+                    background:statTab===x[0]?"#1d4ed8":"transparent",color:statTab===x[0]?"#fff":"#64748b"}},x[1]);
+              })
+            ),
+            statTab==="batter"
+              ? (batters.length===0
                   ? React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:30}},"記録がありません")
-                  : React.createElement('table',{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-                      React.createElement('thead',null,React.createElement('tr',null,
-                        ["選手","試","打","安","二","三","本","打点","得","盗","四死","三振","打率","OPS"].map(function(h){
-                          return React.createElement('th',{key:h,style:{padding:"4px 2px",color:"#7db8e8",fontWeight:700,textAlign:"center",borderBottom:"1px solid #1e3a5f",whiteSpace:"nowrap"}},h);}))),
-                      React.createElement('tbody',null,batters.map(function(b,i){
-                        var avg=b.ab>0?b.h/b.ab:0,obp=(b.ab+b.bb+b.hbp)>0?(b.h+b.bb+b.hbp)/(b.ab+b.bb+b.hbp):0,slg=b.ab>0?b.tb/b.ab:0,ops=obp+slg;
-                        return React.createElement('tr',{key:b.name,style:{background:i%2?"rgba(255,255,255,0.02)":"transparent"}},
-                          [b.name,b.games,b.ab,b.h,b.h2,b.h3,b.hr,b.rbi,b.run,b.sb,b.bb+b.hbp,b.k,
-                           React.createElement('span',{style:{color:avg>=0.3?"#4ade80":"#e2e8f0",fontWeight:avg>=0.3?700:400}},fmt(avg)),
-                           React.createElement('span',{style:{color:ops>=0.8?"#fbbf24":"#e2e8f0",fontWeight:ops>=0.8?700:400}},fmt(ops))
-                          ].map(function(v,j){
-                            return React.createElement('td',{key:j,style:{padding:"5px 2px",textAlign:j===0?"left":"center",color:j===0?"#e2e8f0":"#94a3b8",borderBottom:"1px solid #0d1f35"}},v);});
-                      }))
-                    )
-                ),
-                statTab==="pitcher"&&React.createElement('div',{key:"pt",style:{overflowX:"auto"}},
-                  pitchers.length===0
-                  ? React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:30}},"記録がありません")
-                  : React.createElement('table',{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-                      React.createElement('thead',null,React.createElement('tr',null,
-                        ["投手","試","投球回","被安","自責","四球","奪三振","防御率"].map(function(h){
-                          return React.createElement('th',{key:h,style:{padding:"4px 2px",color:"#7db8e8",fontWeight:700,textAlign:"center",borderBottom:"1px solid #1e3a5f",whiteSpace:"nowrap"}},h);}))),
-                      React.createElement('tbody',null,pitchers.map(function(p,i){
-                        var eraV=p.ip>0?p.er*27/p.ip:null;
-                        return React.createElement('tr',{key:p.name,style:{background:i%2?"rgba(255,255,255,0.02)":"transparent"}},
-                          [p.name,p.games,Math.floor(p.ip)+(p.ip%1>0?"."+(Math.round((p.ip%1)*3)):""),p.h,p.er,p.bb,p.k,
-                           React.createElement('span',{style:{color:eraV!==null&&eraV<3?"#4ade80":eraV!==null&&eraV>5?"#f87171":"#e2e8f0"}},eraV!==null?eraV.toFixed(2):"—")
-                          ].map(function(v,j){
-                            return React.createElement('td',{key:j,style:{padding:"5px 2px",textAlign:j===0?"left":"center",color:j===0?"#e2e8f0":"#94a3b8",borderBottom:"1px solid #0d1f35"}},v);});
-                      }))
+                  : React.createElement('div',{style:{overflowX:"auto"}},
+                      React.createElement('table',{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+                        React.createElement('thead',null,React.createElement('tr',null,
+                          ["選手","試","打","安","二","三","本","打点","得","盗","四死","三振","打率","OPS"].map(function(h){
+                            return React.createElement('th',{key:h,style:{padding:"4px 2px",color:"#7db8e8",fontWeight:700,textAlign:"center",borderBottom:"1px solid #1e3a5f",whiteSpace:"nowrap"}},h);}))),
+                        React.createElement('tbody',null,batters.map(function(b,i){
+                          var avg=b.ab>0?b.h/b.ab:0;
+                          var obp=(b.ab+b.bb+b.hbp)>0?(b.h+b.bb+b.hbp)/(b.ab+b.bb+b.hbp):0;
+                          var ops=obp+(b.ab>0?b.tb/b.ab:0);
+                          return React.createElement('tr',{key:b.name,style:{background:i%2?"rgba(255,255,255,0.02)":"transparent"}},
+                            [b.name,b.games,b.ab,b.h,b.h2,b.h3,b.hr,b.rbi,b.run,b.sb,b.bb+b.hbp,b.k,
+                             React.createElement('span',{style:{color:avg>=0.3?"#4ade80":"#e2e8f0",fontWeight:avg>=0.3?700:400}},fmt(avg)),
+                             React.createElement('span',{style:{color:ops>=0.8?"#fbbf24":"#e2e8f0",fontWeight:ops>=0.8?700:400}},fmt(ops))
+                            ].map(function(v,j){
+                              return React.createElement('td',{key:j,style:{padding:"5px 2px",textAlign:j===0?"left":"center",color:j===0?"#e2e8f0":"#94a3b8",borderBottom:"1px solid #0d1f35"}},v);});
+                        }))
+                      )
                     )
                 )
-              ];
-            })()
+              : (pitchers.length===0
+                  ? React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:30}},"記録がありません")
+                  : React.createElement('div',{style:{overflowX:"auto"}},
+                      React.createElement('table',{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+                        React.createElement('thead',null,React.createElement('tr',null,
+                          ["投手","試","投球回","被安","自責","四球","奪三振","防御率"].map(function(h){
+                            return React.createElement('th',{key:h,style:{padding:"4px 2px",color:"#7db8e8",fontWeight:700,textAlign:"center",borderBottom:"1px solid #1e3a5f",whiteSpace:"nowrap"}},h);}))),
+                        React.createElement('tbody',null,pitchers.map(function(p,i){
+                          var eraV=p.ip>0?p.er*27/p.ip:null;
+                          return React.createElement('tr',{key:p.name,style:{background:i%2?"rgba(255,255,255,0.02)":"transparent"}},
+                            [p.name,p.games,Math.floor(p.ip)+(p.ip%1>0?"."+(Math.round((p.ip%1)*3)):""),p.h,p.er,p.bb,p.k,
+                             React.createElement('span',{style:{color:eraV!==null&&eraV<3?"#4ade80":eraV!==null&&eraV>5?"#f87171":"#e2e8f0"}},eraV!==null?eraV.toFixed(2):"—")
+                            ].map(function(v,j){
+                              return React.createElement('td',{key:j,style:{padding:"5px 2px",textAlign:j===0?"left":"center",color:j===0?"#e2e8f0":"#94a3b8",borderBottom:"1px solid #0d1f35"}},v);});
+                        }))
+                      )
+                    )
+                )
+          );
+        })()
           )
         )
 

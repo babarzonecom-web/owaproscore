@@ -2594,7 +2594,8 @@ function App() {
                         onClick:()=>{
                           if(!isPitchMode) return;
                           const defSide = curTeam==="away"?"home":"away";
-                          setPitchCount(p=>({...p,b:p.b+1}));
+                          const newB = pitchCount.b + 1;
+                          setPitchCount(p=>({...p,b:newB}));
                           setPitchHistory(h=>[...h,"b"]);
                           mutGame(g=>{
                             const pitchers=[...g[defSide+"Pitchers"]||[]];
@@ -2602,7 +2603,7 @@ function App() {
                             if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
                             return{...g,[defSide+"Pitchers"]:pitchers};
                           });
-                          if(pitchCount.b+1>=4){
+                          if(newB>=4){
                             const batterIdx=game[curTeam+"BatterIdx"]||0;
                             setTimeout(()=>{
                               setModal({team:curTeam,pidx:batterIdx,inning:game.inning,step:"auto_bb"});
@@ -2615,7 +2616,8 @@ function App() {
                         onClick:()=>{
                           if(!isPitchMode) return;
                           const defSide = curTeam==="away"?"home":"away";
-                          setPitchCount(p=>({...p,s:p.s+1}));
+                          const newS = pitchCount.s + 1;
+                          setPitchCount(p=>({...p,s:newS}));
                           setPitchHistory(h=>[...h,"s"]);
                           mutGame(g=>{
                             const pitchers=[...g[defSide+"Pitchers"]||[]];
@@ -2623,7 +2625,7 @@ function App() {
                             if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
                             return{...g,[defSide+"Pitchers"]:pitchers};
                           });
-                          if(pitchCount.s+1>=3){
+                          if(newS>=3){
                             const batterIdx=game[curTeam+"BatterIdx"]||0;
                             setTimeout(()=>{
                               setModal({team:curTeam,pidx:batterIdx,inning:game.inning,step:"strikeout_select"});
@@ -2874,9 +2876,70 @@ function App() {
                     )
                   )
                   , React.createElement('tbody', null
-                    , lineup.map((p,idx)=>(
-                      React.createElement('tr', { key: p.id, style: {background:idx%2===0?"#0a1628":"#0d1f35",
-                        opacity:1},}
+                    , lineup.flatMap((p,idx)=>{
+                      // 退いた選手(_subOuts)の行を先に生成
+                      const legacySubOut = p._subOut && !p._subOuts ? [p._subOut] : [];
+                      const subOuts = [...legacySubOut, ...(p._subOuts||[])];
+
+                      // ポジション推移を文字列に
+                      const posHistory = [...subOuts.map(s=>s.pos||"—"), p.pos||""].filter((_,i,a)=>i===0||a[i]!==a[i-1]);
+                      const posLabel = posHistory.length > 1 ? posHistory.join("→") : (p.pos||"");
+
+                      // 退いた選手の行
+                      const subRows = subOuts.map((so, si)=>{
+                        const soKey = (p.id||idx)+"_sub_"+si;
+                        return React.createElement('tr', {key:soKey,
+                          style:{background:"#0a1e0a",borderBottom:"none",opacity:0.85}}
+                          , React.createElement('td', {style:{...S.td,textAlign:"center",fontSize:10,color:"#475569",
+                            borderBottom:"none",paddingTop:4}}, idx+1)
+                          , React.createElement('td', {style:{...S.td,borderBottom:"none",paddingTop:4}}
+                            , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:3}}
+                              , React.createElement('span', {style:{fontSize:11,color:"#94a3b8",
+                                textDecoration:"line-through",maxWidth:66,overflow:"hidden",
+                                textOverflow:"ellipsis",whiteSpace:"nowrap"}}, so.name||"—")
+                              , React.createElement('span', {style:{fontSize:8,color:"#4ade80",
+                                background:"#0d2a1a",border:"1px solid #22c55e",borderRadius:3,
+                                padding:"0 3px",flexShrink:0,marginLeft:2}}, "退")
+                            )
+                          )
+                          , React.createElement('td', {style:{...S.td,textAlign:"center",fontSize:10,
+                            color:"#64748b",borderBottom:"none",paddingTop:4}}, so.pos||"")
+                          , React.createElement('td', {style:{...S.td,textAlign:"center",fontSize:10,
+                            color:"#64748b",borderBottom:"none",paddingTop:4}},
+                            React.createElement('span',{style:{color:"#4ade80"}},so.sb||0),
+                            "/",
+                            React.createElement('span',{style:{color:"#f87171"}},so.cs||0)
+                          )
+                          , React.createElement('td', {style:{...S.td,borderBottom:"none",paddingTop:4}})
+                          , gameInnings.map(inn=>{
+                              const list=toList(so.atBats,inn);
+                              const runs=eRuns(list);
+                              const last=list.length?norm(list[list.length-1]):null;
+                              const lc=last?(_optionalChain([rOf,'call',_=>_(last.code),'optionalAccess',_=>_.color])||"#aaa"):"#1e3a5f";
+                              return React.createElement('td', {key:inn,style:{...S.td,padding:2,borderBottom:"none"}}
+                                , list.length===0
+                                  ? React.createElement('span',{style:{color:"#334155",fontSize:9,display:"block",textAlign:"center"}},"—")
+                                  : React.createElement('span', {style:{
+                                      display:"block",textAlign:"center",fontSize:9,fontWeight:700,
+                                      color:lc,background:lc+"22",borderRadius:4,padding:"2px",
+                                      border:"1px solid "+lc,position:"relative"}},
+                                      list.map(e=>eShort(e)).join("/"),
+                                      runs>0&&React.createElement('span',{style:{position:"absolute",top:-5,right:-3,
+                                        background:"#dc2626",borderRadius:"50%",width:12,height:12,
+                                        fontSize:7,color:"#fff",display:"flex",alignItems:"center",
+                                        justifyContent:"center"}},runs)
+                                    )
+                              );
+                            })
+                        );
+                      });
+
+                      // 現在（or最後に入った）選手の行
+                      const currentRow = React.createElement('tr', { key: p.id,
+                        style: {background: subOuts.length>0
+                          ? (idx%2===0?"#0a1628":"#0d1f35")
+                          : (idx%2===0?"#0a1628":"#0d1f35"),
+                          borderTop: subOuts.length>0 ? "1px solid #22c55e33" : "none"},}
                         , React.createElement('td', { style: {...S.td,textAlign:"center",fontSize:11,
                           color:idx<DEFAULT_PLAYERS?"#7db8e8":"#64748b"},}, idx+1)
                         , React.createElement('td', { style: S.td,}
@@ -2884,11 +2947,18 @@ function App() {
                             , React.createElement('input', { value: p.name, onChange: e=>editPlayer(team,idx,"name",e.target.value),
                               style: {background:"transparent",border:"none",color:p.subbed?"#fbbf24":"#e2e8f0",
                                 fontSize:12,outline:"none",width:70},})
-                            , p.subbed&&React.createElement('span', { style: {fontSize:9,color:"#fbbf24",flexShrink:0},}, "代")
+                            , p.subbed&&React.createElement('span', { style: {fontSize:8,color:"#fbbf24",
+                                background:"#3a2000",border:"1px solid #f59e0b",borderRadius:3,
+                                padding:"0 3px",flexShrink:0}}, "代")
                           )
                         )
                         , React.createElement('td', { style: {...S.td,position:"relative"},}
-                          , React.createElement(PosSelector, { value: p.pos, onChange: v=>editPlayer(team,idx,"pos",v),})
+                          , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:1}}
+                            , React.createElement(PosSelector, { value: p.pos, onChange: v=>editPlayer(team,idx,"pos",v),})
+                            , posHistory.length>1&&React.createElement('div',{style:{fontSize:8,color:"#64748b",
+                                textAlign:"center",maxWidth:40,overflow:"hidden",textOverflow:"ellipsis",
+                                whiteSpace:"nowrap"}},posLabel)
+                          )
                         )
                         , React.createElement('td', { style: {...S.td,textAlign:"center",fontSize:11},}
                           , React.createElement('span', { style: {color:"#4ade80"},}, p.sb||0)
@@ -2899,7 +2969,6 @@ function App() {
                           , React.createElement('button', { onClick: ()=>setModal({team,pidx:idx,step:"sub"}),
                             style: {fontSize:9,padding:"2px 6px",borderRadius:5,cursor:"pointer",
                               background:"transparent",border:"1px solid #2a4a7a",color:"#64748b"},}, "交代"
-
                           )
                         )
                         , gameInnings.map(inn=>{
@@ -2932,8 +3001,10 @@ function App() {
                             )
                           );
                         })
-                      )
-                    ))
+                      );
+
+                      return [...subRows, currentRow];
+                    })
                   )
                 )
               )

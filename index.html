@@ -2331,7 +2331,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , [["score","📊 スコア"],["lineup","👕 打順"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
+        , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
             borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
@@ -3051,13 +3051,13 @@ function App() {
                 )
                 , React.createElement('div', {style:{display:"flex",gap:6}}
                   , React.createElement('button', {
-                      onClick:()=>{ applyTeamToLineup("away",myTeam); setTab("lineup"); },
+                      onClick:()=>{ setModal({step:"team_lineup",side:"away",preselect:myTeam}); setTab("lineup"); },
                       style:{...sBt("#f59e0b",true),fontSize:11,padding:"4px 12px"}
-                    }, "→ ビジターにセット")
+                    }, "👥 ビジターに選ぶ")
                   , React.createElement('button', {
-                      onClick:()=>{ applyTeamToLineup("home",myTeam); setTab("lineup"); },
+                      onClick:()=>{ setModal({step:"team_lineup",side:"home",preselect:myTeam}); setTab("lineup"); },
                       style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 12px"}
-                    }, "→ ホームにセット")
+                    }, "👥 ホームに選ぶ")
                 )
               )
             : React.createElement('div', {style:{color:"#475569",fontSize:13,textAlign:"center",padding:"20px 0"}}, "まだ自チームが登録されていません")
@@ -3099,13 +3099,13 @@ function App() {
                       )
                       , React.createElement('div', {style:{display:"flex",gap:6}}
                         , React.createElement('button', {
-                            onClick:()=>{ applyTeamToLineup("away",t); setTab("lineup"); },
+                            onClick:()=>{ setModal({step:"team_lineup",side:"away",preselect:t}); setTab("lineup"); },
                             style:{...sBt("#f59e0b",true),fontSize:10,padding:"3px 10px"}
-                          }, "→ ビジターにセット")
+                          }, "👥 ビジターに選ぶ")
                         , React.createElement('button', {
-                            onClick:()=>{ applyTeamToLineup("home",t); setTab("lineup"); },
+                            onClick:()=>{ setModal({step:"team_lineup",side:"home",preselect:t}); setTab("lineup"); },
                             style:{...sBt("#1d4ed8"),fontSize:10,padding:"3px 10px"}
-                          }, "→ ホームにセット")
+                          }, "👥 ホームに選ぶ")
                       )
                     ))
                 )
@@ -3205,6 +3205,7 @@ function App() {
           const sideLabel = side==="away" ? game.awayTeam : game.homeTeam;
           const sideColor = side==="away" ? "#fbbf24" : "#7dd3fc";
           const lineup = side==="away" ? game.awayLineup : game.homeLineup;
+          const preselect = modal.preselect || null;
           return (
             React.createElement(TeamLineupModal, {
               side: side,
@@ -3212,6 +3213,7 @@ function App() {
               sideColor: sideColor,
               teams: teams,
               currentLineup: lineup,
+              preselect: preselect,
               onApply: (t, assignments, slotCount)=>{
                 mutGame(g=>{
                   const lk=side+"Lineup";
@@ -4507,10 +4509,10 @@ function SpecialPlayModal({ teamLabel, bases, inning, onCommit, onCancel }) {
     )
   );
 }
-function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, onApply, onCancel }) {
-  // チームが1つの場合は自動選択
-  const [selTeam, setSelTeam] = useState(teams.length===1 ? teams[0] : null);
-  // 打順スロットへの割り当て {slotIdx: playerName}
+function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, preselect, onApply, onCancel }) {
+  // preselectがあればそのチームを初期選択、なければ1チームなら自動選択
+  const initTeam = preselect || (teams.length===1 ? teams[0] : null);
+  const [selTeam, setSelTeam] = useState(initTeam);
   const [assignments, setAssignments] = useState({});
   const [activeSlot, setActiveSlot] = useState(null);
   const [slotCount, setSlotCount] = useState(9);
@@ -4528,55 +4530,60 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, onA
     setActiveSlot(null);
   };
   const clearSlot = (i) => setAssignments(a=>{ const n={...a}; delete n[i]; return n; });
-  const addSlot    = () => setSlotCount(n=>Math.min(n+1,15));
-  const removeSlot = () => setSlotCount(n=>{ const next=Math.max(1,n-1); setAssignments(a=>{const na={...a};delete na[next];return na;}); return next; });
+  const addSlot = () => setSlotCount(n=>Math.min(n+1,15));
+  const removeSlot = () => setSlotCount(n=>{
+    const next=Math.max(1,n-1);
+    setAssignments(a=>{const na={...a};delete na[next];return na;});
+    return next;
+  });
   const assignedCount = Object.keys(assignments).length;
   const lineupSlots = Array.from({length:slotCount},(_,i)=>i);
 
   const handleApply = () => { if(!selTeam) return; onApply(selTeam, assignments, slotCount); };
 
-  // チームタブ選択部分
-  const TeamTabs = () => teams.length <= 1 ? null : (
-    React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}
-      , teams.map(t=>
-          React.createElement('button', {key:t.id,
-            onClick:()=>{ setSelTeam(t); setAssignments({}); setActiveSlot(null); },
-            style:{
-              padding:"7px 16px", borderRadius:8, cursor:"pointer", fontWeight:700, fontSize:13,
-              background: selTeam&&selTeam.id===t.id ? sideColor+"33" : "#0d1f35",
-              border: "2px solid "+(selTeam&&selTeam.id===t.id ? sideColor : "#1e3a5f"),
-              color: selTeam&&selTeam.id===t.id ? sideColor : "#94a3b8",
-            }}
-            , t.name
-            , React.createElement('span',{style:{fontSize:10,color:"#475569",marginLeft:4}},"("+(t.members||[]).length+"名)")
-          )
-        )
-    )
-  );
-
   return (
     React.createElement('div', {style:S.overlay, onClick:onCancel}
-      , React.createElement('div', {style:{...S.mBox,maxWidth:460,maxHeight:"92vh",overflowY:"auto",padding:16}, onClick:e=>e.stopPropagation()}
-        , React.createElement('div', {style:{...S.mt,marginBottom:10,borderLeft:"3px solid "+sideColor,paddingLeft:10}},
+      , React.createElement('div', {style:{...S.mBox,maxWidth:460,maxHeight:"92vh",overflowY:"auto",padding:16},
+          onClick:e=>e.stopPropagation()}
+
+        , React.createElement('div', {style:{...S.mt,marginBottom:10,
+            borderLeft:"3px solid "+sideColor,paddingLeft:10}},
             "👥 "+sideLabel+" のスタメン選択")
 
-        // チームタブ
-        , React.createElement(TeamTabs, null)
+        // チームタブ（複数チームある場合）
+        , teams.length > 1 && React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}
+            , teams.map(t=>
+                React.createElement('button', {key:t.id,
+                  onClick:()=>{ setSelTeam(t); setAssignments({}); setActiveSlot(null); },
+                  style:{
+                    padding:"7px 16px", borderRadius:8, cursor:"pointer", fontWeight:700, fontSize:13,
+                    background: selTeam&&selTeam.id===t.id ? sideColor+"33" : "#0d1f35",
+                    border: "2px solid "+(selTeam&&selTeam.id===t.id ? sideColor : "#1e3a5f"),
+                    color: selTeam&&selTeam.id===t.id ? sideColor : "#94a3b8",
+                  }}
+                  , t.name
+                  , React.createElement('span',{style:{fontSize:10,color:"#475569",marginLeft:4}},
+                      "("+(t.members||[]).length+"名)")
+                )
+              )
+          )
 
         , !selTeam
-          ? React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:24}},"チームを選択してください")
+          ? React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:24,fontSize:13}},
+              "上のタブでチームを選択してください")
           : React.createElement(React.Fragment, null
 
               // 打順数コントロール
               , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:10,marginBottom:12,
                   background:"#0a1628",borderRadius:8,padding:"8px 12px"}}
                 , React.createElement('span',{style:{fontSize:12,color:"#7db8e8",fontWeight:700}},"打順数")
-                , React.createElement('button',{onClick:removeSlot,disabled:slotCount<=1,
+                , React.createElement('button',{onClick:removeSlot, disabled:slotCount<=1,
                     style:{width:28,height:28,borderRadius:6,border:"1px solid #2a4a7a",
                       background:"#0d1f35",color:"#7db8e8",fontSize:16,cursor:"pointer",
                       opacity:slotCount<=1?0.3:1}},"－")
-                , React.createElement('span',{style:{fontSize:16,fontWeight:700,color:"#e2e8f0",minWidth:28,textAlign:"center"}},slotCount)
-                , React.createElement('button',{onClick:addSlot,disabled:slotCount>=15,
+                , React.createElement('span',{style:{fontSize:16,fontWeight:700,color:"#e2e8f0",
+                    minWidth:28,textAlign:"center"}},slotCount)
+                , React.createElement('button',{onClick:addSlot, disabled:slotCount>=15,
                     style:{width:28,height:28,borderRadius:6,border:"1px solid #2a4a7a",
                       background:"#0d1f35",color:"#7db8e8",fontSize:16,cursor:"pointer",
                       opacity:slotCount>=15?0.3:1}},"＋")
@@ -4584,71 +4591,73 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, onA
                     assignedCount+"/"+slotCount+" 人割り当て済み")
               )
 
-              // 2カラムレイアウト：打順スロット ＋ メンバー一覧
-              , React.createElement('div',{style:{display:"flex",gap:10,marginBottom:10}}
+              // 打順スロット ＋ メンバー一覧
+              , React.createElement('div',{style:{display:"flex",gap:10,marginBottom:8}}
 
                 // 左：打順スロット
                 , React.createElement('div',{style:{flex:1}}
                   , React.createElement('div',{style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}},"打順")
-                  , React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:4}}
-                    , lineupSlots.map(i=>{
-                        const assigned = assignments[i];
-                        const isActive = activeSlot===i;
-                        return (
-                          React.createElement('div',{key:i,
-                            onClick:()=>setActiveSlot(isActive?null:i),
-                            style:{display:"flex",alignItems:"center",gap:6,cursor:"pointer",
-                              background:isActive?"#1d3a6e":(assigned?"#0d2a1a":"#0d1f35"),
-                              border:"1.5px solid "+(isActive?"#3b82f6":assigned?"#22c55e":"#1e3a5f"),
-                              borderRadius:8,padding:"6px 10px",transition:"all 0.1s"}}
-                            , React.createElement('span',{style:{fontSize:11,color:"#475569",minWidth:18,textAlign:"center",fontWeight:700}},i+1)
-                            , assigned ? (
-                                React.createElement(React.Fragment,null
-                                  , React.createElement('span',{style:{flex:1,fontSize:13,fontWeight:700,color:"#4ade80"}},assigned)
-                                  , React.createElement('button',{onClick:e=>{e.stopPropagation();clearSlot(i);},
-                                      style:{background:"none",border:"none",color:"#475569",fontSize:13,cursor:"pointer",padding:"0 2px"}},"✕")
-                                )
-                              ) : (
-                                React.createElement('span',{style:{flex:1,fontSize:12,color:isActive?"#93c5fd":"#334155"}},
-                                  isActive?"← 右の名前をタップ":"タップして選択")
+                  , lineupSlots.map(i=>{
+                      const assigned = assignments[i];
+                      const isActive = activeSlot===i;
+                      return (
+                        React.createElement('div',{key:i,
+                          onClick:()=>setActiveSlot(isActive?null:i),
+                          style:{display:"flex",alignItems:"center",gap:6,cursor:"pointer",
+                            marginBottom:4,
+                            background:isActive?"#1d3a6e":(assigned?"#0d2a1a":"#0d1f35"),
+                            border:"1.5px solid "+(isActive?"#3b82f6":assigned?"#22c55e":"#1e3a5f"),
+                            borderRadius:8,padding:"6px 10px"}}
+                          , React.createElement('span',{style:{fontSize:11,color:"#475569",
+                              minWidth:18,textAlign:"center",fontWeight:700}},i+1)
+                          , assigned
+                            ? React.createElement(React.Fragment,null
+                                , React.createElement('span',{style:{flex:1,fontSize:13,
+                                    fontWeight:700,color:"#4ade80"}},assigned)
+                                , React.createElement('button',{
+                                    onClick:e=>{e.stopPropagation();clearSlot(i);},
+                                    style:{background:"none",border:"none",color:"#475569",
+                                      fontSize:13,cursor:"pointer",padding:"0 2px"}},"✕")
                               )
-                          )
-                        );
-                      })
-                  )
+                            : React.createElement('span',{style:{flex:1,fontSize:12,
+                                color:isActive?"#93c5fd":"#334155"}},
+                                isActive?"← 右の名前をタップ":"タップして選択")
+                        )
+                      );
+                    })
                 )
 
-                // 右：メンバー一覧（タブ切替）
+                // 右：メンバー一覧
                 , React.createElement('div',{style:{width:130}}
-                  , React.createElement('div',{style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}},selTeam.name)
-                  , React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:4}}
-                    , members.map((m,mi)=>{
-                        const name = typeof m==="string"?m:(m.name||"");
-                        if(!name) return null;
-                        const isUsed = usedNames.has(name);
-                        const isActive = activeSlot!==null;
-                        return (
-                          React.createElement('button',{key:mi,
-                            onClick:()=>{ if(activeSlot!==null && !isUsed) assign(activeSlot,name); },
-                            style:{
-                              padding:"7px 8px", borderRadius:7, fontSize:12, fontWeight:600, textAlign:"left",
-                              cursor: isActive&&!isUsed ? "pointer" : "default",
-                              background: isUsed?"#0d2a1a":"#0d1f35",
-                              border: "1.5px solid "+(isUsed?"#22c55e":"#1e3a5f"),
-                              color: isUsed?"#4ade80":"#e2e8f0",
-                              opacity: isActive ? (isUsed?0.5:1) : 0.7,
-                            }}
-                            , name
-                            , isUsed&&React.createElement('span',{style:{fontSize:9,color:"#22c55e",marginLeft:4}},"✓")
-                          )
-                        );
-                      })
-                  )
+                  , React.createElement('div',{style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}},
+                      selTeam.name)
+                  , members.map((m,mi)=>{
+                      const name = typeof m==="string"?m:(m.name||"");
+                      if(!name) return null;
+                      const isUsed = usedNames.has(name);
+                      const canSelect = activeSlot!==null && !isUsed;
+                      return (
+                        React.createElement('button',{key:mi,
+                          onClick:()=>{ if(canSelect) assign(activeSlot,name); },
+                          style:{
+                            display:"block", width:"100%", marginBottom:4,
+                            padding:"7px 8px", borderRadius:7, fontSize:12,
+                            fontWeight:600, textAlign:"left",
+                            cursor: canSelect ? "pointer" : "default",
+                            background: isUsed?"#0d2a1a":"#0d1f35",
+                            border: "1.5px solid "+(isUsed?"#22c55e":canSelect?"#3b82f6":"#1e3a5f"),
+                            color: isUsed?"#4ade80":canSelect?"#fff":"#e2e8f0",
+                            opacity: activeSlot===null ? 0.7 : isUsed ? 0.4 : 1,
+                          }}
+                          , name
+                          , isUsed && React.createElement('span',{style:{fontSize:9,color:"#22c55e",marginLeft:4}},"✓")
+                        )
+                      );
+                    })
                 )
               )
-
               , React.createElement('div',{style:{fontSize:11,color:"#64748b",marginBottom:10,textAlign:"center"}},
-                  "打順をタップ → 右の選手名をタップで割り当て")
+                  "① 打順番号をタップ　② 右の選手名をタップで割り当て")
           )
 
         , React.createElement('button',{onClick:handleApply,

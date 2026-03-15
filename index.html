@@ -992,7 +992,24 @@ function App() {
   const [pitchHistory, setPitchHistory] = useState([]); // 取り消し用履歴 ["b","s","f",...]
   const [toast,  setToast]  = useState("");
 
-  const game      = storage.currentGame;
+  const rawGame   = storage.currentGame;
+  // Firebaseから受信したデータはarrayがobjectに変換されるため正規化
+  const _toArr = (v, def) => Array.isArray(v) ? v : (v && typeof v==="object" ? Object.values(v) : def);
+  const _fixPlayer = (p) => p ? {...p, atBats: (p.atBats && typeof p.atBats==="object") ? p.atBats : {}} : p;
+  const game = rawGame ? {
+    ...rawGame,
+    bases:          _toArr(rawGame.bases, [null,null,null]),
+    awayLineup:     _toArr(rawGame.awayLineup, []).map(_fixPlayer),
+    homeLineup:     _toArr(rawGame.homeLineup, []).map(_fixPlayer),
+    awayPitchers:   _toArr(rawGame.awayPitchers, []),
+    homePitchers:   _toArr(rawGame.homePitchers, []),
+    awayPitcherLog: _toArr(rawGame.awayPitcherLog, []),
+    homePitcherLog: _toArr(rawGame.homePitcherLog, []),
+    log:            _toArr(rawGame.log, []),
+    defenseLog:     _toArr(rawGame.defenseLog, []),
+    awayScore:      (rawGame.awayScore && typeof rawGame.awayScore==="object") ? rawGame.awayScore : {},
+    homeScore:      (rawGame.homeScore && typeof rawGame.homeScore==="object") ? rawGame.homeScore : {},
+  } : rawGame;
   const history   = storage.history||[];
   const undoStack = storage.undoStack||[];
   const teams      = storage.teams||[];
@@ -2481,6 +2498,41 @@ function App() {
               const curBatter = curLineup[curBatterIdx];
               const isPitchMode = (game.pitchMode||"result")==="pitch";
               return (React.createElement(React.Fragment, null
+
+                , (()=>{ // 前打者の直近打席結果
+                  const prevIdx = curBatterIdx > 0 ? curBatterIdx - 1 : curLineup.length - 1;
+                  const prevPlayer = curLineup[prevIdx];
+                  if(!prevPlayer || prevIdx === curBatterIdx) return null;
+                  let lastEntry = null;
+                  for(let inn = game.inning; inn >= 1; inn--) {
+                    const ab = prevPlayer.atBats && prevPlayer.atBats[inn];
+                    const entries = ab ? (Array.isArray(ab)?ab:[ab]) : [];
+                    if(entries.length > 0) { lastEntry = entries[entries.length-1]; break; }
+                  }
+                  if(!lastEntry) return null;
+                  const ne = (typeof lastEntry==="object"&&lastEntry!==null)?lastEntry:{code:lastEntry};
+                  const rc2 = ne.code||"";
+                  const CJ = {"H1":"ヒット","H2":"二塁打","H3":"三塁打","HR":"本塁打",
+                    "BB":"四球","HBP":"死球","IBB":"故意四球","KW":"振り逃げ",
+                    "K":"三振","KL":"見逃し三振","GO":"ゴロ","FO":"フライ","LO":"ライナー",
+                    "FF":"邪飛","SAC":"犠打","SF":"犠飛","DP":"ゲッツー","E":"エラー","FC":"野選"};
+                  const isHit2  = ["H1","H2","H3","HR"].includes(rc2);
+                  const isWalk2 = ["BB","HBP","IBB","KW"].includes(rc2);
+                  const isOut2  = ["K","KL","GO","FO","LO","FF","SAC","SF","DP"].includes(rc2);
+                  const col = isHit2?"#4ade80":isWalk2?"#60a5fa":isOut2?"#f87171":rc2==="E"?"#fb923c":"#94a3b8";
+                  return React.createElement('div', {style:{
+                      background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
+                      borderRadius:8,padding:"6px 12px",marginBottom:10,
+                      display:"flex",alignItems:"center",gap:8,fontSize:12}}
+                    , React.createElement('span',{style:{color:"#64748b",fontSize:11,flexShrink:0}},"前打者")
+                    , React.createElement('span',{style:{color:"#cbd5e1",fontWeight:700}},prevPlayer.name)
+                    , React.createElement('span',{style:{color:col,fontWeight:900,fontSize:13,
+                        background:col+"22",padding:"2px 8px",borderRadius:6,
+                        border:"1px solid "+col+"44",flexShrink:0}},CJ[rc2]||rc2)
+                    , ne.dir?React.createElement('span',{style:{color:"#94a3b8",fontSize:11}},ne.dir):null
+                    , (ne.runs||0)>0?React.createElement('span',{style:{color:"#fbbf24",fontSize:11,fontWeight:700}},ne.runs+"点"):null
+                  );
+                })()
 
                 , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginBottom:10},}
                   , React.createElement('div', { style: {fontSize:11,color:"#64748b"},}, "現在の打者")

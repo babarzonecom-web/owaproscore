@@ -1378,7 +1378,7 @@ function App() {
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
         msg:`【${g[team+"Team"]}】${lineup[pidx].name} → ${_optionalChain([rOf, 'call', _7 => _7(code), 'optionalAccess', _8 => _8.label])||code}${zl?`(${zl.label})`:""}${(runs||0)>0?` [${runs}点]`:""}${runnerNote}（${inning}回）`
-      },...g.log.slice(0,99)];
+      },...(g.log||[]).slice(0,99)];
       return {...tmp,...scores,log,[batterKey]:nextPidx};
     });
     setSelDir(null);
@@ -1430,7 +1430,7 @@ function App() {
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
         msg:`【修正】${lineup[pidx].name} ${inning}回 → ${_optionalChain([rOf, 'call', _13 => _13(code), 'optionalAccess', _14 => _14.label])||code}${zl?`(${zl.label})`:""}${(runs||0)>0?` [${runs}点]`:""}`
-      },...g.log.slice(0,99)];
+      },...(g.log||[]).slice(0,99)];
       return {...tmp,...scores,log};
     });
     setModal(null); setSelDir(null);
@@ -1503,7 +1503,7 @@ function App() {
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
         msg:`【${g[team+"Team"]}】${_optionalChain([runner, 'optionalAccess', _15 => _15.name])||lineup[pidx].name} → ${type==="SB"?`盗塁成功(${baseLabel})`:type==="PO"?"牽制アウト":"盗塁刺"}${scoreAdd>0?" [1点]":""}`
-      },...g.log.slice(0,99)];
+      },...(g.log||[]).slice(0,99)];
 
       const outs = (type==="CS"||type==="PO") ? Math.min(g.outs+1,3) : g.outs;
       const changeOccurs = outs>=3;
@@ -1542,7 +1542,7 @@ function App() {
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
         msg:`【${g[team+"Team"]}】${_optionalChain([sp, 'optionalAccess', _16 => _16.label])||code}${runs>0?` [${runs}点]`:""}`
-      },...g.log.slice(0,99)];
+      },...(g.log||[]).slice(0,99)];
       return {...g,
         [team+"Lineup"]: updatedLineup,
         [scoreKey]:scores,
@@ -1769,7 +1769,7 @@ function App() {
         msg: isPosChange
           ? `【${g[team+"Team"]}】ポジション変更: ${outPlayer.name} ${outPlayer.pos||"-"}→${newPos} (${g.inning}回${g.half==="top"?"表":"裏"})`
           : `【${g[team+"Team"]}】交代: ${outPlayer.name}(${outPlayer.pos||"-"}) → ${newName}(${newPos||"-"})${reason?` [${reason}]`:""} (${g.inning}回${g.half==="top"?"表":"裏"})`
-      },...g.log.slice(0,99)];
+      },...(g.log||[]).slice(0,99)];
 
       const defEntry = {
         inning:g.inning, half:g.half, team,
@@ -1809,7 +1809,7 @@ function App() {
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
         msg:`【${g[defTeam+"Team"]}】投手交代: ${_optionalChain([g, 'access', _21 => _21[defTeam+"Pitchers"], 'access', _22 => _22[newPitcherIdx], 'optionalAccess', _23 => _23.name])||"新投手"} 登板（${g.inning}回${g.half==="top"?"表":"裏"}）`
-      },...g.log.slice(0,99)];
+      },...(g.log||[]).slice(0,99)];
       return {...g,[defTeam+"PitcherIdx"]:newPitcherIdx,[logKey]:newLog,log};
     });
   },[mutGame]);

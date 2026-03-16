@@ -1946,9 +1946,26 @@ function App() {
 
       // チームへの自動アップロード（lineup丸ごと保存）
       const g = finished;
-      const matchedTeam = (s.teams||[]).find(t=>t.name===g.awayTeam||t.name===g.homeTeam);
+      // teams / myTeam / opponents 全て検索
+      const allTeams = [
+        ...(s.teams||[]),
+        ...(s.myTeam ? [s.myTeam] : []),
+        ...(s.opponents||[]),
+      ];
+      const matchedTeam = allTeams.find(t=>t.name===g.awayTeam||t.name===g.homeTeam);
       if(matchedTeam){
         fbSaveTeamGame(matchedTeam.id, g);
+        console.log("[SAVE] team game saved to", matchedTeam.id, matchedTeam.name);
+      }
+      // チームコード管理者として接続中なら team_rooms にも保存
+      if(window.__teamShareRole==="admin" && window.__teamShareCode){
+        try {
+          fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/games/"+g.id+".json",{
+            method:"PUT", headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(Object.assign({},g,{_ts:Date.now()}))
+          });
+          console.log("[SAVE] game saved to team_rooms", window.__teamShareCode);
+        } catch(e2){ console.error("[SAVE] team_rooms error", e2); }
       }
 
       return {...s, history:[finished,...s.history.slice(0,19)]};
@@ -4531,11 +4548,23 @@ function HistoryTab({ history, onLoad, onDelete, onExcel, onImport }) {
     if(!id){ setFbMsg("チームIDを入力してください"); return; }
     if(!fbInit()){ setFbMsg("Firebaseに接続できません"); return; }
     setFbLoading(true); setFbMsg("読み込み中...");
-    fbDB.ref("shared_teams/"+id+"/games").once("value").then(snap=>{
+
+    // shared_teams/{id}/games と team_rooms/{id}/games の両方を確認
+    const p1 = fbDB.ref("shared_teams/"+id+"/games").once("value").catch(()=>null);
+    const p2 = fbDB.ref("team_rooms/"+id+"/games").once("value").catch(()=>null);
+
+    Promise.all([p1, p2]).then(([snap1, snap2])=>{
       setFbLoading(false);
-      if(!snap||!snap.val()){ setFbMsg("試合データが見つかりません"); return; }
-      const games = Object.values(snap.val()).filter(Boolean)
-        .sort((a,b)=>(b.savedAt||0)-(a.savedAt||0));
+      const v1 = (snap1&&snap1.val()) ? Object.values(snap1.val()) : [];
+      const v2 = (snap2&&snap2.val()) ? Object.values(snap2.val()) : [];
+      // 両方をマージ（idが重複しないように）
+      const seen = new Set();
+      const games = [...v1, ...v2].filter(g=>{
+        if(!g||!g.id||seen.has(g.id)) return false;
+        seen.add(g.id); return true;
+      }).sort((a,b)=>(b.savedAt||b._ts||0)-(a.savedAt||a._ts||0));
+
+      if(games.length===0){ setFbMsg("試合データが見つかりません。チームIDを確認してください。"); return; }
       setFbMsg(games.length+"試合を読み込みました ✅");
       games.forEach(g=>onImport(g));
     }).catch(e=>{ setFbLoading(false); setFbMsg("エラー: "+e.message); });

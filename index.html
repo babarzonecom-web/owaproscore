@@ -3158,7 +3158,22 @@ function App() {
         ))
 
         , tab==="history"&&(React.createElement(React.Fragment, null
-          , React.createElement(HistoryTab, {history:history, onLoad:loadGame, onDelete:delHistory, onExcel:exportExcel})
+          , React.createElement(HistoryTab, {
+              history:history,
+              onLoad:loadGame,
+              onDelete:delHistory,
+              onExcel:exportExcel,
+              onImport:(g)=>{
+                setStorage(s=>{
+                  // 同じIDの試合が既にあれば上書き、なければ先頭に追加
+                  const existing = (s.history||[]).findIndex(h=>h.id===g.id);
+                  const history = existing>=0
+                    ? s.history.map(h=>h.id===g.id?g:h)
+                    : [g,...(s.history||[]).slice(0,49)];
+                  return {...s, history};
+                });
+              }
+            })
         ))
 
         , tab==="teams"&&(React.createElement(React.Fragment, null
@@ -4506,47 +4521,93 @@ function FirebaseTeamLoader({ onLoaded }) {
 }
 
 // ===== 履歴タブ =====
-function HistoryTab({ history, onLoad, onDelete, onExcel }) {
-  if(!history||history.length===0) return (
-    React.createElement('div', {style:{...S.card,textAlign:"center",padding:40,color:"#475569"}}
-      , React.createElement('div', {style:{fontSize:32,marginBottom:12}}, "🗂")
-      , React.createElement('div', null, "保存済みの試合はありません")
-      , React.createElement('div', {style:{fontSize:12,marginTop:8}}, "「💾 保存」ボタンで試合を保存できます")
-    )
-  );
+function HistoryTab({ history, onLoad, onDelete, onExcel, onImport }) {
+  const [fbTeamId, setFbTeamId] = useState("");
+  const [fbLoading, setFbLoading] = useState(false);
+  const [fbMsg, setFbMsg] = useState("");
+
+  const loadFromFirebase = () => {
+    const id = fbTeamId.trim();
+    if(!id){ setFbMsg("チームIDを入力してください"); return; }
+    if(!fbInit()){ setFbMsg("Firebaseに接続できません"); return; }
+    setFbLoading(true); setFbMsg("読み込み中...");
+    fbDB.ref("shared_teams/"+id+"/games").once("value").then(snap=>{
+      setFbLoading(false);
+      if(!snap||!snap.val()){ setFbMsg("試合データが見つかりません"); return; }
+      const games = Object.values(snap.val()).filter(Boolean)
+        .sort((a,b)=>(b.savedAt||0)-(a.savedAt||0));
+      setFbMsg(games.length+"試合を読み込みました ✅");
+      games.forEach(g=>onImport(g));
+    }).catch(e=>{ setFbLoading(false); setFbMsg("エラー: "+e.message); });
+  };
+
   return (
     React.createElement('div', null
-      , history.map((g,i)=>{
-          const awayTotal = Object.values(g.awayScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
-          const homeTotal = Object.values(g.homeScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
-          const winner = awayTotal>homeTotal?g.awayTeam:homeTotal>awayTotal?g.homeTeam:"引き分け";
-          return React.createElement('div', {key:g.id||i, style:{...S.card,marginBottom:10}}
-            , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}
-              , React.createElement('div', {style:{flex:1,minWidth:0}}
-                , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:3}}, g.date||"—", g.venue?" @ "+g.venue:"")
-                , React.createElement('div', {style:{fontSize:14,fontWeight:700}}
-                  , React.createElement('span', {style:{color:"#fbbf24"}}, g.awayTeam)
-                  , React.createElement('span', {style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#fbbf24",margin:"0 6px"}}, awayTotal)
-                  , React.createElement('span', {style:{color:"#475569",fontSize:12}}, "—")
-                  , React.createElement('span', {style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#7dd3fc",margin:"0 6px"}}, homeTotal)
-                  , React.createElement('span', {style:{color:"#7dd3fc"}}, g.homeTeam)
+
+      // Firebase読み込みUI
+      , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #22c55e", marginBottom:14}}
+        , React.createElement('div', {style:{...S.ct, marginBottom:8}}, "☁️ 別端末の試合履歴を読み込む")
+        , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:10}},
+            "チームIDを入力すると、そのチームで記録した全試合をこの端末の履歴に追加します。")
+        , React.createElement('div', {style:{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}
+          , React.createElement('div', {style:{flex:1,minWidth:160}}
+            , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームID")
+            , React.createElement('input', {
+                value: fbTeamId,
+                onChange: e=>setFbTeamId(e.target.value),
+                onKeyDown: e=>{ if(e.key==="Enter") loadFromFirebase(); },
+                placeholder: "例: m5k2abc3",
+                style:{...S.si, width:"100%", padding:"8px 10px", fontSize:13}
+              })
+          )
+          , React.createElement('button', {
+              onClick: loadFromFirebase, disabled: fbLoading,
+              style:{...sBt("#22c55e"), padding:"9px 16px", fontSize:13, opacity:fbLoading?0.5:1}
+            }, fbLoading ? "読込中..." : "☁️ 読み込む")
+        )
+        , fbMsg && React.createElement('div', {style:{
+            fontSize:12, marginTop:8,
+            color: fbMsg.includes("エラー")||fbMsg.includes("見つかり") ? "#f87171" : "#4ade80"
+          }}, fbMsg)
+      )
+
+      // ローカル履歴一覧
+      , (!history||history.length===0)
+        ? React.createElement('div', {style:{...S.card,textAlign:"center",padding:30,color:"#475569"}}
+            , React.createElement('div', {style:{fontSize:28,marginBottom:8}}, "🗂")
+            , React.createElement('div', null, "保存済みの試合はありません")
+            , React.createElement('div', {style:{fontSize:12,marginTop:6}}, "試合終了または「💾 保存」で自動保存されます")
+          )
+        : history.map((g,i)=>{
+            const awayTotal = Object.values(g.awayScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
+            const homeTotal = Object.values(g.homeScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
+            return React.createElement('div', {key:g.id||i, style:{...S.card,marginBottom:10}}
+              , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}
+                , React.createElement('div', {style:{flex:1,minWidth:0}}
+                  , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:3}}, g.date||"—", g.venue?" @ "+g.venue:"")
+                  , React.createElement('div', {style:{fontSize:14,fontWeight:700}}
+                    , React.createElement('span', {style:{color:"#fbbf24"}}, g.awayTeam)
+                    , React.createElement('span', {style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#fbbf24",margin:"0 6px"}}, awayTotal)
+                    , React.createElement('span', {style:{color:"#475569",fontSize:12}}, "—")
+                    , React.createElement('span', {style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#7dd3fc",margin:"0 6px"}}, homeTotal)
+                    , React.createElement('span', {style:{color:"#7dd3fc"}}, g.homeTeam)
+                  )
+                  , React.createElement('div', {style:{fontSize:11,color:"#475569",marginTop:3}}
+                    , g.finished?"✅ 試合終了":"⏸ 未完了"
+                    , g.savedAt?" · "+g.savedAt:""
+                  )
                 )
-                , React.createElement('div', {style:{fontSize:11,color:"#475569",marginTop:3}}
-                  , g.finished?"✅ 試合終了":"⏸ 未完了"
-                  , g.savedAt?" · "+g.savedAt:""
+                , React.createElement('div', {style:{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}
+                  , React.createElement('button', {onClick:()=>onLoad(g),
+                      style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}}, "📂 読込")
+                  , React.createElement('button', {onClick:()=>onExcel(g),
+                      style:{...sBt("#16a34a"),fontSize:11,padding:"4px 10px"}}, "📊 Excel")
+                  , React.createElement('button', {onClick:()=>onDelete(g.id),
+                      style:{...sBt("#dc2626",true),fontSize:11,padding:"4px 10px"}}, "🗑")
                 )
               )
-              , React.createElement('div', {style:{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}
-                , React.createElement('button', {onClick:()=>onLoad(g),
-                    style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}}, "📂 読込")
-                , React.createElement('button', {onClick:()=>onExcel(g),
-                    style:{...sBt("#16a34a"),fontSize:11,padding:"4px 10px"}}, "📊 Excel")
-                , React.createElement('button', {onClick:()=>onDelete(g.id),
-                    style:{...sBt("#dc2626",true),fontSize:11,padding:"4px 10px"}}, "🗑")
-              )
-            )
-          );
-        })
+            );
+          })
     )
   );
 }

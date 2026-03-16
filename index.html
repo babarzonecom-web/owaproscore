@@ -876,6 +876,42 @@ const fbSaveTeamGame = (teamId, game) => {
   } catch(e){ console.error("[FB] team game save error:", e); }
 };
 
+// チームコードに試合を保存（team_rooms/{code}/games/{id}）
+const fbSaveGameToCode = (code, game) => {
+  if(!code || !game || !game.id) return;
+  try {
+    const url = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"
+      + code.toUpperCase() + "/games/" + game.id + ".json";
+    const payload = {
+      id: game.id,
+      date: game.date||"",
+      innings: game.innings||9,
+      awayTeam: game.awayTeam||"",
+      homeTeam: game.homeTeam||"",
+      awayScore: game.awayScore||{},
+      homeScore: game.homeScore||{},
+      awayLineup: game.awayLineup||[],
+      homeLineup: game.homeLineup||[],
+      awayPitchers: game.awayPitchers||[],
+      homePitchers: game.homePitchers||[],
+      awayPitcherLog: game.awayPitcherLog||[],
+      homePitcherLog: game.homePitcherLog||[],
+      defenseLog: game.defenseLog||[],
+      log: (game.log||[]).slice(0,50),
+      pitcherResults: game.pitcherResults||{},
+      finished: !!game.finished,
+      endReason: game.endReason||"",
+      endInning: game.endInning||null,
+      endNote: game.endNote||"",
+      savedAt: game.savedAt||new Date().toLocaleString("ja-JP"),
+      _ts: Date.now(),
+    };
+    fetch(url, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)})
+      .then(()=>console.log("[FB] game saved to team_rooms/"+code))
+      .catch(e=>console.error("[FB] save game error", e));
+  } catch(e) { console.error("[FB] fbSaveGameToCode error", e); }
+};
+
 const fbDeleteTeam = (id) => {
   if (!fbInit()) return;
   try {
@@ -1931,9 +1967,17 @@ function App() {
   const addPlayer   = (t)=>mutGame(g=>{const lk=t+"Lineup";const n=g[lk].length+1;return{...g,[lk]:[...g[lk],makePlayer(n)]};});
 
   
-  const saveGame=()=>{
-    setStorage(s=>({...s,history:[{...s.currentGame,savedAt:new Date().toLocaleString("ja-JP")},...s.history.slice(0,19)]}));
-    showToast("保存しました");
+  const saveGame=(silent)=>{
+    setStorage(s=>{
+      const saved = {...s.currentGame, savedAt:new Date().toLocaleString("ja-JP")};
+      // チームコード管理者なら必ずFirebaseにアップロード
+      if(window.__teamShareRole==="admin" && window.__teamShareCode){
+        fbSaveGameToCode(window.__teamShareCode, saved);
+      }
+      const hist = [saved, ...(s.history||[]).filter(h=>h.id!==saved.id).slice(0,49)];
+      return {...s, history:hist};
+    });
+    if(!silent) showToast("保存しました ✅");
   };
 
   const endGame = useCallback((reason, endInning, endNote, pitcherResults)=>{
@@ -1944,31 +1988,18 @@ function App() {
         pitcherResults: pitcherResults||{},
         savedAt:new Date().toLocaleString("ja-JP")};
 
-      // チームへの自動アップロード（lineup丸ごと保存）
+      // チームコード管理者なら team_rooms に保存（メインの共有ストレージ）
       const g = finished;
-      // teams / myTeam / opponents 全て検索
-      const allTeams = [
-        ...(s.teams||[]),
-        ...(s.myTeam ? [s.myTeam] : []),
-        ...(s.opponents||[]),
-      ];
-      const matchedTeam = allTeams.find(t=>t.name===g.awayTeam||t.name===g.homeTeam);
-      if(matchedTeam){
-        fbSaveTeamGame(matchedTeam.id, g);
-        console.log("[SAVE] team game saved to", matchedTeam.id, matchedTeam.name);
-      }
-      // チームコード管理者として接続中なら team_rooms にも保存
       if(window.__teamShareRole==="admin" && window.__teamShareCode){
-        try {
-          fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/games/"+g.id+".json",{
-            method:"PUT", headers:{"Content-Type":"application/json"},
-            body:JSON.stringify(Object.assign({},g,{_ts:Date.now()}))
-          });
-          console.log("[SAVE] game saved to team_rooms", window.__teamShareCode);
-        } catch(e2){ console.error("[SAVE] team_rooms error", e2); }
+        fbSaveGameToCode(window.__teamShareCode, g);
       }
+      // 旧来の shared_teams への保存も維持（後方互換）
+      const allTeams = [...(s.teams||[]), ...(s.myTeam?[s.myTeam]:[]), ...(s.opponents||[])];
+      const matchedTeam = allTeams.find(t=>t.name===g.awayTeam||t.name===g.homeTeam);
+      if(matchedTeam) fbSaveTeamGame(matchedTeam.id, g);
 
-      return {...s, history:[finished,...s.history.slice(0,19)]};
+      const hist = [finished, ...(s.history||[]).filter(h=>h.id!==finished.id).slice(0,49)];
+      return {...s, history:hist};
     });
     showToast(reason==="cold"?`コールドゲーム（${endInning}回）`:reason==="mercy"?"コールド成立":"⚾ 試合終了");
   },[mutGame]);
@@ -4499,11 +4530,11 @@ function FirebaseTeamLoader({ onLoaded }) {
     React.createElement('div', null
       , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}
         , React.createElement('div', {style:{flex:1,minWidth:120}}
-          , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームID")
+          , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード（例: TIGERS）")
           , React.createElement('input', {
               value: teamId,
               onChange: e=>setTeamId(e.target.value),
-              placeholder: "例: m5k2abc3",
+              placeholder: "例: TIGERS",
               style:{...S.si, width:"100%", padding:"7px 10px", fontSize:12}
             })
         )
@@ -4544,27 +4575,33 @@ function HistoryTab({ history, onLoad, onDelete, onExcel, onImport }) {
   const [fbMsg, setFbMsg] = useState("");
 
   const loadFromFirebase = () => {
-    const id = fbTeamId.trim();
-    if(!id){ setFbMsg("チームIDを入力してください"); return; }
+    const code = fbTeamId.trim().toUpperCase();
+    if(!code){ setFbMsg("チームコードを入力してください"); return; }
     if(!fbInit()){ setFbMsg("Firebaseに接続できません"); return; }
     setFbLoading(true); setFbMsg("読み込み中...");
 
-    // shared_teams/{id}/games と team_rooms/{id}/games の両方を確認
-    const p1 = fbDB.ref("shared_teams/"+id+"/games").once("value").catch(()=>null);
-    const p2 = fbDB.ref("team_rooms/"+id+"/games").once("value").catch(()=>null);
+    // team_rooms/{code}/games を読む（メイン）
+    // shared_teams/{code}/games も読む（後方互換）
+    const p1 = fbDB.ref("team_rooms/"+code+"/games").once("value").catch(()=>null);
+    const p2 = fbDB.ref("shared_teams/"+code+"/games").once("value").catch(()=>null);
 
     Promise.all([p1, p2]).then(([snap1, snap2])=>{
       setFbLoading(false);
-      const v1 = (snap1&&snap1.val()) ? Object.values(snap1.val()) : [];
-      const v2 = (snap2&&snap2.val()) ? Object.values(snap2.val()) : [];
-      // 両方をマージ（idが重複しないように）
+      const toArr = (snap) => {
+        if(!snap||!snap.val()) return [];
+        const val = snap.val();
+        return Array.isArray(val) ? val : Object.values(val);
+      };
       const seen = new Set();
-      const games = [...v1, ...v2].filter(g=>{
-        if(!g||!g.id||seen.has(g.id)) return false;
-        seen.add(g.id); return true;
-      }).sort((a,b)=>(b.savedAt||b._ts||0)-(a.savedAt||a._ts||0));
+      const games = [...toArr(snap1), ...toArr(snap2)].filter(g=>{
+        if(!g||!g.id||seen.has(String(g.id))) return false;
+        seen.add(String(g.id)); return true;
+      }).sort((a,b)=>(b._ts||0)-(a._ts||0));
 
-      if(games.length===0){ setFbMsg("試合データが見つかりません。チームIDを確認してください。"); return; }
+      if(games.length===0){
+        setFbMsg("試合データが見つかりません。チームコードを確認してください。");
+        return;
+      }
       setFbMsg(games.length+"試合を読み込みました ✅");
       games.forEach(g=>onImport(g));
     }).catch(e=>{ setFbLoading(false); setFbMsg("エラー: "+e.message); });
@@ -4577,15 +4614,15 @@ function HistoryTab({ history, onLoad, onDelete, onExcel, onImport }) {
       , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #22c55e", marginBottom:14}}
         , React.createElement('div', {style:{...S.ct, marginBottom:8}}, "☁️ 別端末の試合履歴を読み込む")
         , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:10}},
-            "チームIDを入力すると、そのチームで記録した全試合をこの端末の履歴に追加します。")
+            "チームコードを入力すると、そのコードで記録した全試合をこの端末の履歴に取り込めます。")
         , React.createElement('div', {style:{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}
           , React.createElement('div', {style:{flex:1,minWidth:160}}
-            , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームID")
+            , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード（例: TIGERS）")
             , React.createElement('input', {
                 value: fbTeamId,
                 onChange: e=>setFbTeamId(e.target.value),
                 onKeyDown: e=>{ if(e.key==="Enter") loadFromFirebase(); },
-                placeholder: "例: m5k2abc3",
+                placeholder: "例: TIGERS",
                 style:{...S.si, width:"100%", padding:"8px 10px", fontSize:13}
               })
           )

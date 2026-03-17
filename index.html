@@ -382,23 +382,22 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
       list.push({ name, from: i, to });
     });
 
-    // 打者の処理
-    if (initBatterScored) {
-      // HR: 打者得点
-      list.push({ name: batterName, from: "batter", to: "scored" });
-    } else if (batterOut) {
-      // アウトコード: 打者はデフォルトアウトだが変更可能（例: ゴロでランナーアウト→打者1塁のケース）
-      list.push({ name: batterName, from: "batter", to: "out" });
-    } else {
-      // 出塁: postBasesから打者の塁を探す
-      let found = false;
-      for (let j = 0; j < 3; j++) {
-        if (postBases[j] === batterName) {
-          list.push({ name: batterName, from: "batter", to: j });
-          found = true; break;
+    // 打者の処理（batterNameが空の場合はスキップ＝盗塁モードで使用）
+    if (batterName) {
+      if (initBatterScored) {
+        list.push({ name: batterName, from: "batter", to: "scored" });
+      } else if (batterOut) {
+        list.push({ name: batterName, from: "batter", to: "out" });
+      } else {
+        let found = false;
+        for (let j = 0; j < 3; j++) {
+          if (postBases[j] === batterName) {
+            list.push({ name: batterName, from: "batter", to: j });
+            found = true; break;
+          }
         }
+        if (!found) list.push({ name: batterName, from: "batter", to: 0 });
       }
-      if (!found) list.push({ name: batterName, from: "batter", to: 0 });
     }
 
     return list;
@@ -3773,77 +3772,37 @@ function App() {
         
         if(modal.step==="sb") {
           const runners = [0,1,2].map(bi=>({bi, name:game.bases[bi]})).filter(r=>r.name);
-          const runnerMoves = modal.runnerMoves || {};
           const sbType      = modal.sbType || null;
           const primaryBi   = modal.primaryBi ?? (runners.length===1 ? runners[0].bi : null);
 
-          const buildMoves = () => runners.map(r=>{
-            const mv = runnerMoves[r.bi];
-            if(!mv) return null;
-            return {runner:r, destBi:mv.destBi, isOut:mv.isOut||false};
-          }).filter(Boolean);
-
           return (
             React.createElement('div', {style:S.overlay, onClick:()=>setModal(null)}
-              , React.createElement('div', {style:{...S.mBox,maxWidth:440,maxHeight:"92vh",overflowY:"auto"},
-                  onClick:e=>e.stopPropagation()}
+              , React.createElement('div', {style:{...S.mBox,maxWidth:400},onClick:e=>e.stopPropagation()}
                 , React.createElement('div', {style:{...S.mt,marginBottom:4}}, "🏃 盗塁 / 進塁")
-                , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:10}},
-                  "ランナーごとに移動先を設定 → 種別を選んで確定")
+                , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:14}},
+                  "種別を選んで「次へ」→ 詳細を手動調整")
 
                 , runners.length===0
                   ? React.createElement('div',{style:{color:"#f87171",fontSize:13,textAlign:"center",padding:20}},
                       "塁上にランナーがいません")
                   : React.createElement(React.Fragment,null
 
-                    // ① ランナーの移動先設定
-                    , React.createElement('div',{style:{marginBottom:12}}
-                      , React.createElement('div',{style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}},
-                        "① ランナーの移動先を設定")
-                      , runners.map(r=>{
-                        const mv = runnerMoves[r.bi];
-                        const baseLabel = ["1塁","2塁","3塁"][r.bi];
-                        const destLabel = mv ? (mv.isOut?"アウト":mv.destBi>=3?"本塁":["1塁","2塁","3塁"][mv.destBi]) : "未設定";
-                        return React.createElement('div',{key:r.bi,style:{
-                          background:"#0a1628",border:"1.5px solid #1e3a5f",
-                          borderRadius:10,padding:"8px 10px",marginBottom:6}}
-                          , React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}}
-                            , React.createElement('span',{style:{fontSize:12,fontWeight:700,color:"#e2e8f0"}},
-                              baseLabel+" "+r.name)
-                            , React.createElement('span',{style:{fontSize:11,color:"#475569"}},"→")
-                            , React.createElement('span',{style:{fontSize:12,fontWeight:700,
-                                color:mv?(mv.isOut?"#f87171":"#4ade80"):"#334155"}}, destLabel)
-                            , mv&&React.createElement('button',{
-                                onClick:()=>{ const nm={...runnerMoves}; delete nm[r.bi]; setModal(m=>({...m,runnerMoves:nm})); },
-                                style:{marginLeft:"auto",background:"none",border:"none",color:"#475569",fontSize:12,cursor:"pointer"}
-                              },"✕")
+                    // ランナー確認
+                    , React.createElement('div',{style:{background:"#0a1628",borderRadius:10,
+                        border:"1px solid #1e3a5f",padding:"10px 12px",marginBottom:14}}
+                      , runners.map(r=>
+                          React.createElement('div',{key:r.bi,style:{display:"flex",alignItems:"center",
+                            gap:8,fontSize:12,color:"#e2e8f0",
+                            marginBottom:r.bi!==runners[runners.length-1].bi?6:0}}
+                            , React.createElement('span',{style:{color:"#64748b",minWidth:28}},["1塁","2塁","3塁"][r.bi])
+                            , React.createElement('span',{style:{fontWeight:700}},r.name)
                           )
-                          , React.createElement('div',{style:{display:"flex",gap:4,flexWrap:"wrap"}}
-                            , Array.from({length:3-r.bi},(_,i)=>r.bi+1+i).concat([3]).map(di=>{
-                                const label = di>=3?"本塁":["1塁","2塁","3塁"][di];
-                                const isSel = mv&&!mv.isOut&&mv.destBi===di;
-                                return React.createElement('button',{key:di,
-                                  onClick:()=>setModal(m=>({...m,runnerMoves:{...m.runnerMoves||{},[r.bi]:{destBi:di,isOut:false}},primaryBi:m.primaryBi??r.bi})),
-                                  style:{padding:"5px 10px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
-                                    background:isSel?"#22c55e33":"#0d1f35",
-                                    border:"1px solid "+(isSel?"#22c55e":"#2a4a7a"),
-                                    color:isSel?"#4ade80":"#94a3b8"}},label);
-                              })
-                            , React.createElement('button',{
-                                onClick:()=>setModal(m=>({...m,runnerMoves:{...m.runnerMoves||{},[r.bi]:{destBi:r.bi,isOut:true}},primaryBi:m.primaryBi??r.bi})),
-                                style:{padding:"5px 10px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
-                                  background:mv&&mv.isOut?"#f8717133":"#0d1f35",
-                                  border:"1px solid "+(mv&&mv.isOut?"#f87171":"#2a4a7a"),
-                                  color:mv&&mv.isOut?"#f87171":"#94a3b8"}
-                              },"アウト")
-                          )
-                        );
-                      })
+                        )
                     )
 
-                    // ② 種別
-                    , buildMoves().length>0&&React.createElement('div',{style:{marginBottom:12}}
-                      , React.createElement('div',{style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}},"② 種別")
+                    // 種別
+                    , React.createElement('div',{style:{marginBottom:14}}
+                      , React.createElement('div',{style:{fontSize:11,color:"#7db8e8",marginBottom:8,fontWeight:700}},"種別を選択")
                       , React.createElement('div',{style:{display:"flex",gap:6,flexWrap:"wrap"}}
                         , [
                             {t:"SB",  l:"✅ 盗塁成功",  c:"#4ade80"},
@@ -3857,7 +3816,7 @@ function App() {
                           ].map(({t,l,c})=>
                             React.createElement('button',{key:t,
                               onClick:()=>setModal(m=>({...m,sbType:t})),
-                              style:{padding:"7px 10px",borderRadius:7,cursor:"pointer",fontSize:11,fontWeight:700,
+                              style:{padding:"8px 10px",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,
                                 background:sbType===t?c+"33":"#0d1f35",
                                 border:"1.5px solid "+(sbType===t?c:"#2a4a7a"),
                                 color:sbType===t?c:"#94a3b8"}},l)
@@ -3865,23 +3824,27 @@ function App() {
                       )
                     )
 
-                    // 確定ボタン
+                    // 次へ
                     , React.createElement('button',{
-                        disabled:buildMoves().length===0||!sbType,
+                        disabled:!sbType,
                         onClick:()=>{
-                          // 進塁調整モーダルへ遷移
-                          setModal(m=>({...m, step:"sb_adjust",
-                            sbMoves: buildMoves(),
-                            sbBuiltType: sbType,
-                            sbPrimaryPidx: primaryBi!=null
-                              ? curLineup.findIndex(p=>p.name===game.bases[primaryBi])
-                              : -1
+                          // デフォルト: 全ランナー1つ進塁
+                          const moves = runners.map(r=>({
+                            runner: r,
+                            destBi: Math.min(r.bi+1, 3),
+                            isOut: false,
                           }));
+                          const pidx = primaryBi!=null
+                            ? curLineup.findIndex(p=>p.name===game.bases[primaryBi])
+                            : runners.length===1
+                              ? curLineup.findIndex(p=>p.name===runners[0].name)
+                              : -1;
+                          setModal(m=>({...m, step:"sb_adjust",
+                            sbMoves: moves, sbBuiltType: sbType, sbPrimaryPidx: pidx}));
                         },
                         style:{...sBt("#22c55e"),width:"100%",padding:"12px",fontSize:14,
-                          fontWeight:700,marginBottom:6,
-                          opacity:(buildMoves().length>0&&sbType)?1:0.35}},
-                      "次へ → 進塁を確認"+(buildMoves().length>0?" ("+buildMoves().length+"名)":""))
+                          fontWeight:700,marginBottom:6,opacity:sbType?1:0.35}},
+                      "次へ → 進塁を調整")
                   )
                 , React.createElement('button',{onClick:()=>setModal(null),style:S.cBtn},"閉じる")
               )
@@ -3889,7 +3852,7 @@ function App() {
           );
         }
 
-                if(modal.step==="sb_adjust") {
+        if(modal.step==="sb_adjust") {
           // recordSBで実際に動かした後の状態をシミュレートしてRunnerAdjustModalに渡す
           const moves   = modal.sbMoves || [];
           const sbType2 = modal.sbBuiltType;

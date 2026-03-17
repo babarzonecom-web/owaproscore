@@ -2868,12 +2868,11 @@ function App() {
             })()
             , React.createElement('div', { style: {borderTop:"1px solid #1e3a5f",paddingTop:10},}
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginBottom:6,flexWrap:"wrap"},}
-                , React.createElement('div', { style: {fontSize:12,color:"#7db8e8"},}, "🏃 盗塁 / 特殊プレー"   )
-                , React.createElement('button', { onClick: ()=>openSpecial(curTeam),
-                  style: {background:"#1a1a3a",border:"1px solid #4a3a7a",borderRadius:7,
-                    color:"#a78bfa",padding:"3px 12px",cursor:"pointer",fontSize:11,fontWeight:700},}, "⚡ WP / PB / BK を記録"
-
-                )
+                , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",fontWeight:700}}, "🏃 盗塁 / 進塁")
+                , React.createElement('button', {
+                    onClick:()=>setModal({team:curTeam, step:"sb", runnerMoves:{}, primaryBi:null}),
+                    style:{...sBt("#22c55e"),fontSize:11,padding:"4px 14px",marginLeft:"auto"}
+                  }, "＋ 進塁を記録")
               )
               
               , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:6},}

@@ -3869,16 +3869,19 @@ function App() {
                     , React.createElement('button',{
                         disabled:buildMoves().length===0||!sbType,
                         onClick:()=>{
-                          const moves = buildMoves();
-                          const pidx = primaryBi!=null
-                            ? curLineup.findIndex(p=>p.name===game.bases[primaryBi])
-                            : -1;
-                          recordSB(modal.team, moves, sbType, pidx>=0?pidx:null);
+                          // 進塁調整モーダルへ遷移
+                          setModal(m=>({...m, step:"sb_adjust",
+                            sbMoves: buildMoves(),
+                            sbBuiltType: sbType,
+                            sbPrimaryPidx: primaryBi!=null
+                              ? curLineup.findIndex(p=>p.name===game.bases[primaryBi])
+                              : -1
+                          }));
                         },
                         style:{...sBt("#22c55e"),width:"100%",padding:"12px",fontSize:14,
                           fontWeight:700,marginBottom:6,
                           opacity:(buildMoves().length>0&&sbType)?1:0.35}},
-                      "✅ 確定"+(buildMoves().length>0?" ("+buildMoves().length+"名移動)":""))
+                      "次へ → 進塁を確認"+(buildMoves().length>0?" ("+buildMoves().length+"名)":""))
                   )
                 , React.createElement('button',{onClick:()=>setModal(null),style:S.cBtn},"閉じる")
               )
@@ -3886,7 +3889,73 @@ function App() {
           );
         }
 
-                if(modal.step==="edit_list") {
+                if(modal.step==="sb_adjust") {
+          // recordSBで実際に動かした後の状態をシミュレートしてRunnerAdjustModalに渡す
+          const moves   = modal.sbMoves || [];
+          const sbType2 = modal.sbBuiltType;
+          const primaryPidx = modal.sbPrimaryPidx ?? -1;
+
+          // 移動後の塁の状態を計算
+          let simBases = [...game.bases];
+          let simScore = 0;
+          const simScored = [];
+          const sortedMoves = [...moves].sort((a,b)=>b.runner.bi - a.runner.bi);
+          sortedMoves.forEach(({runner, destBi, isOut})=>{
+            simBases[runner.bi] = null;
+            if(isOut){ /* アウト */ }
+            else if(destBi>=3){ simScore++; simScored.push(runner.name); }
+            else { simBases[destBi] = runner.name; }
+          });
+          const outsAdded = moves.filter(m=>m.isOut).length;
+          const simOuts = Math.min(game.outs + outsAdded, 3);
+
+          // 守備側のlineup（エラー記録用）
+          const defSide = modal.team==="away" ? "home" : "away";
+          const defLineup = game[defSide+"Lineup"]||[];
+
+          return (
+            React.createElement(RunnerAdjustModal, {
+              preBases: game.bases,
+              postBases: simBases,
+              preScoredNames: simScored,
+              batterName: "",
+              batterScored: false,
+              batterOut: false,
+              outs: simOuts,
+              defTeamLineup: defLineup,
+              pendingCode: "",
+              preErrorPos: null,
+              onConfirm: (adjBases, scoredNames, adjOuts, errorPos) => {
+                // 調整結果でrecordSBを呼び出す
+                // adjBasesとscoredNamesを使って最終的なmovesを再構築
+                const finalMoves = moves.map(mv=>{
+                  const name = mv.runner.name;
+                  // scoredNamesに入っていれば本塁
+                  if(scoredNames.includes(name)) return {...mv, destBi:3, isOut:false};
+                  // adjBasesで見つかれば対応する塁
+                  for(let i=0;i<3;i++){
+                    if(adjBases[i]===name) return {...mv, destBi:i, isOut:false};
+                  }
+                  // 見つからなければアウト
+                  return {...mv, isOut:true, destBi:mv.runner.bi};
+                });
+                // errorPosがあれば守備側選手のエラーを記録
+                if(errorPos){
+                  const defTeam = modal.team==="away"?"home":"away";
+                  mutGame(g=>{
+                    const dlk = defTeam+"Lineup";
+                    const dl = (g[dlk]||[]).map(p=>p.pos===errorPos?{...p,e:(p.e||0)+1}:p);
+                    return {...g,[dlk]:dl};
+                  });
+                }
+                recordSB(modal.team, finalMoves, sbType2, primaryPidx>=0?primaryPidx:null);
+              },
+              onCancel: ()=>setModal(m=>({...m, step:"sb"}))
+            })
+          );
+        }
+
+        if(modal.step==="edit_list") {
           const list=toList(_optionalChain([mPlayer, 'optionalAccess', _41 => _41.atBats])||{}, modal.inning);
           return (
             React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}

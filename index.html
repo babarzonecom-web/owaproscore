@@ -104,15 +104,19 @@ const RESULTS = [
   { code:"SAC", label:"犠打",    color:"#c084fc", short:"SAC" },
   { code:"SF",  label:"犠飛",    color:"#f472b6", short:"SF"  },
   { code:"IBB", label:"申告敬遠",  color:"#818cf8", short:"IBB" },
+  { code:"CI",  label:"打撃妨害",  color:"#06b6d4", short:"CI"  },
+  { code:"OI",  label:"守備妨害アウト", color:"#dc2626", short:"OI" },
 ];
 const DIR_CODES  = new Set(["H1","H2","H3","HR","GO","FO","LO","FF","DP","E","FC","SAC","SF"]);
 const HIT_CODES  = new Set(["H1","H2","H3","HR"]);
-const NOAB_CODES = new Set(["BB","HBP","SAC","SF"]);
+const NOAB_CODES = new Set(["BB","HBP","SAC","SF","IBB","CI"]);
 const rOf = (code) => RESULTS.find(r => r.code === code);
 const SPECIAL_PLAYS = [
-  { code:"WP", label:"ワイルドピッチ", short:"WP", color:"#f97316", desc:"暴投 / 投手の責任" },
-  { code:"PB", label:"パスボール",     short:"PB", color:"#38bdf8", desc:"捕逸 / 捕手の責任" },
-  { code:"BK", label:"ボーク",         short:"BK", color:"#a78bfa", desc:"投手の反則投球"   },
+  { code:"WP",  label:"ワイルドピッチ", short:"WP",  color:"#f97316", desc:"暴投 / 投手の責任" },
+  { code:"PB",  label:"パスボール",     short:"PB",  color:"#38bdf8", desc:"捕逸 / 捕手の責任" },
+  { code:"BK",  label:"ボーク",         short:"BK",  color:"#a78bfa", desc:"投手の反則投球"   },
+  { code:"OBI", label:"走塁妨害",       short:"OBI", color:"#4ade80", desc:"守備側の走塁妨害 / ランナー進塁" },
+  { code:"DI",  label:"守備妨害（走者）",short:"DI",  color:"#f87171", desc:"攻撃側の守備妨害 / 走者アウト" },
 ];
 
 const ZONES = [
@@ -219,6 +223,18 @@ function applyResult(code, bases, outs, batterName) {
       newOuts=outs+1;
       if(n3){ scoredNames=[n3]; runs=1; }
       b=[n1,n2,null]; batterOn=-1; break;
+    }
+    case "CI": {
+      // 打撃妨害: 打者出塁（四球と同じ押し出しルール）、打数なし
+      if(!n1){        b=[BN,n2,n3]; }
+      else if(!n2){   b=[BN,n1,n3]; }
+      else if(!n3){   b=[BN,n1,n2]; }
+      else { scoredNames=[n3]; runs=1; b=[BN,n1,n2]; }
+      batterOn=0; break;
+    }
+    case "OI": {
+      // 守備妨害（打者走者アウト）: アウトカウント+1、ランナーはそのまま
+      newOuts=outs+1; b=[n1,n2,n3]; batterOn=-1; break;
     }
     default: b=[n1,n2,n3]; break;
   }
@@ -602,7 +618,7 @@ const computeOneStats = (p) => {
     if(!NOAB_CODES.has(code)) ab++;
     if(HIT_CODES.has(code)){h++;tb+=code==="H1"?1:code==="H2"?2:code==="H3"?3:4;}
     if(code==="HR") hr++;
-    if(code==="BB") bb++;
+    if(code==="BB"||code==="CI") bb++;  // 打撃妨害も四球扱いで出塁率に加算
     if(code==="HBP") hbp++;
     if(code==="K"||code==="KL"||code==="KW") k++;
     if(code==="SAC") sac++;
@@ -666,7 +682,7 @@ const computePitcherStats = (g) => {
     const currentPIdx = g[defTeam+"PitcherIdx"]||0;
 
     
-    const OUT_CODES_FOR_IP = new Set(["K","KL","GO","FO","LO","FF","SAC","SF"]);
+    const OUT_CODES_FOR_IP = new Set(["K","KL","GO","FO","LO","FF","SAC","SF","DP","OI"]);
     const OUT_CODES = OUT_CODES_FOR_IP;
     const allAtBats = []; 
     const _pitInns = Array.from({length:g.innings||9},(_,i)=>i+1);
@@ -682,10 +698,11 @@ const computePitcherStats = (g) => {
           toList(p.atBats,inn).forEach((e,ei)=>{
             const ne = norm(e);
             const outsAtAb = outsInHalf;
-            allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb});
-            // この打席でアウトが増えた数を加算
-            if(OUT_CODES_FOR_IP.has(ne.code)) outsInHalf++;
-            if(ne.code==="DP") outsInHalf++;
+            const hasError = !!(ne.errorPos); // エラーがあればアウトにならない
+            allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb, hasError});
+            // この打席でアウトが増えた数を加算（エラーがある場合はアウトにならない）
+            if(OUT_CODES_FOR_IP.has(ne.code) && !hasError) outsInHalf++;
+            if(ne.code==="DP" && !hasError) outsInHalf++;
           });
         });
       });
@@ -730,8 +747,55 @@ const computePitcherStats = (g) => {
       if(code==="HBP") ps.autoHbp = (ps.autoHbp||0)+1;
       if(code==="HR") ps.autoHr = (ps.autoHr||0)+1;
       const runsScored = ab.entry.runs||0;
-      ps.autoEr += runsScored;
-      ps.autoRuns = (ps.autoRuns||0) + runsScored;
+      if(runsScored > 0) {
+        // 得点の帰責: 打者自身の得点は現在の投手に、
+        // 前のランナーの得点はそのランナーが出塁した時の投手に帰責
+        const scoredNames = ab.entry.scoredNames || [];
+        const batterName  = lineup[ab.playerIdx]?.name || "";
+        // 打者自身の得点（HR等）
+        const batterScored = scoredNames.includes(batterName) || ab.entry.scored;
+        if(batterScored) {
+          ps.autoEr++;
+          ps.autoRuns = (ps.autoRuns||0) + 1;
+        }
+        // ランナーの得点: 出塁時の投手を遡って特定
+        scoredNames.filter(n=>n && n!==batterName).forEach(runnerName=>{
+          // allAtBatsを遡って、このランナーが最後に出塁した打席を探す
+          let runnerPitcherIdx = activePIdx; // デフォルト: 現在の投手
+          for(let k=0; k<allAtBats.length; k++){
+            const prev = allAtBats[k];
+            if(prev === ab) break; // 現在の打席より前だけ対象
+            const pName = lineup[prev.playerIdx]?.name;
+            if(pName === runnerName && prev.entry.code) {
+              // この選手が出塁した打席かチェック
+              const pc = prev.entry.code;
+              const isReach = ["H1","H2","H3","HR","BB","HBP","IBB","CI","KW","E","FC"].includes(pc);
+              if(isReach) {
+                // この時点の投手を特定
+                let pIdx = log[0].pitcherIdx;
+                for(let li=0;li<log.length;li++){
+                  const l=log[li];
+                  const lt=l.fromInning*2+(l.fromHalf==="top"?0:1);
+                  const at=prev.inning*2+(prev.half==="top"?0:1);
+                  if(lt < at) pIdx=l.pitcherIdx;
+                  else if(lt===at && (l.outsAtStart||0)<=(prev.outsAtAb||0)) pIdx=l.pitcherIdx;
+                }
+                runnerPitcherIdx = pIdx;
+              }
+            }
+          }
+          const rps = stats[runnerPitcherIdx];
+          if(rps) {
+            rps.autoEr++;
+            rps.autoRuns = (rps.autoRuns||0) + 1;
+          }
+        });
+        // scoredNamesがない場合は従来通り現在の投手に帰責
+        if(scoredNames.length === 0) {
+          ps.autoEr += runsScored;
+          ps.autoRuns = (ps.autoRuns||0) + runsScored;
+        }
+      }
     });
 
     
@@ -751,8 +815,8 @@ const computePitcherStats = (g) => {
       const ps = stats[activePIdx];
       if(!ps) return;
       const code = ab.entry.code;
-      if(OUT_CODES.has(code)) ps._outsGot += 1;
-      if(code==="DP") ps._outsGot += 1; 
+      if(OUT_CODES.has(code) && !ab.hasError) ps._outsGot += 1;
+      if(code==="DP" && !ab.hasError) ps._outsGot += 1; 
     });
 
     stats.forEach(ps=>{
@@ -1301,6 +1365,16 @@ function App() {
           }
         } catch(e) { console.error("[TEAM] push error", e); window.__teamAdminPushing = false; }
       }
+      // オートセーブ：currentGameをhistoryに反映（同一IDで上書き）
+      if(newGame && newGame.id){
+        const savedGame = {...newGame, savedAt:new Date().toLocaleString("ja-JP")};
+        const hist = (s.history||[]);
+        const exists = hist.some(h=>h.id===newGame.id);
+        const newHist = exists
+          ? hist.map(h=>h.id===newGame.id ? savedGame : h)
+          : hist; // 新規はendGame/saveGameのタイミングで追加
+        return {...s, currentGame:newGame, undoStack:newUndoStack, history:newHist};
+      }
       return {...s, currentGame:newGame, undoStack:newUndoStack};
     });
   },[]);
@@ -1488,65 +1562,83 @@ function App() {
   },[mutGame]);
 
   
-  const recordSB = useCallback((team,pidx,type,runner,destBi)=>{
-    // destBi: 進塁先の塁インデックス (0=1塁,1=2塁,2=3塁,3=ホーム)
-    mutGame(g=>{
-      const lk=team+"Lineup";
-      const lineup=g[lk].map((p,i)=>{
-        if(i!==pidx) return p;
-        if(type==="SB") return {...p, sb:(p.sb||0)+1};
-        return {...p, cs:(p.cs||0)+1};
-      });
+  // 複数ランナー対応の進塁記録
+  // moves: [{runner:{bi,name}, destBi, isOut}]
+  // type: 進塁の種別（SB/WP/PB/BK/OBI/ADV/CS/PO）
+  // primaryPidx: 主体となる選手のlineupインデックス（盗塁成功/刺のカウント用）
+  const recordSB = useCallback((team, moves, type, primaryPidx)=>{
+    const isOutType = type==="CS" || type==="PO";
+    const isSB      = type==="SB";
 
+    mutGame(g=>{
+      const lk = team+"Lineup";
+      let lineup = [...g[lk]];
       let newBases = [...g.bases];
       let scoreAdd = 0;
-      let scoredRunner = null;
+      const scoredRunners = [];
 
-      if(runner){
-        if(type==="SB"){
-          newBases[runner.bi] = null;
-          if(destBi >= 3){
-            // ホームイン
-            scoreAdd = 1;
-            scoredRunner = runner.name;
-          } else {
-            newBases[destBi] = runner.name;
-          }
-        } else {
-          // CS / PO: アウトになったランナーを除去
-          newBases[runner.bi] = null;
-        }
+      // primaryPidxの選手に盗塁/刺カウント
+      if(primaryPidx != null && primaryPidx >= 0){
+        lineup = lineup.map((p,i)=>{
+          if(i!==primaryPidx) return p;
+          if(isSB)      return {...p, sb:(p.sb||0)+1};
+          if(isOutType) return {...p, cs:(p.cs||0)+1};
+          return p;
+        });
       }
 
-      // チームスコアに直接加算（recomputeScoresは使わない）
-      const inning = g.inning;
+      // 全ランナーの移動を処理（3塁→2塁→1塁の順で処理して衝突防止）
+      const sortedMoves = [...moves].sort((a,b)=>b.runner.bi - a.runner.bi);
+      sortedMoves.forEach(({runner, destBi, isOut})=>{
+        newBases[runner.bi] = null; // 元の塁を空に
+        if(isOut){
+          // アウト: 何もしない（塁をnullにするだけ）
+        } else if(destBi >= 3){
+          // 本塁到達
+          scoreAdd++;
+          scoredRunners.push(runner.name);
+        } else {
+          newBases[destBi] = runner.name;
+        }
+      });
+
+      // スコア加算
+      const inning   = g.inning;
       const scoreKey = team+"Score";
       const newScore = scoreAdd>0
         ? {...g[scoreKey], [inning]: (parseInt(g[scoreKey][inning])||0) + scoreAdd}
         : g[scoreKey];
 
-      // ホームインした選手の個人得点加算
-      let updatedLineup = lineup;
-      if(scoredRunner){
-        updatedLineup = lineup.map(p=>
-          p.name===scoredRunner ? {...p, run:(p.run||0)+1} : p
-        );
-      }
+      // 得点者の個人得点加算
+      lineup = lineup.map(p=>
+        scoredRunners.includes(p.name) ? {...p, run:(p.run||0)+1} : p
+      );
 
-      const destLabel = destBi>=3 ? "ホーム" : ["1塁","2塁","3塁"][destBi??0];
-      const fromLabel = ["1塁","2塁","3塁"][runner?.bi??0];
-      const baseLabel = runner ? `${fromLabel}→${destLabel}` : "";
+      // アウトカウント（isOutのmoveの数だけ増やす）
+      const outsAdded = moves.filter(m=>m.isOut).length;
+
+      // ログメッセージ
+      const typeLabel = {
+        SB:"盗塁成功", CS:"盗塁刺", PO:"牽制アウト",
+        WP:"暴投(WP)進塁", PB:"捕逸(PB)進塁", BK:"ボーク(BK)進塁",
+        OBI:"走塁妨害で進塁", ADV:"進塁",
+      }[type]||type;
+      const moveDesc = moves.map(m=>{
+        const from = ["1塁","2塁","3塁"][m.runner.bi]||"";
+        const to   = m.isOut?"アウト":m.destBi>=3?"本塁":["1塁","2塁","3塁"][m.destBi]||"";
+        return m.runner.name+"("+from+"→"+to+")";
+      }).join(" / ");
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-        msg:`【${g[team+"Team"]}】${_optionalChain([runner, 'optionalAccess', _15 => _15.name])||lineup[pidx].name} → ${type==="SB"?`盗塁成功(${baseLabel})`:type==="PO"?"牽制アウト":"盗塁刺"}${scoreAdd>0?" [1点]":""}`
+        msg:"【"+g[team+"Team"]+"】"+typeLabel+": "+moveDesc+(scoreAdd>0?" ["+scoreAdd+"点]":"")
       },...(g.log||[]).slice(0,99)];
 
-      const outs = (type==="CS"||type==="PO") ? Math.min(g.outs+1,3) : g.outs;
+      const outs = Math.min(g.outs + outsAdded, 3);
       const changeOccurs = outs>=3;
-      // 3アウトでイニングチェンジ → ランナーをリセット
-      const finalBases = changeOccurs ? [null,null,null] : newBases;
+      const finalBases   = changeOccurs ? [null,null,null] : newBases;
+
       return {...g,
-        [lk]:updatedLineup,
+        [lk]:lineup,
         [scoreKey]:newScore,
         bases:finalBases,
         outs:changeOccurs?0:outs,
@@ -1555,7 +1647,12 @@ function App() {
         log};
     });
     setModal(null);
-    showToast(type==="SB"?"盗塁✅":type==="PO"?"牽制アウト❌":"盗塁刺❌");
+    const toastMsg = {
+      SB:"盗塁✅", CS:"盗塁刺❌", PO:"牽制アウト❌",
+      WP:"WP進塁✅", PB:"PB進塁✅", BK:"ボーク✅",
+      OBI:"走塁妨害・進塁✅", ADV:"進塁✅",
+    }[type]||type;
+    showToast(toastMsg);
   },[mutGame]);
 
   
@@ -2122,7 +2219,7 @@ function App() {
                 value: teamShareInput,
                 onChange: e => setTeamShareInput(e.target.value.toUpperCase()),
                 onKeyDown: e => { if(e.key==="Enter") connectTeam(teamShareInput, teamSharePwInput); },
-                placeholder: "例: TIGERS",
+                placeholder: "チームコード or チームID",
                 autoCapitalize: "characters",
                 style:{
                   width:"100%", padding:"12px 16px", borderRadius:10, fontSize:20,
@@ -2563,7 +2660,7 @@ function App() {
                   const CJ = {"H1":"ヒット","H2":"二塁打","H3":"三塁打","HR":"本塁打",
                     "BB":"四球","HBP":"死球","IBB":"故意四球","KW":"振り逃げ",
                     "K":"三振","KL":"見逃し三振","GO":"ゴロ","FO":"フライ","LO":"ライナー",
-                    "FF":"邪飛","SAC":"犠打","SF":"犠飛","DP":"ゲッツー","E":"エラー","FC":"野選"};
+                    "FF":"邪飛","SAC":"犠打","SF":"犠飛","DP":"ゲッツー","E":"エラー","FC":"野選","CI":"打撃妨害","OI":"守備妨害"};
                   const isHit2  = ["H1","H2","H3","HR"].includes(rc2);
                   const isWalk2 = ["BB","HBP","IBB","KW"].includes(rc2);
                   const isOut2  = ["K","KL","GO","FO","LO","FF","SAC","SF","DP"].includes(rc2);
@@ -2789,7 +2886,7 @@ function App() {
                   const pi = curLineup.findIndex(p=>p.name===runnerName);
                   return (
                     React.createElement('button', { key: bi,
-                      onClick: ()=>setModal({team:curTeam,pidx:pi>=0?pi:0,step:"sb",sbRunner:{bi,name:runnerName}}),
+                      onClick: ()=>setModal({team:curTeam,pidx:pi>=0?pi:0,step:"sb",runnerMoves:{[bi]:{destBi:bi+1,isOut:false}},primaryBi:bi}),
                       style: {background:"#1a2e1a",border:"1px solid #22c55e",borderRadius:8,
                         color:"#4ade80",padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,
                         display:"flex",alignItems:"center",gap:6},}
@@ -3211,13 +3308,17 @@ function App() {
               onLoad:loadGame,
               onDelete:delHistory,
               onExcel:exportExcel,
-              onImport:(g)=>{
+              onImport:(games)=>{
+                // gamesは配列で一括受け取り
+                const arr = Array.isArray(games)?games:[games];
                 setStorage(s=>{
-                  const existing = (s.history||[]).findIndex(h=>h.id===g.id);
-                  const history = existing>=0
-                    ? s.history.map(h=>h.id===g.id?g:h)
-                    : [g,...(s.history||[]).slice(0,49)];
-                  return {...s, history};
+                  let hist = [...(s.history||[])];
+                  arr.forEach(g=>{
+                    const idx = hist.findIndex(h=>h.id===g.id);
+                    if(idx>=0) hist[idx]=g; // 上書き
+                    else hist = [g,...hist]; // 先頭追加
+                  });
+                  return {...s, history:hist.slice(0,50)};
                 });
               },
               onUpload:(g)=>{
@@ -3239,29 +3340,6 @@ function App() {
         ))
 
         , tab==="teams"&&(React.createElement(React.Fragment, null
-
-          , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #22c55e", marginBottom:14}}
-            , React.createElement('div', {style:{...S.ct, marginBottom:10}}, "☁️ Firebaseからチームを復元")
-            , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:12}},
-                "チームIDと管理者コードを入力すると、別端末や新バージョンでもチームデータを復元できます。")
-            , React.createElement(FirebaseTeamLoader, {
-                onLoaded: (team, asMyTeam) => {
-                  if(asMyTeam) {
-                    setStorage(s=>({...s, myTeam: team}));
-                    showToast("自チーム「"+team.name+"」を復元しました");
-                  } else {
-                    setStorage(s=>{
-                      const existing = (s.opponents||[]).findIndex(t=>t.id===team.id);
-                      const opponents = existing>=0
-                        ? s.opponents.map(t=>t.id===team.id?team:t)
-                        : [...(s.opponents||[]), team];
-                      return {...s, opponents};
-                    });
-                    showToast("「"+team.name+"」を対戦相手に追加しました");
-                  }
-                }
-              })
-          )
 
           , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #fbbf24"}}
             , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:12}}
@@ -3376,25 +3454,37 @@ function App() {
 
             , !isTeamConnected && React.createElement(React.Fragment, null
               , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:14}},
-                "チームコードを入力してチームの試合をリアルタイムで共有。管理者パスワードを入力すると操作できます。")
+                "チームコードでリアルタイム共有・試合履歴の共有ができます。新規の場合は好きなコードを決めて入力してください。")
               , React.createElement('div', {style:{marginBottom:10}}
-                , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード（必須）")
+                , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:6,marginBottom:4}}
+                  , React.createElement('div', {style:{fontSize:11,color:"#94a3b8"}}, "チームコード")
+                  , React.createElement('button', {
+                      onClick:()=>{
+                        const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+                        const code=Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
+                        setTeamShareInput(code);
+                      },
+                      style:{fontSize:10,padding:"2px 8px",borderRadius:5,cursor:"pointer",marginLeft:"auto",
+                        background:"#1e3a5f",border:"1px solid #3b82f6",color:"#7dd3fc"}
+                    }, "🎲 ランダム生成")
+                )
                 , React.createElement('input', {
                     value: teamShareInput,
                     onChange: e=>setTeamShareInput(e.target.value.toUpperCase()),
-                    placeholder:"例: TIGERS",
+                    placeholder:"例: TIGERS（自由に決めてOK）",
                     style:{width:"100%",padding:"9px 12px",borderRadius:8,background:"#0d1f35",
                       border:"1.5px solid #3730a3",color:"#e2e8f0",fontSize:16,
                       fontFamily:"monospace",letterSpacing:2,outline:"none",boxSizing:"border-box"}
                   })
               )
               , React.createElement('div', {style:{marginBottom:14}}
-                , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "管理者パスワード（任意・管理者のみ）")
+                , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}},
+                  "管理者パスワード", React.createElement('span',{style:{color:"#475569",fontSize:10,marginLeft:4}},"（記録者は必須・閲覧のみなら空欄）"))
                 , React.createElement('input', {
                     type:"password",
                     value: teamSharePwInput,
                     onChange: e=>setTeamSharePwInput(e.target.value),
-                    placeholder:"入力しない場合は閲覧のみ",
+                    placeholder:"記録者は必ず入力",
                     style:{width:"100%",padding:"9px 12px",borderRadius:8,background:"#0d1f35",
                       border:"1.5px solid #1e3a5f",color:"#e2e8f0",fontSize:14,
                       outline:"none",boxSizing:"border-box"}
@@ -3405,8 +3495,8 @@ function App() {
                   onClick:()=>connectTeam(teamShareInput, teamSharePwInput),
                   style:{...sBt("#7c3aed"),width:"100%",padding:"11px",fontSize:14,fontWeight:700}
                 }, "接続する")
-              , React.createElement('div', {style:{fontSize:10,color:"#475569",marginTop:10,textAlign:"center"}},
-                "チームコードを新規作成するには管理者パスワードを入力して接続してください")
+              , React.createElement('div', {style:{fontSize:10,color:"#475569",marginTop:8,textAlign:"center"}},
+                "※ 同じコードが存在しない場合は新規作成されます")
             )
 
             , isTeamConnected && React.createElement(React.Fragment, null
@@ -3684,93 +3774,120 @@ function App() {
         
         if(modal.step==="sb") {
           const runners = [0,1,2].map(bi=>({bi, name:game.bases[bi]})).filter(r=>r.name);
-          const sel = modal.sbRunner;
-          const destBi = modal.sbDest ?? (sel ? sel.bi+1 : null);
-          // sel.biから選べる進塁先（1つ先〜ホーム）
-          const destOptions = sel
-            ? Array.from({length: 3-sel.bi}, (_,i)=>sel.bi+1+i).concat(sel.bi<3?[3]:[]).filter((v,idx,a)=>a.indexOf(v)===idx && v<=3)
-            : [];
+          const runnerMoves = modal.runnerMoves || {};
+          const sbType      = modal.sbType || null;
+          const primaryBi   = modal.primaryBi ?? (runners.length===1 ? runners[0].bi : null);
+
+          const buildMoves = () => runners.map(r=>{
+            const mv = runnerMoves[r.bi];
+            if(!mv) return null;
+            return {runner:r, destBi:mv.destBi, isOut:mv.isOut||false};
+          }).filter(Boolean);
 
           return (
-            React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
-              , React.createElement('div', { style: S.mBox, onClick: e=>e.stopPropagation(),}
-                , React.createElement('div', { style: {...S.mt,marginBottom:4},}, "🏃 盗塁 / 走塁 / 牽制")
-                , React.createElement('div', { style: {fontSize:11,color:"#94a3b8",marginBottom:14},}, "塁にいるランナーを選んでください")
+            React.createElement('div', {style:S.overlay, onClick:()=>setModal(null)}
+              , React.createElement('div', {style:{...S.mBox,maxWidth:440,maxHeight:"92vh",overflowY:"auto"},
+                  onClick:e=>e.stopPropagation()}
+                , React.createElement('div', {style:{...S.mt,marginBottom:4}}, "🏃 盗塁 / 進塁")
+                , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:10}},
+                  "ランナーごとに移動先を設定 → 種別を選んで確定")
 
-                , runners.length===0 ? (
-                  React.createElement('div', { style: {color:"#f87171",fontSize:13,textAlign:"center",marginBottom:14},}, "現在塁上にランナーがいません")
-                ) : (React.createElement(React.Fragment, null
+                , runners.length===0
+                  ? React.createElement('div',{style:{color:"#f87171",fontSize:13,textAlign:"center",padding:20}},
+                      "塁上にランナーがいません")
+                  : React.createElement(React.Fragment,null
 
-                  , React.createElement('div', { style: {marginBottom:14},}
-                    , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "① ランナー選択")
-                    , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:8},}
+                    // ① ランナーの移動先設定
+                    , React.createElement('div',{style:{marginBottom:12}}
+                      , React.createElement('div',{style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}},
+                        "① ランナーの移動先を設定")
                       , runners.map(r=>{
-                        const baseLabel=["1塁","2塁","3塁"][r.bi];
-                        const isSel = sel && sel.bi===r.bi;
-                        return (
-                          React.createElement('button', { key: r.bi, onClick: ()=>setModal(m=>({...m, sbRunner:isSel?null:r, sbDest:isSel?null:r.bi+1})),
-                            style: {background:isSel?"#1d4ed833":"#0d1f35",
-                              border:`2px solid ${isSel?"#3b82f6":"#1e3a5f"}`,
-                              borderRadius:10,padding:"10px 16px",cursor:"pointer",
-                              display:"flex",flexDirection:"column",alignItems:"center",gap:3},}
-                            , React.createElement('span', { style: {fontSize:10,color:isSel?"#93c5fd":"#64748b"},}, baseLabel)
-                            , React.createElement('span', { style: {fontSize:14,fontWeight:700,color:isSel?"#fff":"#e2e8f0"},}, r.name)
+                        const mv = runnerMoves[r.bi];
+                        const baseLabel = ["1塁","2塁","3塁"][r.bi];
+                        const destLabel = mv ? (mv.isOut?"アウト":mv.destBi>=3?"本塁":["1塁","2塁","3塁"][mv.destBi]) : "未設定";
+                        return React.createElement('div',{key:r.bi,style:{
+                          background:"#0a1628",border:"1.5px solid #1e3a5f",
+                          borderRadius:10,padding:"8px 10px",marginBottom:6}}
+                          , React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}}
+                            , React.createElement('span',{style:{fontSize:12,fontWeight:700,color:"#e2e8f0"}},
+                              baseLabel+" "+r.name)
+                            , React.createElement('span',{style:{fontSize:11,color:"#475569"}},"→")
+                            , React.createElement('span',{style:{fontSize:12,fontWeight:700,
+                                color:mv?(mv.isOut?"#f87171":"#4ade80"):"#334155"}}, destLabel)
+                            , mv&&React.createElement('button',{
+                                onClick:()=>{ const nm={...runnerMoves}; delete nm[r.bi]; setModal(m=>({...m,runnerMoves:nm})); },
+                                style:{marginLeft:"auto",background:"none",border:"none",color:"#475569",fontSize:12,cursor:"pointer"}
+                              },"✕")
+                          )
+                          , React.createElement('div',{style:{display:"flex",gap:4,flexWrap:"wrap"}}
+                            , Array.from({length:3-r.bi},(_,i)=>r.bi+1+i).concat([3]).map(di=>{
+                                const label = di>=3?"本塁":["1塁","2塁","3塁"][di];
+                                const isSel = mv&&!mv.isOut&&mv.destBi===di;
+                                return React.createElement('button',{key:di,
+                                  onClick:()=>setModal(m=>({...m,runnerMoves:{...m.runnerMoves||{},[r.bi]:{destBi:di,isOut:false}},primaryBi:m.primaryBi??r.bi})),
+                                  style:{padding:"5px 10px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
+                                    background:isSel?"#22c55e33":"#0d1f35",
+                                    border:"1px solid "+(isSel?"#22c55e":"#2a4a7a"),
+                                    color:isSel?"#4ade80":"#94a3b8"}},label);
+                              })
+                            , React.createElement('button',{
+                                onClick:()=>setModal(m=>({...m,runnerMoves:{...m.runnerMoves||{},[r.bi]:{destBi:r.bi,isOut:true}},primaryBi:m.primaryBi??r.bi})),
+                                style:{padding:"5px 10px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,
+                                  background:mv&&mv.isOut?"#f8717133":"#0d1f35",
+                                  border:"1px solid "+(mv&&mv.isOut?"#f87171":"#2a4a7a"),
+                                  color:mv&&mv.isOut?"#f87171":"#94a3b8"}
+                              },"アウト")
                           )
                         );
                       })
                     )
-                  )
 
-                  , sel && (React.createElement(React.Fragment, null
-
-                    , React.createElement('div', { style: {marginBottom:12},}
-                      , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "② 進塁先")
-                      , React.createElement('div', { style: {display:"flex",gap:8},}
-                        , destOptions.map(di=>{
-                          const label = di>=3?"🏠 ホーム":["1塁","2塁","3塁"][di];
-                          const isSelDest = destBi===di;
-                          return React.createElement('button', { key: di, onClick: ()=>setModal(m=>({...m,sbDest:di})),
-                            style: {flex:1,padding:"10px 6px",borderRadius:9,cursor:"pointer",fontSize:13,fontWeight:700,
-                              background:isSelDest?"#1d4ed833":"#0d1f35",
-                              border:`2px solid ${isSelDest?"#3b82f6":"#1e3a5f"}`,
-                              color:isSelDest?"#7dd3fc":"#e2e8f0"}}, label);
-                        })
+                    // ② 種別
+                    , buildMoves().length>0&&React.createElement('div',{style:{marginBottom:12}}
+                      , React.createElement('div',{style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}},"② 種別")
+                      , React.createElement('div',{style:{display:"flex",gap:6,flexWrap:"wrap"}}
+                        , [
+                            {t:"SB",  l:"✅ 盗塁成功",  c:"#4ade80"},
+                            {t:"CS",  l:"❌ 盗塁刺",    c:"#f87171"},
+                            {t:"PO",  l:"🏷 牽制死",    c:"#a78bfa"},
+                            {t:"WP",  l:"WP 暴投",      c:"#f97316"},
+                            {t:"PB",  l:"PB 捕逸",      c:"#38bdf8"},
+                            {t:"BK",  l:"BK ボーク",    c:"#a78bfa"},
+                            {t:"OBI", l:"走塁妨害",     c:"#4ade80"},
+                            {t:"ADV", l:"記録なし進塁", c:"#94a3b8"},
+                          ].map(({t,l,c})=>
+                            React.createElement('button',{key:t,
+                              onClick:()=>setModal(m=>({...m,sbType:t})),
+                              style:{padding:"7px 10px",borderRadius:7,cursor:"pointer",fontSize:11,fontWeight:700,
+                                background:sbType===t?c+"33":"#0d1f35",
+                                border:"1.5px solid "+(sbType===t?c:"#2a4a7a"),
+                                color:sbType===t?c:"#94a3b8"}},l)
+                          )
                       )
                     )
 
-                    , React.createElement('div', { style: {marginBottom:8},}
-                      , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "③ 結果")
-                      , React.createElement('div', { style: {display:"flex",gap:8,flexWrap:"wrap"},}
-                        , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"SB",sel,destBi??sel.bi+1),
-                          style: {flex:1,background:"#4ade8033",border:"2px solid #4ade80",borderRadius:10,
-                            color:"#4ade80",padding:"12px",cursor:"pointer",fontSize:13,fontWeight:700},},
-                          "✅ 盗塁成功", destBi>=3?" (ホームイン)":""
-                        )
-                        , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"CS",sel,sel.bi+1),
-                          style: {flex:1,background:"#f8717133",border:"2px solid #f87171",borderRadius:10,
-                            color:"#f87171",padding:"12px",cursor:"pointer",fontSize:13,fontWeight:700},}, "❌ 盗塁刺"
-                        )
-                        , React.createElement('button', { onClick: ()=>recordSB(modal.team,modal.pidx,"PO",sel,sel.bi),
-                          style: {flex:1,background:"#a78bfa33",border:"2px solid #a78bfa",borderRadius:10,
-                            color:"#a78bfa",padding:"12px",cursor:"pointer",fontSize:13,fontWeight:700},}, "🏷 牽制死"
-                        )
-                      )
-                    )
-                  ))
-                )), mPlayer&&(
-                  React.createElement('div', { style: {fontSize:11,color:"#7db8e8",textAlign:"center",marginBottom:10},}
-                    , mPlayer.name, ": 盗塁 "  , React.createElement('span', { style: {color:"#4ade80",fontWeight:700},}, mPlayer.sb||0), "　 盗塁刺 "
-                     , React.createElement('span', { style: {color:"#f87171",fontWeight:700},}, mPlayer.cs||0)
+                    // 確定ボタン
+                    , React.createElement('button',{
+                        disabled:buildMoves().length===0||!sbType,
+                        onClick:()=>{
+                          const moves = buildMoves();
+                          const pidx = primaryBi!=null
+                            ? curLineup.findIndex(p=>p.name===game.bases[primaryBi])
+                            : -1;
+                          recordSB(modal.team, moves, sbType, pidx>=0?pidx:null);
+                        },
+                        style:{...sBt("#22c55e"),width:"100%",padding:"12px",fontSize:14,
+                          fontWeight:700,marginBottom:6,
+                          opacity:(buildMoves().length>0&&sbType)?1:0.35}},
+                      "✅ 確定"+(buildMoves().length>0?" ("+buildMoves().length+"名移動)":""))
                   )
-                )
-                , React.createElement('button', { onClick: ()=>setModal(null), style: S.cBtn,}, "閉じる")
+                , React.createElement('button',{onClick:()=>setModal(null),style:S.cBtn},"閉じる")
               )
             )
           );
         }
 
-        
-        if(modal.step==="edit_list") {
+                if(modal.step==="edit_list") {
           const list=toList(_optionalChain([mPlayer, 'optionalAccess', _41 => _41.atBats])||{}, modal.inning);
           return (
             React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
@@ -4146,11 +4263,15 @@ function StatsTab({ game, history }) {
   // 全試合データ（現在の試合 + 履歴）
   const allGames = [game, ...(history||[])].filter(g=>g&&g.awayLineup&&g.homeLineup);
 
-  // 選手ごとに全試合の成績を集計
-  const aggregatePlayerStats = (side) => {
+  // 選手ごとに全試合の成績を集計（away/home両方から選手名で統合）
+  const aggregatePlayerStats = (filterTeamName) => {
     const map = {};
     allGames.forEach(g=>{
-      const lineup = g[side+"Lineup"]||[];
+      // filterTeamNameに一致するsideのlineupを使用
+      const sides = filterTeamName
+        ? (g.awayTeam===filterTeamName ? ["away"] : g.homeTeam===filterTeamName ? ["home"] : ["away","home"])
+        : ["away","home"];
+      const lineup = sides.flatMap(s=>g[s+"Lineup"]||[]);
       lineup.forEach(p=>{
         const subOuts = [...(p._subOut&&!p._subOuts?[p._subOut]:[]), ...(p._subOuts||[])];
         const allVersions = [...subOuts, p];
@@ -4169,7 +4290,7 @@ function StatsTab({ game, history }) {
             if(c==="H2") m.h2++;
             if(c==="H3") m.h3++;
             if(c==="HR") m.hr++;
-            if(c==="BB"||c==="IBB") m.bb++;
+            if(c==="BB"||c==="IBB"||c==="CI") m.bb++;  // 打撃妨害も出塁扱い
             if(c==="HBP") m.hbp++;
             if(["K","KL","KW"].includes(c)) m.k++;
             if(c==="SAC") m.sac++;
@@ -4191,7 +4312,7 @@ function StatsTab({ game, history }) {
       const ops_n = (parseFloat("0"+obp)||0)+(parseFloat("0"+slg)||0);
       const ops = ops_n>0?ops_n.toFixed(3).replace(/^0/,""):".---";
       return {...m, pa, avg, slg, obp, ops, games:m.games.size};
-    }).sort((a,b)=>b.ab-a.ab);
+    }).sort((a,b)=>b.pa-a.pa||b.ab-a.ab);
   };
 
   // 投手成績集計
@@ -4228,8 +4349,8 @@ function StatsTab({ game, history }) {
     }).sort((a,b)=>b.ipNum-a.ipNum);
   };
 
-  const awayBat = aggregatePlayerStats("away");
-  const homeBat = aggregatePlayerStats("home");
+  const awayBat = aggregatePlayerStats(game.awayTeam);
+  const homeBat = aggregatePlayerStats(game.homeTeam);
   const awayPit = aggregatePitcherStats("away");
   const homePit = aggregatePitcherStats("home");
 
@@ -4359,7 +4480,7 @@ function StatsTab({ game, history }) {
         });
       });
     });
-    const pList = Object.values(players).filter(p=>p.games.some(g=>g&&g.ab>0));
+    const pList = Object.values(players).filter(p=>p.games.some(g=>g&&(g.ab>0||g.bb>0||g.hbp>0||g.sac>0||g.sf>0)));
     if(pList.length===0) return React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:20}},"データがありません");
 
     // 各試合のヘッダー
@@ -4544,11 +4665,11 @@ function FirebaseTeamLoader({ onLoaded }) {
     React.createElement('div', null
       , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}
         , React.createElement('div', {style:{flex:1,minWidth:120}}
-          , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード（例: TIGERS）")
+          , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード or チームID")
           , React.createElement('input', {
               value: teamId,
               onChange: e=>setTeamId(e.target.value),
-              placeholder: "例: TIGERS",
+              placeholder: "チームコード or チームID",
               style:{...S.si, width:"100%", padding:"7px 10px", fontSize:12}
             })
         )
@@ -4617,7 +4738,7 @@ function HistoryTab({ history, onLoad, onDelete, onExcel, onImport, onUpload }) 
         return;
       }
       setFbMsg(games.length+"試合を読み込みました ✅");
-      games.forEach(g=>onImport(g));
+      onImport(games); // 一括で渡す
     }).catch(e=>{ setFbLoading(false); setFbMsg("エラー: "+e.message); });
   };
 
@@ -4628,15 +4749,15 @@ function HistoryTab({ history, onLoad, onDelete, onExcel, onImport, onUpload }) 
       , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #22c55e", marginBottom:14}}
         , React.createElement('div', {style:{...S.ct, marginBottom:8}}, "☁️ 別端末の試合履歴を読み込む")
         , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:10}},
-            "チームコードを入力すると、そのコードで記録した全試合をこの端末の履歴に取り込めます。")
+            "チームコード または チームIDを入力すると、そのチームで記録した試合をこの端末の履歴に取り込めます。チームIDはチームタブの自チーム欄で確認できます。")
         , React.createElement('div', {style:{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}
           , React.createElement('div', {style:{flex:1,minWidth:160}}
-            , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード（例: TIGERS）")
+            , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード or チームID")
             , React.createElement('input', {
                 value: fbTeamId,
                 onChange: e=>setFbTeamId(e.target.value),
                 onKeyDown: e=>{ if(e.key==="Enter") loadFromFirebase(); },
-                placeholder: "例: TIGERS",
+                placeholder: "チームコード or チームID",
                 style:{...S.si, width:"100%", padding:"8px 10px", fontSize:13}
               })
           )

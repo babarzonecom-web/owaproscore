@@ -1576,12 +1576,17 @@ function App() {
       let scoreAdd = 0;
       const scoredRunners = [];
 
-      // primaryPidxの選手に盗塁/刺カウント
-      if(primaryPidx != null && primaryPidx >= 0){
-        lineup = lineup.map((p,i)=>{
-          if(i!==primaryPidx) return p;
-          if(isSB)      return {...p, sb:(p.sb||0)+1};
-          if(isOutType) return {...p, cs:(p.cs||0)+1};
+      // 盗塁/刺カウントを各ランナーに加算
+      // SB/CS/PO: movesの各ランナーそれぞれにカウント
+      if(isSB || isOutType) {
+        // 対象ランナー名のセットを作成
+        const sbRunnerNames = new Set(moves.map(m=>m.runner.name));
+        lineup = lineup.map(p=>{
+          if(!sbRunnerNames.has(p.name)) return p;
+          const mv = moves.find(m=>m.runner.name===p.name);
+          if(!mv) return p;
+          if(isSB && !mv.isOut) return {...p, sb:(p.sb||0)+1};   // 盗塁成功
+          if(isOutType || mv.isOut) return {...p, cs:(p.cs||0)+1}; // 刺・牽制死
           return p;
         });
       }

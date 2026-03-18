@@ -1577,16 +1577,17 @@ function App() {
       const scoredRunners = [];
 
       // 盗塁/刺カウントを各ランナーに加算
-      // SB/CS/PO: movesの各ランナーそれぞれにカウント
+      // SB/CS/PO: 実際に移動した（元の塁から動いた）ランナーのみ対象
       if(isSB || isOutType) {
-        // 対象ランナー名のセットを作成
-        const sbRunnerNames = new Set(moves.map(m=>m.runner.name));
         lineup = lineup.map(p=>{
-          if(!sbRunnerNames.has(p.name)) return p;
+          // このランナーのmoveを探す
           const mv = moves.find(m=>m.runner.name===p.name);
           if(!mv) return p;
-          if(isSB && !mv.isOut) return {...p, sb:(p.sb||0)+1};   // 盗塁成功
-          if(isOutType || mv.isOut) return {...p, cs:(p.cs||0)+1}; // 刺・牽制死
+          // 元の塁と同じ場所に留まっている場合は盗塁扱いしない
+          const stayed = !mv.isOut && mv.destBi === mv.runner.bi;
+          if(stayed) return p;
+          if(isSB && !mv.isOut) return {...p, sb:(p.sb||0)+1};    // 盗塁成功
+          if(mv.isOut || isOutType) return {...p, cs:(p.cs||0)+1}; // 刺・牽制死
           return p;
         });
       }
@@ -3900,12 +3901,13 @@ function App() {
                   const name = mv.runner.name;
                   // scoredNamesに入っていれば本塁
                   if(scoredNames.includes(name)) return {...mv, destBi:3, isOut:false};
-                  // adjBasesで見つかれば対応する塁
+                  // adjBasesで見つかれば対応する塁（元の塁に留まる場合も含む）
                   for(let i=0;i<3;i++){
                     if(adjBases[i]===name) return {...mv, destBi:i, isOut:false};
                   }
-                  // 見つからなければアウト
-                  return {...mv, isOut:true, destBi:mv.runner.bi};
+                  // adjBasesにいない = アウトまたは本塁だが scoredNames にもない
+                  // → アウト扱い（ただし元の塁情報を保持）
+                  return {...mv, isOut:true};
                 });
                 // errorPosがあれば守備側選手のエラーを記録
                 if(errorPos){

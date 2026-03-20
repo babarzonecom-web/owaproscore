@@ -3303,7 +3303,7 @@ function App() {
         ))
 
         , tab==="stats"&&(React.createElement(React.Fragment, null
-          , React.createElement(StatsTab, {game:game, history:history})
+          , React.createElement(StatsTab, {game:game, history:history, teams:teams, myTeam:myTeam, opponents:opponents})
         ))
 
         , tab==="history"&&(React.createElement(React.Fragment, null
@@ -4294,17 +4294,37 @@ function App() {
   );
 }
 // ===== 成績タブ =====
-function StatsTab({ game, history }) {
-  const [statsView, setStatsView] = useState("batting"); // batting | pitching | team
-  const [targetTeam, setTargetTeam] = useState("both"); // away | home | both
+function StatsTab({ game, history, teams, myTeam, opponents }) {
+  const [statsView, setStatsView] = useState("batting");
+  const [selectedTeam, setSelectedTeam] = useState(null); // null=全チーム
 
   // 全試合データ（現在の試合 + 履歴）
   const allGames = [game, ...(history||[])].filter(g=>g&&g.awayLineup&&g.homeLineup);
 
+  // 全試合に登場するチーム名を収集
+  const allTeamNames = [...new Set(allGames.flatMap(g=>[g.awayTeam,g.homeTeam].filter(Boolean)))];
+
+  // 登録チーム（自チーム・対戦相手）との照合でソート
+  const registeredTeams = [
+    ...(myTeam ? [myTeam] : []),
+    ...(opponents||[]),
+    ...(teams||[]),
+  ];
+  // 登録済みチームを先に、未登録チームは後ろに
+  const sortedTeamNames = [
+    ...allTeamNames.filter(n=>registeredTeams.some(t=>t.name===n)),
+    ...allTeamNames.filter(n=>!registeredTeams.some(t=>t.name===n)),
+  ];
+
+  // 選択中チームでフィルタした試合
+  const filteredGames = selectedTeam
+    ? allGames.filter(g=>g.awayTeam===selectedTeam||g.homeTeam===selectedTeam)
+    : allGames;
+
   // 選手ごとに全試合の成績を集計（away/home両方から選手名で統合）
   const aggregatePlayerStats = (filterTeamName) => {
     const map = {};
-    allGames.forEach(g=>{
+    filteredGames.forEach(g=>{
       // filterTeamNameに一致するsideのlineupを使用
       const sides = filterTeamName
         ? (g.awayTeam===filterTeamName ? ["away"] : g.homeTeam===filterTeamName ? ["home"] : ["away","home"])
@@ -4356,7 +4376,7 @@ function StatsTab({ game, history }) {
   // 投手成績集計
   const aggregatePitcherStats = (side) => {
     const map = {};
-    allGames.forEach(g=>{
+    filteredGames.forEach(g=>{
       const pitchers = g[side+"Pitchers"]||[];
       const pStats = computePitcherStats(g);
       const autoArr = (pStats[side]||[]);
@@ -4387,13 +4407,18 @@ function StatsTab({ game, history }) {
     }).sort((a,b)=>b.ipNum-a.ipNum);
   };
 
-  const awayBat = aggregatePlayerStats(game.awayTeam);
-  const homeBat = aggregatePlayerStats(game.homeTeam);
+  // 選択チームの打撃成績（選択なしの場合は現在の試合のチームを表示）
+  const primaryTeam  = selectedTeam || game.awayTeam;
+  const secondTeam   = selectedTeam
+    ? null  // チーム選択時は1チームのみ
+    : game.homeTeam;
+  const awayBat = aggregatePlayerStats(primaryTeam);
+  const homeBat = secondTeam ? aggregatePlayerStats(secondTeam) : [];
   const awayPit = aggregatePitcherStats("away");
   const homePit = aggregatePitcherStats("home");
 
   // 直近5試合の個人成績
-  const recent5 = [game,...(history||[])].slice(0,5);
+  const recent5 = filteredGames.slice(0,5);
 
   const thS = {...S.th, fontSize:10, padding:"5px 3px"};
   const tdS = {...S.td, textAlign:"center", fontSize:12, padding:"5px 3px"};
@@ -4490,100 +4515,167 @@ function StatsTab({ game, history }) {
 
   // 直近5試合の成績
   const Recent5 = () => {
+    // 選手ごとに5試合分の成績と通算を集計
     const players = {};
     recent5.forEach((g,gi)=>{
-      ["away","home"].forEach(side=>{
+      // selectedTeamがあればそのチームのみ、なければ両チーム
+      const sides = selectedTeam
+        ? (g.awayTeam===selectedTeam?["away"]:g.homeTeam===selectedTeam?["home"]:["away","home"])
+        : ["away","home"];
+      sides.forEach(side=>{
         (g[side+"Lineup"]||[]).forEach(p=>{
           if(!p.name||p.name.startsWith("選手")) return;
-          if(!players[p.name]) players[p.name]={name:p.name, games:[]};
+          if(!players[p.name]) players[p.name]={name:p.name, games:Array(recent5.length).fill(null)};
           let ab=0,h=0,h2=0,h3=0,hr=0,rbi=0,bb=0,hbp=0,k=0,sb=0,run=0,tb=0;
           Object.values(p.atBats||{}).flat().forEach(e=>{
             const c=(typeof e==="object"&&e)?e.code:e; if(!c) return;
-            if(!["BB","HBP","SAC","SF","IBB"].includes(c)) ab++;
+            if(!["BB","HBP","SAC","SF","IBB","CI"].includes(c)) ab++;
             if(["H1","H2","H3","HR"].includes(c)){h++;tb+=c==="H1"?1:c==="H2"?2:c==="H3"?3:4;}
             if(c==="H2") h2++;
             if(c==="H3") h3++;
             if(c==="HR") hr++;
-            if(c==="BB"||c==="IBB") bb++;
+            if(c==="BB"||c==="IBB"||c==="CI") bb++;
             if(c==="HBP") hbp++;
             if(["K","KL","KW"].includes(c)) k++;
           });
-          rbi += (p.rbi||0);
-          sb  += (p.sb||0);
-          run += (p.run||0);
-          const avg = ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---";
-          const slg = ab>0?(tb/ab).toFixed(3).replace(/^0/,""):".---";
-          const obp = (ab+bb+hbp)>0?((h+bb+hbp)/(ab+bb+hbp)).toFixed(3).replace(/^0/,""):".---";
-          players[p.name].games[gi] = {ab,h,h2,h3,hr,rbi,bb,k,sb,run,avg,slg,obp};
+          rbi+=(p.rbi||0); sb+=(p.sb||0); run+=(p.run||0);
+          players[p.name].games[gi]={ab,h,h2,h3,hr,rbi,bb,hbp,k,sb,run,tb};
         });
       });
     });
-    const pList = Object.values(players).filter(p=>p.games.some(g=>g&&(g.ab>0||g.bb>0||g.hbp>0||g.sac>0||g.sf>0)));
+
+    // 5試合通算を計算
+    const pList = Object.values(players).map(p=>{
+      const tots = p.games.reduce((s,g)=>{
+        if(!g) return s;
+        return {ab:s.ab+g.ab,h:s.h+g.h,h2:s.h2+g.h2,h3:s.h3+g.h3,hr:s.hr+g.hr,
+          rbi:s.rbi+g.rbi,bb:s.bb+g.bb,k:s.k+g.k,sb:s.sb+g.sb,tb:s.tb+g.tb};
+      },{ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,k:0,sb:0,tb:0});
+      const pa = tots.ab+tots.bb;
+      const avg = tots.ab>0?(tots.h/tots.ab).toFixed(3).replace(/^0/,""):".---";
+      const slg = tots.ab>0?(tots.tb/tots.ab).toFixed(3).replace(/^0/,""):".---";
+      return {...p, tots:{...tots,pa,avg,slg}};
+    }).filter(p=>p.tots.ab>0||p.tots.bb>0)
+      .sort((a,b)=>b.tots.ab-a.tots.ab);
+
     if(pList.length===0) return React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:20}},"データがありません");
 
-    // 各試合のヘッダー
-    const gameHeaders = recent5.map((g,i)=>(
-      React.createElement('th', {key:i, style:{...thS, borderLeft:"2px solid #1e3a5f"},
-        colSpan:9}
-        , React.createElement('div', null, g.date||("試合"+(i+1)))
-        , React.createElement('div', {style:{fontSize:9,color:"#475569",fontWeight:400}},
-            (g.awayTeam||"").slice(0,5)+" vs "+(g.homeTeam||"").slice(0,5))
-      )
-    ));
+    const dot = (val,color,bold)=>React.createElement('span',{style:{color:color||"#e2e8f0",fontWeight:bold?700:400,fontSize:11}},val||0);
 
-    const statHeaders = recent5.map((_,i)=>(
-      React.createElement(React.Fragment, {key:i},
-        ["打数","安打","二塁","三塁","本塁","打率","打点","四球","三振"].map(h=>
-          React.createElement('th',{key:h,style:{...thS,fontSize:9,borderLeft:h==="打数"?"2px solid #1e3a5f":"none"}},h)
-        )
-      )
-    ));
-
-    return (
-      React.createElement('div', {style:{overflowX:"auto"}}
-        , React.createElement('table', {style:{...S.table,minWidth:600}}
+    return React.createElement('div', null
+      // 通算成績テーブル（上部）
+      , React.createElement('div', {style:{overflowX:"auto",marginBottom:16}}
+        , React.createElement('table', {style:{...S.table,minWidth:380}}
           , React.createElement('thead', null
             , React.createElement('tr', null
-              , React.createElement('th', {style:{...thS,textAlign:"left",paddingLeft:8,minWidth:60}}, "選手")
-              , ...gameHeaders
-            )
-            , React.createElement('tr', null
-              , React.createElement('th', {style:{...thS,textAlign:"left",paddingLeft:8}}, "")
-              , ...statHeaders
+              , ["選手","打席","打数","安打","通算打率","本塁","打点","四球","三振","盗塁"].map(h=>
+                  React.createElement('th', {key:h, style:{...thS,
+                    fontSize:h==="通算打率"?11:10,
+                    color:h==="通算打率"?"#fbbf24":"#94a3b8",
+                    background:h==="通算打率"?"#1a1505":"transparent"}}, h)
+                )
             )
           )
           , React.createElement('tbody', null
-            , pList.map((p,i)=>
-                React.createElement('tr', {key:p.name, style:{background:i%2===0?"#0a1628":"#0d1f35"}}
-                  , React.createElement('td', {style:{...tdN,color:"#e2e8f0",minWidth:60,whiteSpace:"nowrap"}}, p.name)
-                  , ...recent5.map((_,gi)=>{
-                      const d = p.games[gi];
-                      if(!d||d.ab===0) return ["打数","安打","二塁","三塁","本塁","打率","打点","四球","三振"].map((h,hi)=>
-                        React.createElement('td',{key:gi+"-"+hi,style:{...tdS,color:"#334155",borderLeft:hi===0?"2px solid #1e3a5f":"none"}},"-")
-                      );
-                      return [
-                        React.createElement('td',{key:gi+"-ab",style:{...tdS,borderLeft:"2px solid #1e3a5f"}},d.ab),
-                        React.createElement('td',{key:gi+"-h", style:{...tdS,color:d.h>0?"#4ade80":"#e2e8f0",fontWeight:d.h>0?700:400}},d.h),
-                        React.createElement('td',{key:gi+"-h2",style:{...tdS,color:d.h2>0?"#22c55e":"#e2e8f0"}},d.h2),
-                        React.createElement('td',{key:gi+"-h3",style:{...tdS,color:d.h3>0?"#16a34a":"#e2e8f0"}},d.h3),
-                        React.createElement('td',{key:gi+"-hr",style:{...tdS,color:d.hr>0?"#f87171":"#e2e8f0",fontWeight:d.hr>0?700:400}},d.hr),
-                        React.createElement('td',{key:gi+"-avg",style:{...tdS,color:"#fbbf24",fontWeight:700}},d.avg),
-                        React.createElement('td',{key:gi+"-rbi",style:{...tdS,color:d.rbi>0?"#fb923c":"#e2e8f0"}},d.rbi),
-                        React.createElement('td',{key:gi+"-bb",style:{...tdS,color:"#60a5fa"}},d.bb),
-                        React.createElement('td',{key:gi+"-k", style:{...tdS,color:"#94a3b8"}},d.k),
-                      ];
-                    })
-                )
-              )
+            , pList.map((p,i)=>{
+                const t = p.tots;
+                return React.createElement('tr', {key:p.name, style:{background:i%2===0?"#0a1628":"#0d1f35"}}
+                  , React.createElement('td',{style:{...tdN,color:"#e2e8f0",minWidth:56,fontSize:12}},p.name)
+                  , React.createElement('td',{style:tdS},t.pa)
+                  , React.createElement('td',{style:tdS},t.ab)
+                  , React.createElement('td',{style:{...tdS,color:t.h>0?"#4ade80":"#e2e8f0",fontWeight:t.h>0?700:400}},t.h)
+                  , React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900,fontSize:13,
+                      background:"#1a1505"}},t.avg)
+                  , React.createElement('td',{style:{...tdS,color:t.hr>0?"#f87171":"#e2e8f0",fontWeight:t.hr>0?700:400}},t.hr)
+                  , React.createElement('td',{style:{...tdS,color:t.rbi>0?"#fb923c":"#e2e8f0"}},t.rbi)
+                  , React.createElement('td',{style:{...tdS,color:"#60a5fa"}},t.bb)
+                  , React.createElement('td',{style:{...tdS,color:"#94a3b8"}},t.k)
+                  , React.createElement('td',{style:{...tdS,color:"#4ade80"}},t.sb)
+                );
+              })
           )
         )
       )
+
+      // 試合別内訳（折りたたみ式）
+      , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:8,fontWeight:700}},
+          "試合別内訳")
+      , pList.map((p,pi)=>
+          React.createElement('div', {key:p.name, style:{
+            marginBottom:6, background:"#0a1628", borderRadius:8,
+            border:"1px solid #1e3a5f", overflow:"hidden"}}
+            // 選手名ヘッダー
+            , React.createElement('div', {style:{
+                display:"flex",alignItems:"center",gap:8,padding:"6px 10px",
+                background:"#0d1f35",borderBottom:"1px solid #1e3a5f"}}
+              , React.createElement('span',{style:{fontWeight:700,color:"#e2e8f0",fontSize:12}},p.name)
+              , React.createElement('span',{style:{color:"#fbbf24",fontWeight:900,fontSize:14,marginLeft:"auto"}},p.tots.avg)
+              , React.createElement('span',{style:{color:"#64748b",fontSize:10,marginLeft:4}},"通算打率")
+            )
+            // 試合別行
+            , recent5.map((g,gi)=>{
+                const d = p.games[gi];
+                if(!d||d.ab===0) return null;
+                const avg = d.ab>0?(d.h/d.ab).toFixed(3).replace(/^0/,""):".---";
+                const hitColor = d.h>0?"#4ade80":"#e2e8f0";
+                const vs = g.awayTeam===selectedTeam
+                  ? "vs "+g.homeTeam
+                  : g.homeTeam===selectedTeam
+                    ? "vs "+g.awayTeam
+                    : g.awayTeam+" vs "+g.homeTeam;
+                return React.createElement('div', {key:gi, style:{
+                  display:"flex",alignItems:"center",gap:6,padding:"5px 10px",
+                  borderBottom:gi<recent5.length-1?"1px solid #0d1f35":"none",
+                  fontSize:11}}
+                  , React.createElement('span',{style:{color:"#475569",minWidth:70,flexShrink:0}},g.date||"試合"+(gi+1))
+                  , React.createElement('span',{style:{color:"#334155",fontSize:10,flex:1,overflow:"hidden",
+                      textOverflow:"ellipsis",whiteSpace:"nowrap"}},vs)
+                  , React.createElement('span',{style:{color:hitColor,fontWeight:700,minWidth:28,textAlign:"right"}},
+                      d.h+"/"+d.ab)
+                  , d.h2>0&&React.createElement('span',{style:{color:"#22c55e",fontSize:10}},"二"+d.h2)
+                  , d.h3>0&&React.createElement('span',{style:{color:"#16a34a",fontSize:10}},"三"+d.h3)
+                  , d.hr>0&&React.createElement('span',{style:{color:"#f87171",fontWeight:700,fontSize:10}},"HR"+d.hr)
+                  , d.rbi>0&&React.createElement('span',{style:{color:"#fb923c",fontSize:10}},"打点"+d.rbi)
+                  , d.bb>0&&React.createElement('span',{style:{color:"#60a5fa",fontSize:10}},"四"+d.bb)
+                  , d.k>0&&React.createElement('span',{style:{color:"#94a3b8",fontSize:10}},"K"+d.k)
+                  , React.createElement('span',{style:{color:"#fbbf24",fontWeight:700,minWidth:40,textAlign:"right"}},avg)
+                );
+              })
+          )
+        )
     );
   };
 
   return (
     React.createElement('div', null
-      // タブ切替
+
+      // チーム選択タブ
+      , sortedTeamNames.length > 1 && React.createElement('div', {style:{marginBottom:12}}
+        , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}}, "📋 チームを選択")
+        , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
+          , React.createElement('button', {
+              onClick:()=>setSelectedTeam(null),
+              style:{padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
+                background:!selectedTeam?"#1d4ed8":"#0d1f35",
+                border:"1.5px solid "+(!selectedTeam?"#3b82f6":"#1e3a5f"),
+                color:!selectedTeam?"#fff":"#7db8e8"}}, "全チーム")
+          , sortedTeamNames.map(name=>{
+              const isReg = registeredTeams.some(t=>t.name===name);
+              const isSel = selectedTeam===name;
+              return React.createElement('button', {key:name,
+                onClick:()=>setSelectedTeam(isSel?null:name),
+                style:{padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
+                  background:isSel?"#065f46":"#0d1f35",
+                  border:"1.5px solid "+(isSel?"#22c55e":isReg?"#1e4a2a":"#1e3a5f"),
+                  color:isSel?"#4ade80":isReg?"#86efac":"#7db8e8"}},
+                name, isReg&&React.createElement('span',{style:{fontSize:9,color:isSel?"#4ade80":"#22c55e",marginLeft:3}},"★"))
+            })
+        )
+        , React.createElement('div', {style:{fontSize:10,color:"#475569",marginTop:4}},
+          filteredGames.length+"試合分の成績"+(selectedTeam?" ("+selectedTeam+"が出場した試合)":""))
+      )
+
+      // 種別タブ切替
       , React.createElement('div', {style:{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}
         , [["batting","⚾ 打撃"],["pitching","🎯 投手"],["team","🏆 チーム通算"],["recent","📅 直近5試合"]].map(([id,label])=>
             React.createElement('button', {key:id, onClick:()=>setStatsView(id),
@@ -4596,11 +4688,11 @@ function StatsTab({ game, history }) {
 
       // 打撃成績
       , statsView==="batting" && React.createElement('div', null
-          , allGames.length===0
+          , filteredGames.length===0
             ? React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:20}},"試合データがありません")
             : React.createElement('div', null
-                , React.createElement(BattingTable, {players:awayBat, teamName:game.awayTeam, color:"#fbbf24"})
-                , React.createElement(BattingTable, {players:homeBat, teamName:game.homeTeam, color:"#7dd3fc"})
+                , React.createElement(BattingTable, {players:awayBat, teamName:primaryTeam, color:"#4ade80"})
+                , secondTeam && React.createElement(BattingTable, {players:homeBat, teamName:secondTeam, color:"#7dd3fc"})
               )
         )
 

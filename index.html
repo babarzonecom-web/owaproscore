@@ -4299,7 +4299,8 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
   const [selectedTeam, setSelectedTeam] = useState(null); // null=全チーム
 
   // 全試合データ（現在の試合 + 履歴）
-  const allGames = [game, ...(history||[])].filter(g=>g&&g.awayLineup&&g.homeLineup);
+  // 成績集計は試合終了（finished）した試合のみ対象
+  const allGames = (history||[]).filter(g=>g&&g.awayLineup&&g.homeLineup&&g.finished);
 
   // 全試合に登場するチーム名を収集
   const allTeamNames = [...new Set(allGames.flatMap(g=>[g.awayTeam,g.homeTeam].filter(Boolean)))];

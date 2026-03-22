@@ -2120,7 +2120,7 @@ function App() {
     setModal({step:"confirm_delete", targetId:id});
   };
   const startNew=()=>{
-    setModal({step:"confirm_new"});
+    setModal({step:"confirm_new", fromWelcome:true});
   };
 
   const aStats=computeStats(game.awayLineup);
@@ -3706,28 +3706,18 @@ function App() {
 
         
         if(modal.step==="confirm_new") {
-          // 利用可能なチーム一覧
           const allRegTeams = [...(myTeam?[myTeam]:[]), ...(opponents||[])];
-          const [selAway, setSelAway] = modal.fromWelcome
-            ? [modal._selAway||null, v=>setModal(m=>({...m,_selAway:v}))]
-            : [null, ()=>{}];
-          const [selHome, setSelHome] = modal.fromWelcome
-            ? [modal._selHome||null, v=>setModal(m=>({...m,_selHome:v}))]
-            : [null, ()=>{}];
+          const selAway = modal._selAway || null;
+          const selHome = modal._selHome || null;
 
           const startGame = (save) => {
             const g = newGame(newInnings, newPitchMode);
-            // チームが選択されていればセット
             if(selAway) g.awayTeam = selAway.name;
             if(selHome) g.homeTeam = selHome.name;
             if(save) saveGame();
-            setStorage(s=>{
-              let updated = {...s, currentGame:g, undoStack:[]};
-              return updated;
-            });
-            // チームのラインナップをセット（選択されていれば）
-            if(selAway) setTimeout(()=>applyTeamToLineup("away", selAway), 100);
-            if(selHome) setTimeout(()=>applyTeamToLineup("home", selHome), 100);
+            setStorage(s=>({...s, currentGame:g, undoStack:[]}));
+            if(selAway) setTimeout(()=>applyTeamToLineup("away", selAway), 200);
+            if(selHome) setTimeout(()=>applyTeamToLineup("home", selHome), 200);
             setTab("score");
             setModal(null);
             showToast(`新試合を開始しました（${newInnings}回制）`);

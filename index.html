@@ -4430,26 +4430,32 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
   };
 
   // 投手成績集計
-  const aggregatePitcherStats = (side) => {
+  const aggregatePitcherStats = (filterTeamName) => {
     const map = {};
     filteredGames.forEach(g=>{
-      const pitchers = g[side+"Pitchers"]||[];
+      // filterTeamNameに一致するsideを特定
+      const sides = filterTeamName
+        ? (g.awayTeam===filterTeamName ? ["away"] : g.homeTeam===filterTeamName ? ["home"] : [])
+        : ["away","home"];
       const pStats = computePitcherStats(g);
-      const autoArr = (pStats[side]||[]);
-      pitchers.forEach((p,i)=>{
-        if(!p.name||p.name.startsWith("投手")) return;
-        if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set()};
-        const m = map[p.name];
-        m.games.add(g.id);
-        const a = autoArr[i]||{};
-        m.outs += (a._outsGot||0);
-        m.h    += (a.autoH||0);
-        m.er   += (a.autoEr||0);
-        m.bb   += (a.autoBb||0);
-        m.k    += (a.autoK||0);
-        m.hbp  += (a.autoHbp||0);
-        m.hr   += (a.autoHr||0);
-        m.runs += (a.autoRuns||0);
+      sides.forEach(side=>{
+        const pitchers = g[side+"Pitchers"]||[];
+        const autoArr = (pStats[side]||[]);
+        pitchers.forEach((p,i)=>{
+          if(!p.name||p.name.startsWith("投手")) return;
+          if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set()};
+          const m = map[p.name];
+          m.games.add(g.id);
+          const a = autoArr[i]||{};
+          m.outs += (a._outsGot||0);
+          m.h    += (a.autoH||0);
+          m.er   += (a.autoEr||0);
+          m.bb   += (a.autoBb||0);
+          m.k    += (a.autoK||0);
+          m.hbp  += (a.autoHbp||0);
+          m.hr   += (a.autoHr||0);
+          m.runs += (a.autoRuns||0);
+        });
       });
     });
     return Object.values(map).map(m=>{
@@ -4473,8 +4479,8 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
     : (_refGame && _refGame.homeTeam) || "";
   const awayBat = aggregatePlayerStats(primaryTeam);
   const homeBat = secondTeam ? aggregatePlayerStats(secondTeam) : [];
-  const awayPit = aggregatePitcherStats("away");
-  const homePit = aggregatePitcherStats("home");
+  const awayPit = aggregatePitcherStats(primaryTeam);
+  const homePit = secondTeam ? aggregatePitcherStats(secondTeam) : [];
   const defStats = aggregateDefenseStats(primaryTeam||null);
 
   // 直近5試合の個人成績
@@ -4774,7 +4780,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
       // 投手成績
       , statsView==="pitching" && React.createElement('div', null
           , React.createElement(PitchingTable, {pitchers:awayPit, teamName:primaryTeam, color:"#fbbf24"})
-          , (!selectedTeam) && React.createElement(PitchingTable, {pitchers:homePit, teamName:secondTeam||"", color:"#7dd3fc"})
+          , secondTeam && React.createElement(PitchingTable, {pitchers:homePit, teamName:secondTeam, color:"#7dd3fc"})
         )
 
       // 守備成績

@@ -2549,8 +2549,9 @@ function App() {
                 "チームタブでチームを選択するとスムーズに開始できます")
             )
           ) : (
+          React.createElement(React.Fragment, null
 
-          React.createElement('div', { style: S.card,}
+          , React.createElement('div', { style: S.card,}
             , React.createElement('div', { style: S.ct,}, "⚙️ 試合情報" )
             , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-end"},}
               , [["awayTeam","アウェイ",game.awayTeam],["homeTeam","ホーム",game.homeTeam],["venue","球場",game.venue]].map(([k,l,v])=>(
@@ -2985,7 +2986,8 @@ function App() {
               )
             )
           )
-          ) // else ブロックの閉じ
+          ) // else最後のcard閉じ
+          ) // Fragment閉じ
         ))
 
         , tab==="score"&&(game.defenseLog||[]).length>0&&(

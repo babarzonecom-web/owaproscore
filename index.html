@@ -4314,7 +4314,9 @@ function App() {
 // ===== 成績タブ =====
 function StatsTab({ game, history, teams, myTeam, opponents }) {
   const [statsView, setStatsView] = useState("batting");
-  const [selectedTeam, setSelectedTeam] = useState(null); // null=全チーム
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [sortKey, setSortKey] = useState("avg");     // ソートキー
+  const [sortDesc, setSortDesc] = useState(true);    // true=降順
 
   // 全試合データ（現在の試合 + 履歴）
   // 成績集計は試合終了（finished）した試合のみ対象
@@ -4420,7 +4422,11 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
       const ops_n = (parseFloat("0"+obp)||0)+(parseFloat("0"+slg)||0);
       const ops = ops_n>0?ops_n.toFixed(3).replace(/^0/,""):".---";
       return {...m, pa, avg, slg, obp, ops, games:m.games.size};
-    }).sort((a,b)=>b.pa-a.pa||b.ab-a.ab);
+    }).sort((a,b)=>{
+      const va = typeof a[sortKey]==="string" ? parseFloat("0"+a[sortKey]) : (a[sortKey]||0);
+      const vb = typeof b[sortKey]==="string" ? parseFloat("0"+b[sortKey]) : (b[sortKey]||0);
+      return sortDesc ? vb-va : va-vb;
+    });
   };
 
   // 投手成績集計
@@ -4458,10 +4464,13 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
   };
 
   // 選択チームの打撃成績（選択なしの場合は現在の試合のチームを表示）
-  const primaryTeam  = selectedTeam || game.awayTeam;
-  const secondTeam   = selectedTeam
-    ? null  // チーム選択時は1チームのみ
-    : game.homeTeam;
+  // filteredGamesから実際のチーム名を取得（進行中試合のデフォルト名を避ける）
+  const _refGame = filteredGames[0];
+  const primaryTeam = selectedTeam
+    || (_refGame && _refGame.awayTeam) || "";
+  const secondTeam = selectedTeam
+    ? null
+    : (_refGame && _refGame.homeTeam) || "";
   const awayBat = aggregatePlayerStats(primaryTeam);
   const homeBat = secondTeam ? aggregatePlayerStats(secondTeam) : [];
   const awayPit = aggregatePitcherStats("away");
@@ -4483,8 +4492,21 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
         , React.createElement('table', {style:{...S.table,minWidth:560}}
           , React.createElement('thead', null
             , React.createElement('tr', null
-              , ["選手","試","打席","打数","安打","打率","長打率","出塁率","OPS","本塁","打点","得点","四球","三振","盗塁","失策"].map(h=>
-                  React.createElement('th', {key:h,style:thS}, h))
+              , [
+                  ["選手",null],["試","games"],["打席","pa"],["打数","ab"],["安打","h"],
+                  ["打率","avg"],["長打率","slg"],["出塁率","obp"],["OPS","ops"],
+                  ["本塁","hr"],["打点","rbi"],["得点","run"],["四球","bb"],["三振","k"],["盗塁","sb"],["失策","e"]
+                ].map(([label,key])=>
+                  React.createElement('th', {key:label, style:{...thS,
+                    cursor:key?"pointer":"default",
+                    color:sortKey===key?"#fbbf24":"#94a3b8",
+                    background:sortKey===key?"#1a1505":"transparent",
+                    userSelect:"none"},
+                    onClick:key?()=>{
+                      if(sortKey===key) setSortDesc(d=>!d);
+                      else { setSortKey(key); setSortDesc(true); }
+                    }:undefined},
+                    label, sortKey===key?(sortDesc?"▼":"▲"):""))
             )
           )
           , React.createElement('tbody', null
@@ -4751,8 +4773,8 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
 
       // 投手成績
       , statsView==="pitching" && React.createElement('div', null
-          , React.createElement(PitchingTable, {pitchers:awayPit, teamName:game.awayTeam, color:"#fbbf24"})
-          , React.createElement(PitchingTable, {pitchers:homePit, teamName:game.homeTeam, color:"#7dd3fc"})
+          , React.createElement(PitchingTable, {pitchers:awayPit, teamName:primaryTeam, color:"#fbbf24"})
+          , (!selectedTeam) && React.createElement(PitchingTable, {pitchers:homePit, teamName:secondTeam||"", color:"#7dd3fc"})
         )
 
       // 守備成績
@@ -4810,7 +4832,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
               )
               , React.createElement('tbody', null
                 , [
-                    {side:"away", name:game.awayTeam, color:"#fbbf24", players:awayBat},
+                    {side:"away", name:primaryTeam, color:"#4ade80", players:awayBat},
                     {side:"home", name:game.homeTeam, color:"#7dd3fc", players:homeBat},
                   ].map(({name,color,players,side})=>{
                     const runs = allGames.reduce((s,g)=>s+Object.values(g[side+"Score"]||{}).reduce((a,v)=>a+(parseInt(v)||0),0),0);

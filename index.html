@@ -2726,7 +2726,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v193")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v194")
         , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -4755,11 +4755,12 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
         const autoArr = (pStats[side]||[]);
         pitchers.forEach((p,i)=>{
           if(!p.name||p.name.startsWith("投手")) return;
-          if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set()};
+          if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set(),outsXinnings:0};
           const m = map[p.name];
           m.games.add(g.id);
           const a = autoArr[i]||{};
-          m.outs += (a._outsGot||0);
+          const outsGot = a._outsGot||0;
+          m.outs += outsGot;
           m.h    += (a.autoH||0);
           m.er   += (a.autoEr||0);
           m.bb   += (a.autoBb||0);
@@ -4767,6 +4768,8 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
           m.hbp  += (a.autoHbp||0);
           m.hr   += (a.autoHr||0);
           m.runs += (a.autoRuns||0);
+          // 防御率計算用：投球アウト数×試合のイニング数を累積
+          m.outsXinnings += outsGot * (g.innings||9);
         });
       });
     });
@@ -4775,7 +4778,9 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
       const ipFrac  = m.outs%3;
       const ipNum   = ipWhole + ipFrac/3;
       const ipDisp  = ipWhole+"回"+(ipFrac>0?ipFrac+"/3":"");
-      const era = ipNum>0?(m.er*9/ipNum).toFixed(2):(m.er>0?"∞":"—");
+      // 加重平均イニング数（投球アウト数で重み付け）
+      const avgInnings = m.outs>0 ? m.outsXinnings/m.outs : 9;
+      const era = ipNum>0?(m.er*avgInnings/ipNum).toFixed(2):(m.er>0?"∞":"—");
       const whip= ipNum>0?((m.bb+m.h)/ipNum).toFixed(2):"—";
       return {...m, ipDisp, ipNum, era, whip, games:m.games.size};
     }).sort((a,b)=>b.ipNum-a.ipNum);

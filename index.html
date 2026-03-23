@@ -1183,10 +1183,24 @@ function App() {
           // 管理者の場合：現在のゲームデータを即座にFirebaseへ書き込む
           if(role === "admin") {
             try {
-              const currentGame = JSON.parse(localStorage.getItem("bb_v7")||"{}").currentGame;
+              const localData = JSON.parse(localStorage.getItem("bb_v7")||"{}");
+              const currentGame = localData.currentGame;
               if(currentGame && fbInit()) {
                 fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/currentGame.json",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({},currentGame,{_ts:Date.now()}))});
                 console.log("[TEAM] Admin initial push done");
+              }
+              // 自チーム情報をFirebaseにアップロード
+              const myT = localData.myTeam;
+              if(myT && myT.name) {
+                const teamInfo = {
+                  id: myT.id || tc,
+                  name: myT.name,
+                  members: myT.members || [],
+                  isMyTeam: true,
+                  _ts: Date.now(),
+                };
+                fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/teamInfo.json",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(teamInfo)});
+                console.log("[TEAM] Team info uploaded:", myT.name);
               }
             } catch(e2){ console.error("[TEAM] initial push error", e2); }
           }
@@ -1205,6 +1219,41 @@ function App() {
           localStorage.setItem("tsRole", role);
           showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
           console.log("[TEAM] Connected role="+role+" code="+tc+" window.role="+window.__teamShareRole);
+
+          // チームコードからチーム情報（メンバー）を取得して自動登録
+          fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/teamInfo.json",{cache:"no-store"})
+            .then(r=>r.json()).then(teamInfo=>{
+              if(!teamInfo || !teamInfo.name) return;
+              // メンバー配列を正規化
+              const rawMembers = teamInfo.members;
+              const members = Array.isArray(rawMembers)
+                ? rawMembers
+                : (rawMembers ? Object.values(rawMembers) : []);
+              const teamObj = {
+                id: teamInfo.id || tc,
+                name: teamInfo.name,
+                members: members,
+              };
+              // 自チームまたは対戦相手として登録
+              setStorage(s=>{
+                const isMyTeam = teamInfo.isMyTeam || false;
+                if(isMyTeam) {
+                  // 既に同名の自チームがなければ登録
+                  if(!s.myTeam || s.myTeam.name !== teamObj.name) {
+                    showToast("🏟 "+teamObj.name+" を自チームにセットしました");
+                    return {...s, myTeam: teamObj};
+                  }
+                } else {
+                  // 対戦相手として登録（重複チェック）
+                  const exists = (s.opponents||[]).some(t=>t.name===teamObj.name);
+                  if(!exists) {
+                    showToast("⚔️ "+teamObj.name+" を対戦相手に追加しました");
+                    return {...s, opponents:[...(s.opponents||[]), teamObj]};
+                  }
+                }
+                return s;
+              });
+            }).catch(()=>{});
 
           // 閲覧者のみFirebase購読（管理者は購読しない）
           if(role === "viewer") {
@@ -2505,6 +2554,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v185")
         , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3740,7 +3790,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700}}, "🏟 チームを選択（任意）")
                 , ["away","home"].map(side=>{
                     const sel = side==="away" ? selAway : selHome;
-                    const setSel = side==="away" ? setSelAway : setSelHome;
+                    const setSel = v => setModal(m=>({...m, [side==="away"?"_selAway":"_selHome"]:v}));
                     const label = side==="away" ? "ビジター（先攻）" : "ホーム（後攻）";
                     return React.createElement('div', {key:side, style:{marginBottom:8}}
                       , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:4}}, label)

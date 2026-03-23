@@ -1797,17 +1797,16 @@ function App() {
       const scoredRunners = [];
 
       // 盗塁/刺カウントを各ランナーに加算
-      // SB/CS/PO: 実際に移動した（元の塁から動いた）ランナーのみ対象
-      if(isSB || isOutType) {
+      // SB→盗塁+1、CS/PO→盗塁刺+1、RO→カウントなし（走塁死は盗塁関連に含まない）
+      const isCsType = type==="CS" || type==="PO"; // 盗塁刺・牽制死のみcs加算
+      if(isSB || isCsType) {
         lineup = lineup.map(p=>{
-          // このランナーのmoveを探す
           const mv = moves.find(m=>m.runner.name===p.name);
           if(!mv) return p;
-          // 元の塁と同じ場所に留まっている場合は盗塁扱いしない
           const stayed = !mv.isOut && mv.destBi === mv.runner.bi;
           if(stayed) return p;
-          if(isSB && !mv.isOut) return {...p, sb:(p.sb||0)+1};    // 盗塁成功
-          if(mv.isOut || isOutType) return {...p, cs:(p.cs||0)+1}; // 刺・牽制死
+          if(isSB && !mv.isOut) return {...p, sb:(p.sb||0)+1};  // 盗塁成功
+          if(isCsType && mv.isOut) return {...p, cs:(p.cs||0)+1}; // 盗塁刺・牽制死
           return p;
         });
       }
@@ -2727,7 +2726,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v192")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v193")
         , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",

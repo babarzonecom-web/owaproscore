@@ -1249,8 +1249,95 @@ function App() {
           showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
           console.log("[TEAM] Connected role="+role+" code="+tc+" window.role="+window.__teamShareRole);
 
-          // チームコードからチーム情報を取得して自動登録
-          // teamInfo と currentGame の両方から復元を試みる
+          // ===== チーム自動同期（コード接続時に双方向） =====
+          const syncTeamsWithFirebase = (tc, role) => {
+            const baseUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc;
+
+            // 自分のチームをアップロード（登録があれば）
+            const uploadMyTeams = () => {
+              const localData = JSON.parse(localStorage.getItem("bb_v7")||"{}");
+              const allTeams = [
+                ...(localData.myTeam ? [{...localData.myTeam, isMyTeam:true}] : []),
+                ...(localData.opponents||[]).map(t=>({...t, isMyTeam:false})),
+              ];
+              if(allTeams.length === 0) return Promise.resolve();
+              return Promise.all(allTeams.map(t=>
+                fetch(baseUrl+"/teams/"+encodeURIComponent(t.name)+".json", {
+                  method:"PUT", headers:{"Content-Type":"application/json"},
+                  body:JSON.stringify({id:t.id||t.name, name:t.name, members:t.members||[], isMyTeam:t.isMyTeam, _ts:Date.now()})
+                })
+              ));
+            };
+
+            // Firebaseのチームをダウンロードして登録
+            const downloadTeams = () =>
+              fetch(baseUrl+"/teams.json", {cache:"no-store"})
+                .then(r=>r.json())
+                .then(data=>{
+                  if(!data) return;
+                  const arr = Array.isArray(data) ? data : Object.values(data);
+                  if(arr.length===0) return;
+                  setStorage(s=>{
+                    let ns = {...s};
+                    let added = [];
+                    arr.forEach(t=>{
+                      if(!t||!t.name) return;
+                      const members = Array.isArray(t.members)?t.members:(t.members?Object.values(t.members):[]);
+                      const teamObj = {id:t.id||t.name, name:t.name, members};
+                      if(t.isMyTeam) {
+                        if(!ns.myTeam||ns.myTeam.name!==t.name){
+                          ns={...ns, myTeam:teamObj};
+                          added.push("自チーム:"+t.name);
+                        }
+                      } else {
+                        if(!(ns.opponents||[]).some(o=>o.name===t.name)){
+                          ns={...ns, opponents:[...(ns.opponents||[]),teamObj]};
+                          added.push(t.name);
+                        }
+                      }
+                    });
+                    if(added.length>0) showToast("👥 チーム同期: "+added.join(", "));
+                    return ns;
+                  });
+                }).catch(()=>{});
+
+            // currentGameからも補完（teamInfoがない古いデータ向け）
+            const downloadFromGame = () =>
+              fetch(baseUrl+"/currentGame.json", {cache:"no-store"})
+                .then(r=>r.json())
+                .then(gameData=>{
+                  if(!gameData) return;
+                  setStorage(s=>{
+                    let ns = {...s};
+                    const addFromLineup = (teamName, lineupRaw, isMyTeam) => {
+                      if(!teamName||teamName==="ビジターチーム"||teamName==="ホームチーム") return;
+                      const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
+                      const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
+                      if(members.length===0) return;
+                      if(isMyTeam) {
+                        if(!ns.myTeam||ns.myTeam.name!==teamName) ns={...ns,myTeam:{id:tc+"_my",name:teamName,members}};
+                      } else {
+                        if(!(ns.opponents||[]).some(o=>o.name===teamName))
+                          ns={...ns,opponents:[...(ns.opponents||[]),{id:tc+"_opp",name:teamName,members}]};
+                      }
+                    };
+                    addFromLineup(gameData.awayTeam, gameData.awayLineup, false);
+                    addFromLineup(gameData.homeTeam, gameData.homeLineup, false);
+                    return ns;
+                  });
+                }).catch(()=>{});
+
+            // アップロード後にダウンロード（順序保証）
+            uploadMyTeams()
+              .then(()=>downloadTeams())
+              .then(()=>downloadFromGame())
+              .catch(()=>{});
+          };
+
+          // 接続時に自動同期を実行
+          syncTeamsWithFirebase(tc, role);
+
+          // 以下は削除（registerTeamFromDataに統合済み）
           const registerTeamFromData = (teamInfo, gameData) => {
             const teamsToRegister = [];
 
@@ -1316,13 +1403,7 @@ function App() {
             });
           };
 
-          // teamInfoとcurrentGameを並列取得
-          Promise.all([
-            fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/teamInfo.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>null),
-            fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/currentGame.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>null),
-          ]).then(([teamInfo, gameData])=>{
-            registerTeamFromData(teamInfo, gameData);
-          }).catch(()=>{});
+          // (旧registerTeamFromData呼び出しはsyncTeamsWithFirebaseに統合)
 
           // 閲覧者のみFirebase購読（管理者は購読しない）
           if(role === "viewer") {
@@ -2646,7 +2727,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v189")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v191")
         , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3585,6 +3666,8 @@ function App() {
                         "現在の履歴:", (history||[]).length, "試合保存済み")
                   )
                 )
+
+
               )
             ) : (
               // 未接続：チームコード入力UI

@@ -821,6 +821,25 @@ const computePitcherStats = (g) => {
       if(code==="DP" && !ab.hasError) ps._outsGot += 1; 
     });
 
+    // baserunnerOuts（走塁アウト）も投球回に加算
+    const bOuts = g.baserunnerOuts || [];
+    bOuts.forEach(bo=>{
+      if(bo.defTeam !== defTeam) return;
+      // このアウトが発生した時点のイニング・ハーフ・アウト数
+      const boInning = bo.inning; const boHalf = bo.half; const boOuts = bo.outsAtTime||0;
+      // 担当投手を特定
+      let activePIdx = log[0].pitcherIdx;
+      for(let i=0;i<log.length;i++){
+        const l=log[i];
+        const lt=l.fromInning*2+(l.fromHalf==="top"?0:1);
+        const bt=boInning*2+(boHalf==="top"?0:1);
+        if(lt < bt) activePIdx=l.pitcherIdx;
+        else if(lt===bt && (l.outsAtStart||0)<=(boOuts||0)) activePIdx=l.pitcherIdx;
+      }
+      const ps = stats[activePIdx];
+      if(ps) ps._outsGot++;
+    });
+
     stats.forEach(ps=>{
       ps.autoIp = Math.floor(ps._outsGot/3)*10 + (ps._outsGot%3); 
     });
@@ -846,6 +865,7 @@ const newGame = (innings=7, pitchMode="result") => ({
   awayPitcherIdx:0, homePitcherIdx:0, 
   
   awayPitcherLog:[], homePitcherLog:[],
+  baserunnerOuts: [], // 走塁アウト記録 [{inning,half,outsAtTime,defTeam}]
 });
 
 // Firebase helpers
@@ -1173,6 +1193,13 @@ function App() {
               setTeamShareError("管理者パスワードが違います");
               return;
             }
+          } else {
+            // パスワードなし
+            if(!data || !data.adminPw) {
+              // adminPw未設定のチームコード → 管理者として接続
+              role = "admin";
+            }
+            // adminPw設定済みの場合はviewerのまま
           }
 
           // windowグローバルに保存（mutGame内から参照）
@@ -1552,11 +1579,25 @@ function App() {
         defLineupUpdate = {[defLk]:defLineup};
       }
       const changeOccurs = newOuts>=3;
+      // 手動調整でアウトが増えた分をbaserunnerOutsに記録（投球回計算用）
+      // OUT_CODES_FOR_IPに含まれないコード（進塁手動アウト等）の場合のみ追加
+      const codeIsIpOut = OUT_CODES_FOR_IP.has(code);
+      let brOuts = [...(g.baserunnerOuts||[])];
+      if(newOuts !== undefined && !codeIsIpOut) {
+        const addedOuts = (newOuts || 0) - (g.outs || 0);
+        if(addedOuts > 0) {
+          const defTeam = team==="away"?"home":"away";
+          for(let i=0;i<addedOuts;i++){
+            brOuts.push({inning:g.inning, half:g.half, outsAtTime:g.outs+i, defTeam});
+          }
+        }
+      }
       const tmp={...g, [lk]:lineup, ...defLineupUpdate,
         bases: newBases!==undefined ? newBases : g.bases,
         outs:  newOuts!==undefined  ? (changeOccurs?0:newOuts) : g.outs,
         inning: changeOccurs ? (g.half==="top"?g.inning:Math.min(g.inning+1,15)) : g.inning,
         half:   changeOccurs ? (g.half==="top"?"bottom":"top") : g.half,
+        baserunnerOuts: brOuts,
       };
       const batterKey = team+"BatterIdx";
       const lineupLen = lineup.length;
@@ -1664,7 +1705,7 @@ function App() {
   // type: 進塁の種別（SB/WP/PB/BK/OBI/ADV/CS/PO）
   // primaryPidx: 主体となる選手のlineupインデックス（盗塁成功/刺のカウント用）
   const recordSB = useCallback((team, moves, type, primaryPidx)=>{
-    const isOutType = type==="CS" || type==="PO";
+    const isOutType = type==="CS" || type==="PO" || type==="RO";
     const isSB      = type==="SB";
 
     mutGame(g=>{
@@ -1740,6 +1781,14 @@ function App() {
       const changeOccurs = outs>=3;
       const finalBases   = changeOccurs ? [null,null,null] : newBases;
 
+      // 走塁アウトをbaserunnerOutsに記録（投球回計算用）
+      let brOuts = [...(g.baserunnerOuts||[])];
+      if(outsAdded > 0) {
+        for(let i=0;i<outsAdded;i++){
+          brOuts.push({inning:g.inning, half:g.half, outsAtTime:g.outs+i, defTeam:team==="away"?"home":"away"});
+        }
+      }
+
       return {...g,
         [lk]:lineup,
         [scoreKey]:newScore,
@@ -1747,11 +1796,12 @@ function App() {
         outs:changeOccurs?0:outs,
         inning:changeOccurs?(g.half==="top"?g.inning:Math.min(g.inning+1,15)):g.inning,
         half:changeOccurs?(g.half==="top"?"bottom":"top"):g.half,
+        baserunnerOuts:brOuts,
         log};
     });
     setModal(null);
     const toastMsg = {
-      SB:"盗塁✅", CS:"盗塁刺❌", PO:"牽制アウト❌",
+      SB:"盗塁✅", CS:"盗塁刺❌", PO:"牽制アウト❌", RO:"走塁死❌",
       WP:"WP進塁✅", PB:"PB進塁✅", BK:"ボーク✅",
       OBI:"走塁妨害・進塁✅", ADV:"進塁✅",
     }[type]||type;
@@ -2596,7 +2646,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v185")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v189")
         , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -4010,6 +4060,7 @@ function App() {
                             {t:"SB",  l:"✅ 盗塁成功",  c:"#4ade80"},
                             {t:"CS",  l:"❌ 盗塁刺",    c:"#f87171"},
                             {t:"PO",  l:"🏷 牽制死",    c:"#a78bfa"},
+                            {t:"RO",  l:"🏃 走塁死",    c:"#f97316"},
                             {t:"WP",  l:"WP 暴投",      c:"#f97316"},
                             {t:"PB",  l:"PB 捕逸",      c:"#38bdf8"},
                             {t:"BK",  l:"BK ボーク",    c:"#a78bfa"},
@@ -4030,11 +4081,12 @@ function App() {
                     , React.createElement('button',{
                         disabled:!sbType,
                         onClick:()=>{
-                          // デフォルト: 全ランナー1つ進塁
+                          // CS/POの場合はデフォルトでisOut:true
+                          const isOutType = ["CS","PO","RO"].includes(sbType);
                           const moves = runners.map(r=>({
                             runner: r,
-                            destBi: Math.min(r.bi+1, 3),
-                            isOut: false,
+                            destBi: isOutType ? r.bi : Math.min(r.bi+1, 3),
+                            isOut: isOutType,
                           }));
                           const pidx = primaryBi!=null
                             ? curLineup.findIndex(p=>p.name===game.bases[primaryBi])

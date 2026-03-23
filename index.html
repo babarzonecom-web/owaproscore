@@ -1189,7 +1189,7 @@ function App() {
                 fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/currentGame.json",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({},currentGame,{_ts:Date.now()}))});
                 console.log("[TEAM] Admin initial push done");
               }
-              // 自チーム情報をFirebaseにアップロード
+              // 自チーム情報をFirebaseにアップロード（fbInit不要・REST直接）
               const myT = localData.myTeam;
               if(myT && myT.name) {
                 const teamInfo = {
@@ -1199,8 +1199,10 @@ function App() {
                   isMyTeam: true,
                   _ts: Date.now(),
                 };
-                fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/teamInfo.json",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(teamInfo)});
-                console.log("[TEAM] Team info uploaded:", myT.name);
+                fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/teamInfo.json",
+                  {method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(teamInfo)})
+                  .then(()=>console.log("[TEAM] Team info uploaded:", myT.name))
+                  .catch(e=>console.error("[TEAM] teamInfo upload error", e));
               }
             } catch(e2){ console.error("[TEAM] initial push error", e2); }
           }
@@ -1220,40 +1222,80 @@ function App() {
           showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
           console.log("[TEAM] Connected role="+role+" code="+tc+" window.role="+window.__teamShareRole);
 
-          // チームコードからチーム情報（メンバー）を取得して自動登録
-          fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/teamInfo.json",{cache:"no-store"})
-            .then(r=>r.json()).then(teamInfo=>{
-              if(!teamInfo || !teamInfo.name) return;
-              // メンバー配列を正規化
+          // チームコードからチーム情報を取得して自動登録
+          // teamInfo と currentGame の両方から復元を試みる
+          const registerTeamFromData = (teamInfo, gameData) => {
+            const teamsToRegister = [];
+
+            // teamInfoがある場合
+            if(teamInfo && teamInfo.name) {
               const rawMembers = teamInfo.members;
               const members = Array.isArray(rawMembers)
                 ? rawMembers
                 : (rawMembers ? Object.values(rawMembers) : []);
-              const teamObj = {
+              teamsToRegister.push({
                 id: teamInfo.id || tc,
                 name: teamInfo.name,
                 members: members,
-              };
-              // 自チームまたは対戦相手として登録
-              setStorage(s=>{
-                const isMyTeam = teamInfo.isMyTeam || false;
-                if(isMyTeam) {
-                  // 既に同名の自チームがなければ登録
-                  if(!s.myTeam || s.myTeam.name !== teamObj.name) {
-                    showToast("🏟 "+teamObj.name+" を自チームにセットしました");
-                    return {...s, myTeam: teamObj};
+                isMyTeam: teamInfo.isMyTeam || false,
+              });
+            }
+
+            // currentGameのlineupからもチームを復元（teamInfoがない場合の補完）
+            if(gameData && gameData.awayTeam && gameData.awayTeam !== "ビジターチーム") {
+              const alreadyHas = teamsToRegister.some(t=>t.name===gameData.awayTeam);
+              if(!alreadyHas) {
+                const rawLineup = gameData.awayLineup;
+                const lineup = Array.isArray(rawLineup) ? rawLineup : (rawLineup ? Object.values(rawLineup) : []);
+                const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
+                if(members.length > 0) {
+                  teamsToRegister.push({id:tc+"_away", name:gameData.awayTeam, members, isMyTeam:false});
+                }
+              }
+            }
+            if(gameData && gameData.homeTeam && gameData.homeTeam !== "ホームチーム") {
+              const alreadyHas = teamsToRegister.some(t=>t.name===gameData.homeTeam);
+              if(!alreadyHas) {
+                const rawLineup = gameData.homeLineup;
+                const lineup = Array.isArray(rawLineup) ? rawLineup : (rawLineup ? Object.values(rawLineup) : []);
+                const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
+                if(members.length > 0) {
+                  teamsToRegister.push({id:tc+"_home", name:gameData.homeTeam, members, isMyTeam:false});
+                }
+              }
+            }
+
+            if(teamsToRegister.length === 0) return;
+
+            setStorage(s=>{
+              let ns = {...s};
+              let msgs = [];
+              teamsToRegister.forEach(team=>{
+                if(team.isMyTeam) {
+                  if(!ns.myTeam || ns.myTeam.name !== team.name) {
+                    ns = {...ns, myTeam: {id:team.id,name:team.name,members:team.members}};
+                    msgs.push("🏟 "+team.name+" を自チームにセット");
                   }
                 } else {
-                  // 対戦相手として登録（重複チェック）
-                  const exists = (s.opponents||[]).some(t=>t.name===teamObj.name);
+                  const exists = (ns.opponents||[]).some(t=>t.name===team.name);
                   if(!exists) {
-                    showToast("⚔️ "+teamObj.name+" を対戦相手に追加しました");
-                    return {...s, opponents:[...(s.opponents||[]), teamObj]};
+                    ns = {...ns, opponents:[...(ns.opponents||[]), {id:team.id,name:team.name,members:team.members}]};
+                    msgs.push("⚔️ "+team.name+" を対戦相手に追加");
                   }
                 }
-                return s;
               });
-            }).catch(()=>{});
+              if(msgs.length > 0) showToast(msgs.join(" / "));
+              return ns;
+            });
+          };
+
+          // teamInfoとcurrentGameを並列取得
+          Promise.all([
+            fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/teamInfo.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>null),
+            fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/currentGame.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>null),
+          ]).then(([teamInfo, gameData])=>{
+            registerTeamFromData(teamInfo, gameData);
+          }).catch(()=>{});
 
           // 閲覧者のみFirebase購読（管理者は購読しない）
           if(role === "viewer") {

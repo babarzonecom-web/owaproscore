@@ -110,6 +110,7 @@ const RESULTS = [
   { code:"SF",  label:"犠飛",    color:"#f472b6", short:"SF"  },
   { code:"OI",  label:"守備妨害アウト", color:"#dc2626", short:"OI" },
 ];
+const OUT_CODES_FOR_IP = new Set(["K","KL","GO","FO","LO","FF","SAC","SF","DP","OI"]);
 const DIR_CODES  = new Set(["H1","H2","H3","HR","GO","FO","LO","FF","DP","E","FC","SAC","SF"]);
 const HIT_CODES  = new Set(["H1","H2","H3","HR"]);
 const NOAB_CODES = new Set(["BB","HBP","SAC","SF","IBB","CI"]);
@@ -684,8 +685,7 @@ const computePitcherStats = (g) => {
     const currentPIdx = g[defTeam+"PitcherIdx"]||0;
 
     
-    const OUT_CODES_FOR_IP = new Set(["K","KL","GO","FO","LO","FF","SAC","SF","DP","OI"]);
-    const OUT_CODES = OUT_CODES_FOR_IP;
+    const OUT_CODES = OUT_CODES_FOR_IP; // グローバル定数を参照
     const allAtBats = []; 
     const _pitInns = Array.from({length:g.innings||9},(_,i)=>i+1);
     _pitInns.forEach(inn=>{
@@ -2727,7 +2727,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v191")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v192")
         , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",

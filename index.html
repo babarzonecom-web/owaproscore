@@ -3768,13 +3768,31 @@ function App() {
 
           const startGame = (save) => {
             const g = newGame(newInnings, newPitchMode);
-            if(selAway) g.awayTeam = selAway.name;
-            if(selHome) g.homeTeam = selHome.name;
-            if(save) saveGame();
             g.started = true;
+
+            // チーム選択があれば名前とlineupを直接セット
+            const buildLineup = (team) => {
+              const members = team.members||[];
+              const lineup = members.slice(0,9).map((m,i)=>({
+                ...makePlayer(i+1),
+                name: typeof m==="string" ? m : (m.name||`選手${i+1}`),
+                pos: typeof m==="object" && m.pos ? m.pos : "",
+              }));
+              while(lineup.length < DEFAULT_PLAYERS) lineup.push(makePlayer(lineup.length+1));
+              return lineup;
+            };
+
+            if(selAway) {
+              g.awayTeam = selAway.name;
+              g.awayLineup = buildLineup(selAway);
+            }
+            if(selHome) {
+              g.homeTeam = selHome.name;
+              g.homeLineup = buildLineup(selHome);
+            }
+
+            if(save) saveGame();
             setStorage(s=>({...s, currentGame:g, undoStack:[]}));
-            if(selAway) setTimeout(()=>applyTeamToLineup("away", selAway), 200);
-            if(selHome) setTimeout(()=>applyTeamToLineup("home", selHome), 200);
             setTab("score");
             setModal(null);
             showToast(`新試合を開始しました（${newInnings}回制）`);

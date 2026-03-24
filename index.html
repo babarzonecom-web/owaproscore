@@ -1324,6 +1324,9 @@ function App() {
             const baseUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc;
 
             // 自分のチームをアップロード（登録があれば）
+            // Firebaseキーに使えない文字を除去（日本語・記号等）
+            const toFirebaseKey = str => (str||"").replace(/[.#$\[\]%\/]/g,"_").replace(/[^\x00-\x7F]/g, c=>"u"+c.codePointAt(0).toString(16)).slice(0,64)||"team";
+
             const uploadMyTeams = () => {
               const localData = JSON.parse(localStorage.getItem("bb_v7")||"{}");
               const allTeams = [
@@ -1331,12 +1334,13 @@ function App() {
                 ...(localData.opponents||[]).map(t=>({...t, isMyTeam:false})),
               ];
               if(allTeams.length === 0) return Promise.resolve();
-              return Promise.all(allTeams.map(t=>
-                fetch(baseUrl+"/teams/"+encodeURIComponent(t.name)+".json", {
+              return Promise.all(allTeams.map(t=>{
+                const safeKey = toFirebaseKey(t.name);
+                return fetch(baseUrl+"/teams/"+safeKey+".json", {
                   method:"PUT", headers:{"Content-Type":"application/json"},
                   body:JSON.stringify({id:t.id||t.name, name:t.name, members:t.members||[], isMyTeam:t.isMyTeam, _ts:Date.now()})
-                })
-              ));
+                });
+              }));
             };
 
             // Firebaseのチームをダウンロードして登録
@@ -2819,7 +2823,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v202")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v204")
         , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -4772,12 +4776,32 @@ function App() {
 function StatsTab({ game, history, teams, myTeam, opponents }) {
   const [statsView, setStatsView] = useState("batting");
   const [selectedTeam, setSelectedTeam] = useState(null);
-  const [sortKey, setSortKey] = useState("avg");     // ソートキー
-  const [sortDesc, setSortDesc] = useState(true);    // true=降順
+  const [sortKey, setSortKey] = useState("avg");
+  const [sortDesc, setSortDesc] = useState(true);
+  const [showAlias, setShowAlias] = useState(false); // 別名設定UI表示
+  // チーム名エイリアス: {履歴のチーム名 -> 登録チーム名}
+  const [teamAliases, setTeamAliases] = React.useState(()=>{
+    try { return JSON.parse(localStorage.getItem("teamAliases")||"{}"); } catch(e){ return {}; }
+  });
+  const saveAlias = (from, to) => {
+    setTeamAliases(prev=>{
+      const next = {...prev};
+      if(to) next[from]=to; else delete next[from];
+      localStorage.setItem("teamAliases", JSON.stringify(next));
+      return next;
+    });
+  };
+  // エイリアスを適用してゲームのチーム名を正規化
+  const normalizeTeamName = name => teamAliases[name] || name;
 
   // 全試合データ（現在の試合 + 履歴）
   // 成績集計は試合終了（finished）した試合のみ対象
-  const allGames = (history||[]).filter(g=>g&&g.awayLineup&&g.homeLineup&&g.finished);
+  // エイリアスを適用したゲームリスト
+  const allGames = (history||[]).filter(g=>g&&g.awayLineup&&g.homeLineup&&g.finished).map(g=>({
+    ...g,
+    awayTeam: normalizeTeamName(g.awayTeam),
+    homeTeam: normalizeTeamName(g.homeTeam),
+  }));
 
   // 全試合に登場するチーム名を収集
   const allTeamNames = [...new Set(allGames.flatMap(g=>[g.awayTeam,g.homeTeam].filter(Boolean)))];
@@ -5219,8 +5243,46 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
                 name, isReg&&React.createElement('span',{style:{fontSize:9,color:isSel?"#4ade80":"#22c55e",marginLeft:3}},"★"))
             })
         )
-        , React.createElement('div', {style:{fontSize:10,color:"#475569",marginTop:4}},
-          filteredGames.length+"試合分の成績"+(selectedTeam?" ("+selectedTeam+"が出場した試合)":""))
+        , React.createElement('div', {style:{display:"flex",alignItems:"center",marginTop:4,gap:8}}
+          , React.createElement('div', {style:{fontSize:10,color:"#475569",flex:1}},
+              filteredGames.length+"試合分の成績"+(selectedTeam?" ("+selectedTeam+"が出場した試合)":""))
+          , React.createElement('button', {
+              onClick:()=>setShowAlias(v=>!v),
+              style:{fontSize:10,padding:"2px 8px",borderRadius:5,cursor:"pointer",
+                background:showAlias?"#1d4ed833":"#0d1f35",
+                border:"1px solid "+(showAlias?"#3b82f6":"#1e3a5f"),
+                color:showAlias?"#7dd3fc":"#475569"}
+            }, "🔗 チーム名を紐づける")
+        )
+
+        // 別名設定UI
+        , showAlias && React.createElement('div', {style:{
+            background:"#060f1e",borderRadius:8,padding:10,marginTop:8,
+            border:"1px solid #1e3a5f"}}
+          , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}},
+            "🔗 チーム名の紐づけ設定")
+          , React.createElement('div', {style:{fontSize:10,color:"#475569",marginBottom:8}},
+            "履歴に残っている別名を登録チームに紐づけます")
+          , [...new Set((history||[]).filter(g=>g.finished).flatMap(g=>[g.awayTeam,g.homeTeam]).filter(Boolean))].map(rawName=>{
+              const registered = [...(myTeam?[myTeam]:[]),...(opponents||[]),...(teams||[])];
+              const current = teamAliases[rawName] || "";
+              return React.createElement('div', {key:rawName, style:{
+                  display:"flex",alignItems:"center",gap:6,marginBottom:6}}
+                , React.createElement('span', {style:{fontSize:11,color:"#e2e8f0",minWidth:80,
+                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, rawName)
+                , React.createElement('span', {style:{fontSize:11,color:"#475569"}}, "→")
+                , React.createElement('select', {
+                    value: current,
+                    onChange: e=>saveAlias(rawName, e.target.value),
+                    style:{flex:1,background:"#0d1f35",border:"1px solid #1e3a5f",
+                      color:"#e2e8f0",borderRadius:6,padding:"4px 6px",fontSize:11}
+                  }
+                  , React.createElement('option', {value:""}, "（そのまま）")
+                  , registered.map(t=>React.createElement('option', {key:t.name,value:t.name}, t.name))
+                )
+              );
+            })
+        )
       )
 
       // 種別タブ切替

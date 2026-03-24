@@ -621,16 +621,17 @@ const computeOneStats = (p) => {
     if(!NOAB_CODES.has(code)) ab++;
     if(HIT_CODES.has(code)){h++;tb+=code==="H1"?1:code==="H2"?2:code==="H3"?3:4;}
     if(code==="HR") hr++;
-    if(code==="BB"||code==="CI") bb++;  // 打撃妨害も四球扱いで出塁率に加算
+    if(code==="BB"||code==="IBB"||code==="CI") bb++;  // IBB・打撃妨害も四球扱い
     if(code==="HBP") hbp++;
     if(code==="K"||code==="KL"||code==="KW") k++;
     if(code==="SAC") sac++;
     if(code==="SF")  sf++;
   });
-  r += (p.run||0);  // HR・盗塁・WP等すべての得点はp.runに集約
-  const pa = ab + bb + hbp + sac + sf;
+  r += (p.run||0);
+  const pa = ab + bb + hbp + sac + sf;  // IBBはbbに含まれるので別途加算不要
   const slg = ab>0 ? (tb/ab) : 0;
-  const obp = (ab+bb+hbp)>0 ? ((h+bb+hbp)/(ab+bb+hbp)) : 0;
+  // 出塁率: (H+BB+HBP) / (AB+BB+HBP+SF)  ※SFは分母に含める（犠打SACは除外）
+  const obp = (ab+bb+hbp+sf)>0 ? ((h+bb+hbp)/(ab+bb+hbp+sf)) : 0;
   const ops = obp + slg;
   const fmtAvg = v => v>0 ? v.toFixed(3).replace(/^0/,"") : ".---";
   return {...p,_pa:pa,_ab:ab,_h:h,_hr:hr,_bb:bb,_hbp:hbp,_k:k,_tb:tb,_r:r,
@@ -686,26 +687,32 @@ const computePitcherStats = (g) => {
 
     
     const OUT_CODES = OUT_CODES_FOR_IP; // グローバル定数を参照
-    const allAtBats = []; 
+    const allAtBats = [];
     const _pitInns = Array.from({length:g.innings||9},(_,i)=>i+1);
     _pitInns.forEach(inn=>{
       ["top","bottom"].forEach(half=>{
-        
         const battingTeam = half==="top" ? "away" : "home";
         if(battingTeam !== offTeam) return;
-        // このイニング・ハーフの累積アウト数を打席順に付与
-        let outsInHalf = 0;
+
+        // このイニングの全打席を「打順番号（0-indexed）+ 打席内インデックス」でソート
+        // lineup[pi]の打席をpi=打順位置として扱う
+        const halfAtBats = [];
         lineup.forEach((p,pi)=>{
           if(!p.atBats) p.atBats={};
           toList(p.atBats,inn).forEach((e,ei)=>{
-            const ne = norm(e);
-            const outsAtAb = outsInHalf;
-            const hasError = !!(ne.errorPos); // エラーがあればアウトにならない
-            allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb, hasError});
-            // この打席でアウトが増えた数を加算（エラーがある場合はアウトにならない）
-            if(OUT_CODES_FOR_IP.has(ne.code) && !hasError) outsInHalf++;
-            if(ne.code==="DP" && !hasError) outsInHalf++;
+            halfAtBats.push({pi, ei, e:norm(e)});
           });
+        });
+        // 打順インデックスでソート（同一打順内はentryIdx順）
+        halfAtBats.sort((a,b)=> a.pi!==b.pi ? a.pi-b.pi : a.ei-b.ei);
+
+        // outsInHalfを累積しながらallAtBatsに追加
+        let outsInHalf = 0;
+        halfAtBats.forEach(({pi, ei, e:ne})=>{
+          const hasError = !!(ne.errorPos);
+          allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb:outsInHalf, hasError});
+          if(OUT_CODES_FOR_IP.has(ne.code) && !hasError) outsInHalf++;
+          if(ne.code==="DP" && !hasError) outsInHalf++;
         });
       });
     });
@@ -1621,7 +1628,7 @@ function App() {
   const awayHitsTotal = sumLineupH(game.awayLineup||[]);
   const homeHitsTotal = sumLineupH(game.homeLineup||[]);
 
-  const RBI_CODES = new Set(["H1","H2","H3","HR","BB","HBP","IBB","SAC","SF"]);
+  const RBI_CODES = new Set(["H1","H2","H3","HR","BB","HBP","IBB","SAC","SF","FC","E"]); // FC(野選)・E(エラー)でも打点つく場合あり
   const commitAtBat = useCallback((team, pidx, inning, code, dir, scoredNames, newBases, newOuts, errorPos, skipPitchAdd)=>{
     const runs = (scoredNames||[]).length;
     const batterName = (() => { try { return _optionalChain([game, 'access', _4 => _4[team+"Lineup"], 'access', _5 => _5[pidx], 'optionalAccess', _6 => _6.name])||""; } catch(e){return "";} })();
@@ -1973,9 +1980,18 @@ function App() {
   
   const changeInning=()=>{
     mutGame(g=>{
-      
-      if(g.half==="top") return{...g,half:"bottom",outs:0,bases:[null,null,null]};
-      return{...g,inning:Math.min(g.inning+1,15),half:"top",outs:0,bases:[null,null,null]};
+      // アウトが3未満でチェンジする場合、不足分をbaserunnerOutsに補完（投球回計算用）
+      const defTeam = g.half==="top" ? "home" : "away"; // 守備側チーム
+      let brOuts = [...(g.baserunnerOuts||[])];
+      const missing = 3 - (g.outs||0);
+      if(missing > 0 && missing < 3) {
+        // 手動チェンジによる不足アウトを補完
+        for(let i=0;i<missing;i++){
+          brOuts.push({inning:g.inning, half:g.half, outsAtTime:(g.outs||0)+i, defTeam, manual:true});
+        }
+      }
+      if(g.half==="top") return{...g,half:"bottom",outs:0,bases:[null,null,null],baserunnerOuts:brOuts};
+      return{...g,inning:Math.min(g.inning+1,15),half:"top",outs:0,bases:[null,null,null],baserunnerOuts:brOuts};
     });
     showToast("チェンジ！");
   };
@@ -2726,7 +2742,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v194")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v196")
         , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -4706,7 +4722,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
           Object.values(v.atBats||{}).flat().forEach(e=>{
             const ne = (typeof e==="object"&&e)?e:{code:e};
             const c = ne.code; if(!c) return;
-            const noab = ["BB","HBP","SAC","SF","IBB"].includes(c);
+            const noab = ["BB","HBP","SAC","SF","IBB","CI"].includes(c); // CI(打撃妨害)も打数なし
             if(!noab) m.ab++;
             if(["H1","H2","H3","HR"].includes(c)){m.h++;m.tb+=c==="H1"?1:c==="H2"?2:c==="H3"?3:4;}
             if(c==="H2") m.h2++;
@@ -4730,7 +4746,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
       const pa = m.ab+m.bb+m.hbp+m.sac+m.sf;
       const avg = m.ab>0?(m.h/m.ab).toFixed(3).replace(/^0/,""):".---";
       const slg = m.ab>0?(m.tb/m.ab).toFixed(3).replace(/^0/,""):".---";
-      const obp = (m.ab+m.bb+m.hbp)>0?((m.h+m.bb+m.hbp)/(m.ab+m.bb+m.hbp)).toFixed(3).replace(/^0/,""):".---";
+      const obp = (m.ab+m.bb+m.hbp+m.sf)>0?((m.h+m.bb+m.hbp)/(m.ab+m.bb+m.hbp+m.sf)).toFixed(3).replace(/^0/,""):".---";
       const ops_n = (parseFloat("0"+obp)||0)+(parseFloat("0"+slg)||0);
       const ops = ops_n>0?ops_n.toFixed(3).replace(/^0/,""):".---";
       return {...m, pa, avg, slg, obp, ops, games:m.games.size};

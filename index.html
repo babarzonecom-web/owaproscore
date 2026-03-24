@@ -2819,7 +2819,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v201")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v202")
         , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3762,13 +3762,29 @@ function App() {
 
               )
             ) : (
-              // 未接続：チームコード入力UI
+              // 未接続：モード選択UI
               React.createElement(React.Fragment, null
-                , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:12}}
+                , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:14}}
                   , React.createElement('div', {style:S.ct}, "📡 チーム同期")
                 )
-                , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:14}},
-                  "チームコードで接続すると、リアルタイム共有・試合履歴の読み込みができます。新規の場合は好きなコードを入力してください。")
+
+                // モード切替タブ
+                , React.createElement('div', {style:{display:"flex",gap:6,marginBottom:14}}
+                  , [["viewer","👁 観戦・閲覧","#3b82f6"],["admin","✏️ スコア記録","#22c55e"]].map(([mode,label,color])=>
+                      React.createElement('button', {key:mode,
+                        onClick:()=>setTeamSharePwInput(mode==="viewer"?"__viewer__":""),
+                        style:{flex:1,padding:"10px 8px",borderRadius:9,cursor:"pointer",fontSize:13,fontWeight:700,
+                          background:(teamSharePwInput==="__viewer__"&&mode==="viewer")||(teamSharePwInput!=="__viewer__"&&mode==="admin")
+                            ? color+"22" : "#0d1f35",
+                          border:"2px solid "+((teamSharePwInput==="__viewer__"&&mode==="viewer")||(teamSharePwInput!=="__viewer__"&&mode==="admin")
+                            ? color : "#1e3a5f"),
+                          color:(teamSharePwInput==="__viewer__"&&mode==="viewer")||(teamSharePwInput!=="__viewer__"&&mode==="admin")
+                            ? color : "#475569"}
+                      }, label)
+                    )
+                )
+
+                // チームコード入力
                 , React.createElement('div', {style:{marginBottom:10}}
                   , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:6,marginBottom:4}}
                     , React.createElement('div', {style:{fontSize:11,color:"#94a3b8"}}, "チームコード")
@@ -3791,27 +3807,33 @@ function App() {
                         fontFamily:"monospace",letterSpacing:2,outline:"none",boxSizing:"border-box"}
                     })
                 )
-                , React.createElement('div', {style:{marginBottom:14}}
+
+                // スコア記録モードのみパスワード表示
+                , teamSharePwInput !== "__viewer__" && React.createElement('div', {style:{marginBottom:14}}
                   , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}},
-                    "管理者パスワード",
-                    React.createElement('span',{style:{color:"#475569",fontSize:10,marginLeft:4}},"（記録者は必須・閲覧のみなら空欄）"))
+                    "パスワード",
+                    React.createElement('span',{style:{color:"#475569",fontSize:10,marginLeft:4}},"（チーム作成時に設定したパスワード）"))
                   , React.createElement('input', {
                       type:"password",
                       value: teamSharePwInput,
                       onChange: e=>setTeamSharePwInput(e.target.value),
-                      placeholder:"記録者は必ず入力",
+                      placeholder:"パスワードを入力",
                       style:{width:"100%",padding:"9px 12px",borderRadius:8,background:"#0d1f35",
                         border:"1.5px solid #1e3a5f",color:"#e2e8f0",fontSize:14,
                         outline:"none",boxSizing:"border-box"}
                     })
                 )
+
                 , teamShareError && React.createElement('div', {style:{color:"#f87171",fontSize:12,marginBottom:8}}, teamShareError)
                 , React.createElement('button', {
-                    onClick:()=>connectTeam(teamShareInput, teamSharePwInput),
-                    style:{...sBt("#7c3aed"),width:"100%",padding:"11px",fontSize:14,fontWeight:700}
-                  }, "接続する")
+                    onClick:()=>connectTeam(teamShareInput, teamSharePwInput==="__viewer__"?"":teamSharePwInput),
+                    style:{...sBt(teamSharePwInput==="__viewer__"?"#3b82f6":"#22c55e"),
+                      width:"100%",padding:"11px",fontSize:14,fontWeight:700}
+                  }, teamSharePwInput==="__viewer__" ? "👁 観戦・閲覧で接続" : "✏️ 記録者として接続")
                 , React.createElement('div', {style:{fontSize:10,color:"#475569",marginTop:8,textAlign:"center"}},
-                  "※ 同じコードが存在しない場合は新規作成されます")
+                  teamSharePwInput==="__viewer__"
+                    ? "チームコードがあれば観戦・成績閲覧できます"
+                    : "新規の場合は好きなコードとパスワードを設定してください")
               )
             )
           )

@@ -1094,7 +1094,7 @@ function App() {
     if(!s.opponents)   s.opponents=[];
     return s;
   });
-  const [tab,   setTab]   = useState("score");
+  const [tab,   setTab]   = useState(localStorage.getItem("tsCode") ? "score" : "login");
   const [syncMode,   setSyncMode]   = useState("off");
   const [syncGameId, setSyncGameId] = useState("");
   const [viewerCode, setViewerCode] = useState("");
@@ -1316,6 +1316,7 @@ function App() {
           setTeamShareError("");
           localStorage.setItem("tsCode", tc);
           localStorage.setItem("tsRole", role);
+          setTab("score");
           showToast(role==="admin" ? "🔑 管理者として接続しました" : "👁 閲覧モードで接続しました");
           console.log("[TEAM] Connected role="+role+" code="+tc+" window.role="+window.__teamShareRole);
 
@@ -1541,6 +1542,7 @@ function App() {
   };
 
   const disconnectTeam = () => {
+    setTab("login");
     if(window.__teamShareRef) {
       try { window.__teamShareRef.off("value"); } catch(e) {}
       window.__teamShareRef = null;
@@ -2823,8 +2825,8 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v204")
-        , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v205")
+        , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
             borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
@@ -2848,6 +2850,184 @@ function App() {
               , React.createElement('div', {style:{fontSize:11,color:"#475569"}}, "チームコード: "+teamShareCode+" — 操作はできません")
             )
           )
+
+        // ===== ログイン画面 =====
+        , tab==="login"&&React.createElement('div', {style:{
+            minHeight:"80vh",display:"flex",flexDirection:"column",
+            alignItems:"center",justifyContent:"center",padding:"24px 20px"}}
+
+          // タイトル
+          , React.createElement('div', {style:{textAlign:"center",marginBottom:36}}
+            , React.createElement('div', {style:{fontSize:52,marginBottom:10}}, "⚾")
+            , React.createElement('div', {style:{fontSize:24,fontWeight:900,color:"#e2e8f0",letterSpacing:1,marginBottom:4}}, "おわプロスコア")
+            , React.createElement('div', {style:{fontSize:12,color:"#475569"}}, "草野球・少年野球スコアブック")
+          )
+
+          // 3つのモードボタン
+          , React.createElement('div', {style:{width:"100%",maxWidth:340,display:"flex",flexDirection:"column",gap:12,marginBottom:24}}
+
+            // 新規チームを作る
+            , React.createElement('button', {
+                onClick:()=>setTab("login_new"),
+                style:{padding:"18px 20px",borderRadius:14,border:"2px solid #22c55e",
+                  background:"#0d2a1a",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:14}}
+              , React.createElement('div', {style:{fontSize:28}}, "🏟")
+              , React.createElement('div', null
+                , React.createElement('div', {style:{fontSize:15,fontWeight:700,color:"#4ade80",marginBottom:2}}, "新規チームを作る")
+                , React.createElement('div', {style:{fontSize:11,color:"#475569"}}, "チームコードを新規発行して記録を開始")
+              )
+            )
+
+            // 記録者として参加
+            , React.createElement('button', {
+                onClick:()=>setTab("login_record"),
+                style:{padding:"18px 20px",borderRadius:14,border:"2px solid #3b82f6",
+                  background:"#0d1f35",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:14}}
+              , React.createElement('div', {style:{fontSize:28}}, "✏️")
+              , React.createElement('div', null
+                , React.createElement('div', {style:{fontSize:15,fontWeight:700,color:"#7dd3fc",marginBottom:2}}, "記録者として参加")
+                , React.createElement('div', {style:{fontSize:11,color:"#475569"}}, "チームコード＋パスワードで接続")
+              )
+            )
+
+            // 観戦する
+            , React.createElement('button', {
+                onClick:()=>setTab("login_watch"),
+                style:{padding:"18px 20px",borderRadius:14,border:"2px solid #a78bfa",
+                  background:"#1a0d35",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:14}}
+              , React.createElement('div', {style:{fontSize:28}}, "👁")
+              , React.createElement('div', null
+                , React.createElement('div', {style:{fontSize:15,fontWeight:700,color:"#c4b5fd",marginBottom:2}}, "観戦・閲覧する")
+                , React.createElement('div', {style:{fontSize:11,color:"#475569"}}, "チームコードだけで速報を見る")
+              )
+            )
+          )
+
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v205")
+        )
+
+        // ===== 新規チーム作成 =====
+        , tab==="login_new"&&React.createElement('div', {style:{
+            minHeight:"80vh",display:"flex",flexDirection:"column",
+            alignItems:"center",justifyContent:"center",padding:"24px 20px"}}
+          , React.createElement('div', {style:{width:"100%",maxWidth:340}}
+            , React.createElement('button', {onClick:()=>setTab("login"),
+                style:{background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:13,marginBottom:16,padding:0}},
+              "← 戻る")
+            , React.createElement('div', {style:{fontSize:20,fontWeight:900,color:"#e2e8f0",marginBottom:4}}, "🏟 新規チームを作る")
+            , React.createElement('div', {style:{fontSize:12,color:"#475569",marginBottom:20}}, "チームコードとパスワードを設定してください")
+
+            , React.createElement('div', {style:{marginBottom:10}}
+              , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:6,marginBottom:4}}
+                , React.createElement('span', {style:{fontSize:11,color:"#94a3b8"}}, "チームコード（自由に決めてOK）")
+                , React.createElement('button', {
+                    onClick:()=>{
+                      const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+                      setTeamShareInput(Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join(""));
+                    },
+                    style:{fontSize:10,padding:"2px 8px",borderRadius:5,cursor:"pointer",marginLeft:"auto",
+                      background:"#1e3a5f",border:"1px solid #3b82f6",color:"#7dd3fc"}
+                  }, "🎲 ランダム生成")
+              )
+              , React.createElement('input', {
+                  value:teamShareInput,
+                  onChange:e=>setTeamShareInput(e.target.value.toUpperCase()),
+                  placeholder:"例: TIGERS",
+                  style:{width:"100%",padding:"11px 12px",borderRadius:8,background:"#0d1f35",
+                    border:"1.5px solid #3730a3",color:"#e2e8f0",fontSize:18,
+                    fontFamily:"monospace",letterSpacing:3,outline:"none",boxSizing:"border-box",marginBottom:10}
+                })
+            )
+            , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "パスワード（記録者だけが知る）")
+            , React.createElement('input', {
+                type:"password",value:teamSharePwInput,
+                onChange:e=>setTeamSharePwInput(e.target.value),
+                placeholder:"パスワードを設定",
+                style:{width:"100%",padding:"11px 12px",borderRadius:8,background:"#0d1f35",
+                  border:"1.5px solid #1e3a5f",color:"#e2e8f0",fontSize:14,
+                  outline:"none",boxSizing:"border-box",marginBottom:16}
+              })
+            , teamShareError&&React.createElement('div',{style:{color:"#f87171",fontSize:12,marginBottom:8}},teamShareError)
+            , React.createElement('button', {
+                onClick:()=>{ connectTeam(teamShareInput, teamSharePwInput); setTab("score"); },
+                disabled:!teamShareInput||!teamSharePwInput,
+                style:{width:"100%",padding:"14px",borderRadius:10,border:"none",
+                  background:!teamShareInput||!teamSharePwInput?"#1e3a5f":"#16a34a",
+                  color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}
+              }, "✅ チームを作って開始")
+          )
+        )
+
+        // ===== 記録者として参加 =====
+        , tab==="login_record"&&React.createElement('div', {style:{
+            minHeight:"80vh",display:"flex",flexDirection:"column",
+            alignItems:"center",justifyContent:"center",padding:"24px 20px"}}
+          , React.createElement('div', {style:{width:"100%",maxWidth:340}}
+            , React.createElement('button', {onClick:()=>setTab("login"),
+                style:{background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:13,marginBottom:16,padding:0}},
+              "← 戻る")
+            , React.createElement('div', {style:{fontSize:20,fontWeight:900,color:"#e2e8f0",marginBottom:4}}, "✏️ 記録者として参加")
+            , React.createElement('div', {style:{fontSize:12,color:"#475569",marginBottom:20}}, "チームコードとパスワードを入力してください")
+
+            , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード")
+            , React.createElement('input', {
+                value:teamShareInput,
+                onChange:e=>setTeamShareInput(e.target.value.toUpperCase()),
+                placeholder:"例: TIGERS",
+                style:{width:"100%",padding:"11px 12px",borderRadius:8,background:"#0d1f35",
+                  border:"1.5px solid #3730a3",color:"#e2e8f0",fontSize:18,
+                  fontFamily:"monospace",letterSpacing:3,outline:"none",boxSizing:"border-box",marginBottom:10}
+              })
+            , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "パスワード")
+            , React.createElement('input', {
+                type:"password",value:teamSharePwInput,
+                onChange:e=>setTeamSharePwInput(e.target.value),
+                placeholder:"パスワードを入力",
+                style:{width:"100%",padding:"11px 12px",borderRadius:8,background:"#0d1f35",
+                  border:"1.5px solid #1e3a5f",color:"#e2e8f0",fontSize:14,
+                  outline:"none",boxSizing:"border-box",marginBottom:16}
+              })
+            , teamShareError&&React.createElement('div',{style:{color:"#f87171",fontSize:12,marginBottom:8}},teamShareError)
+            , React.createElement('button', {
+                onClick:()=>{ connectTeam(teamShareInput, teamSharePwInput); setTab("score"); },
+                disabled:!teamShareInput||!teamSharePwInput,
+                style:{width:"100%",padding:"14px",borderRadius:10,border:"none",
+                  background:!teamShareInput||!teamSharePwInput?"#1e3a5f":"#3b82f6",
+                  color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}
+              }, "✏️ 記録者として接続")
+          )
+        )
+
+        // ===== 観戦・閲覧 =====
+        , tab==="login_watch"&&React.createElement('div', {style:{
+            minHeight:"80vh",display:"flex",flexDirection:"column",
+            alignItems:"center",justifyContent:"center",padding:"24px 20px"}}
+          , React.createElement('div', {style:{width:"100%",maxWidth:340}}
+            , React.createElement('button', {onClick:()=>setTab("login"),
+                style:{background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:13,marginBottom:16,padding:0}},
+              "← 戻る")
+            , React.createElement('div', {style:{fontSize:20,fontWeight:900,color:"#e2e8f0",marginBottom:4}}, "👁 観戦・閲覧する")
+            , React.createElement('div', {style:{fontSize:12,color:"#475569",marginBottom:20}}, "チームコードだけで速報・成績を見られます")
+
+            , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード")
+            , React.createElement('input', {
+                value:teamShareInput,
+                onChange:e=>setTeamShareInput(e.target.value.toUpperCase()),
+                placeholder:"例: TIGERS",
+                style:{width:"100%",padding:"11px 12px",borderRadius:8,background:"#0d1f35",
+                  border:"1.5px solid #3730a3",color:"#e2e8f0",fontSize:18,
+                  fontFamily:"monospace",letterSpacing:3,outline:"none",boxSizing:"border-box",marginBottom:16}
+              })
+            , teamShareError&&React.createElement('div',{style:{color:"#f87171",fontSize:12,marginBottom:8}},teamShareError)
+            , React.createElement('button', {
+                onClick:()=>{ connectTeam(teamShareInput, ""); setTab("score"); },
+                disabled:!teamShareInput,
+                style:{width:"100%",padding:"14px",borderRadius:10,border:"none",
+                  background:!teamShareInput?"#1e3a5f":"#7c3aed",
+                  color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}
+              }, "👁 観戦・閲覧で接続")
+          )
+        )
 
         , tab==="score"&&(React.createElement(React.Fragment, null
 

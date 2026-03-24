@@ -1120,6 +1120,11 @@ function App() {
   const [teamShareCode, setTeamShareCode] = useState(localStorage.getItem("tsCode")||"");
   const [teamSharePw,   setTeamSharePw]   = useState("");
   const [teamShareInput,setTeamShareInput]= useState(localStorage.getItem("tsCode")||"");
+  const [ghToken,   setGhToken]   = useState(()=>localStorage.getItem("gh_token")||"");
+  const [ghOwner,   setGhOwner]   = useState(()=>localStorage.getItem("gh_owner")||"babarzonecom-web");
+  const [ghRepo,    setGhRepo]    = useState(()=>localStorage.getItem("gh_repo")||"owaproscore");
+  const [ghBranch,  setGhBranch]  = useState(()=>localStorage.getItem("gh_branch")||"main");
+  const [ghDeploying, setGhDeploying] = useState(false);
   const [teamSharePwInput,setTeamSharePwInput]= useState("");
   const [teamShareRole, setTeamShareRole] = useState(localStorage.getItem("tsRole")||""); // "admin"|"viewer"|""
   const [teamShareError,setTeamShareError]= useState("");
@@ -1186,6 +1191,54 @@ function App() {
   };
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
   // ===== チームコード接続 =====
+  const deployToGitHub = async () => {
+    if(!ghToken||!ghOwner||!ghRepo){ showToast("GitHubの設定を入力してください"); return; }
+    setGhDeploying(true);
+    try {
+      const path = "index.html";
+      const apiBase = "https://api.github.com/repos/"+ghOwner+"/"+ghRepo+"/contents/"+path;
+      const headers = {
+        "Authorization": "token "+ghToken,
+        "Content-Type": "application/json",
+        "Accept": "application/vnd.github.v3+json",
+      };
+      // 現在のSHAを取得
+      const getRes = await fetch(apiBase+"?ref="+ghBranch, {headers});
+      const getData = await getRes.json();
+      const sha = getData.sha;
+      if(!sha){ showToast("❌ SHA取得失敗: "+JSON.stringify(getData).slice(0,100)); setGhDeploying(false); return; }
+      // 現在のindex.htmlをfetchしてBase64エンコード
+      const htmlRes = await fetch(location.href.split("?")[0]+"?nocache="+Date.now());
+      const htmlText = await htmlRes.text();
+      const bytes = new TextEncoder().encode(htmlText);
+      let binary = "";
+      const chunkSize = 8192;
+      for(let i=0;i<bytes.length;i+=chunkSize){
+        binary += String.fromCharCode(...bytes.slice(i,i+chunkSize));
+      }
+      const b64 = btoa(binary);
+      // プッシュ
+      const pushRes = await fetch(apiBase, {
+        method:"PUT", headers,
+        body: JSON.stringify({
+          message:"deploy: owaproscore "+new Date().toLocaleString("ja-JP"),
+          content: b64, sha, branch: ghBranch,
+        })
+      });
+      const pushData = await pushRes.json();
+      if(pushRes.ok){
+        showToast("✅ デプロイ完了！数十秒後に反映されます");
+        localStorage.setItem("gh_token",ghToken);
+        localStorage.setItem("gh_owner",ghOwner);
+        localStorage.setItem("gh_repo",ghRepo);
+        localStorage.setItem("gh_branch",ghBranch);
+      } else {
+        showToast("❌ "+(pushData.message||pushRes.status));
+      }
+    } catch(e){ showToast("❌ "+e.message); }
+    setGhDeploying(false);
+  };
+
   const connectTeam = (code, pw) => {
     try {
       const tc = (code||"").trim().toUpperCase();
@@ -2766,7 +2819,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v199")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v200")
         , [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",

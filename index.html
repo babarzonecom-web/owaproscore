@@ -2825,7 +2825,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v205")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v206")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2903,7 +2903,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v205")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v206")
         )
 
         // ===== 新規チーム作成 =====
@@ -3744,7 +3744,14 @@ function App() {
                       )
                     )
                     , React.createElement('tbody', null
-                      , pitchers.map((p,i) => {
+                      , pitchers.filter((p,i)=>{
+                          // 未登板投手を非表示：デフォルト名かつ投球なし
+                          const auto = (pitcherStats[side]||[])[i]||{};
+                          const isDefault = /^投手\d+$/.test(p.name||'');
+                          const hasRecord = (auto._outsGot||0)>0||(auto.autoH||0)>0||(auto.autoBb||0)>0||(auto.autoK||0)>0;
+                          return !isDefault || hasRecord || i===curPIdx;
+                        }).map((p,_i) => {
+                          const i = pitchers.indexOf(p); // 元のインデックスを保持
                           const isCur = i===curPIdx;
                           const auto = (pitcherStats[side]||[])[i]||{};
                           const rawIp = auto.autoIp||0;
@@ -4958,7 +4965,26 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [sortKey, setSortKey] = useState("avg");
   const [sortDesc, setSortDesc] = useState(true);
-  const [showAlias, setShowAlias] = useState(false); // 別名設定UI表示
+  const [showAlias, setShowAlias] = useState(false);
+  const [editMode, setEditMode] = useState(false);   // 手動修正モード
+  const [statOverrides, setStatOverrides] = React.useState(()=>{
+    try { return JSON.parse(localStorage.getItem("statOverrides")||"{}"); } catch(e){ return {}; }
+  });
+  const saveOverride = (playerKey, field, val) => {
+    setStatOverrides(prev=>{
+      const next = {...prev, [playerKey]:{...(prev[playerKey]||{}), [field]:val}};
+      localStorage.setItem("statOverrides", JSON.stringify(next));
+      return next;
+    });
+  };
+  const clearOverride = (playerKey) => {
+    setStatOverrides(prev=>{
+      const next = {...prev};
+      delete next[playerKey];
+      localStorage.setItem("statOverrides", JSON.stringify(next));
+      return next;
+    });
+  };
   // チーム名エイリアス: {履歴のチーム名 -> 登録チーム名}
   const [teamAliases, setTeamAliases] = React.useState(()=>{
     try { return JSON.parse(localStorage.getItem("teamAliases")||"{}"); } catch(e){ return {}; }
@@ -5042,15 +5068,19 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
       const sides = filterTeamName
         ? (g.awayTeam===filterTeamName ? ["away"] : g.homeTeam===filterTeamName ? ["home"] : ["away","home"])
         : ["away","home"];
-      const lineup = sides.flatMap(s=>g[s+"Lineup"]||[]);
-      lineup.forEach(p=>{
-        const subOuts = [...(p._subOut&&!p._subOuts?[p._subOut]:[]), ...(p._subOuts||[])];
-        const allVersions = [...subOuts, p];
-        allVersions.forEach(v=>{
-          const name = v.name;
-          if(!name||name.startsWith("選手")) return;
-          if(!map[name]) map[name]={name,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,sb:0,cs:0,run:0,sac:0,sf:0,tb:0,e:0,games:new Set()};
-          const m = map[name];
+      sides.forEach(side=>{
+        const teamName = g[side+"Team"]||"";
+        (g[side+"Lineup"]||[]).forEach(p=>{
+          const subOuts = [...(p._subOut&&!p._subOuts?[p._subOut]:[]), ...(p._subOuts||[])];
+          const allVersions = [...subOuts, p];
+          allVersions.forEach(v=>{
+            const name = v.name;
+            if(!name||name.startsWith("選手")) return;
+            // 全チーム表示時はチーム名で区別、チーム絞り込み時はそのまま
+            const key = filterTeamName ? name : (teamName ? teamName+" "+name : name);
+            const dispName = filterTeamName ? name : (teamName ? teamName+" "+name : name);
+            if(!map[key]) map[key]={name:dispName,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,sb:0,cs:0,run:0,sac:0,sf:0,tb:0,e:0,games:new Set()};
+            const m = map[key];
           m.games.add(g.id);
           Object.values(v.atBats||{}).flat().forEach(e=>{
             const ne = (typeof e==="object"&&e)?e:{code:e};
@@ -5067,11 +5097,12 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
             if(c==="SAC") m.sac++;
             if(c==="SF") m.sf++;
           });
-          m.rbi += (v.rbi||0);
-          m.sb  += (v.sb||0);
-          m.cs  += (v.cs||0);
-          m.run += (v.run||0);
-          m.e   += (v.e||0);
+            m.rbi += (v.rbi||0);
+            m.sb  += (v.sb||0);
+            m.cs  += (v.cs||0);
+            m.run += (v.run||0);
+            m.e   += (v.e||0);
+          });
         });
       });
     });
@@ -5156,7 +5187,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
   const tdS = {...S.td, textAlign:"center", fontSize:12, padding:"5px 3px"};
   const tdN = {...tdS, textAlign:"left", paddingLeft:8, fontWeight:700};
 
-  const BattingTable = ({players, teamName, color}) => (
+  const BattingTable = ({players, teamName, color, editMode, statOverrides, saveOverride, clearOverride}) => (
     React.createElement('div', {style:{marginBottom:24}}
       , React.createElement('div', {style:{fontSize:14,fontWeight:700,color,marginBottom:8,
           borderLeft:`4px solid ${color}`,paddingLeft:10}}, teamName+" 打撃成績")
@@ -5184,12 +5215,39 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
           , React.createElement('tbody', null
             , players.map((p,i)=>
                 React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0a1628":"#0d1f35"}}
-                  , React.createElement('td', {style:{...tdN,color:"#e2e8f0"}}, p.name)
+                  , React.createElement('td', {style:{...tdN,color:"#e2e8f0"}}
+                    , p.name
+                    , editMode && (statOverrides||{})[p.name] && React.createElement('button',{
+                        onClick:()=>clearOverride&&clearOverride(p.name),
+                        style:{fontSize:9,marginLeft:4,background:"#7c3aed33",border:"1px solid #a78bfa",
+                          borderRadius:4,color:"#c4b5fd",cursor:"pointer",padding:"1px 4px"}
+                      },"解除")
+                  )
                   , React.createElement('td', {style:tdS}, p.games)
                   , React.createElement('td', {style:tdS}, p.pa)
-                  , React.createElement('td', {style:tdS}, p.ab)
-                  , React.createElement('td', {style:{...tdS,color:"#4ade80",fontWeight:700}}, p.h)
-                  , React.createElement('td', {style:{...tdS,color:"#fbbf24",fontWeight:900}}, p.avg)
+                  , (()=>{
+                      const ov = (statOverrides||{})[p.name]||{};
+                      const fields = [
+                        ["ab",p.ab,tdS],
+                        ["h",p.h,{...tdS,color:"#4ade80",fontWeight:700}],
+                        ["avg",p.avg,{...tdS,color:"#fbbf24",fontWeight:900}],
+                      ];
+                      if(!editMode) return fields.map(([k,v,s])=>React.createElement('td',{key:k,style:s},ov[k]!==undefined?ov[k]:v));
+                      return fields.map(([k,v,s])=>React.createElement('td',{key:k,style:{...s,padding:2}}
+                        , React.createElement('input',{
+                            type:"text",
+                            defaultValue: ov[k]!==undefined?ov[k]:v,
+                            onBlur:e=>{
+                              const val = e.target.value.trim();
+                              if(val===""||val===String(v)) { if(ov[k]!==undefined){const n={...ov};delete n[k];saveOverride&&saveOverride(p.name,"_merge",n);} }
+                              else saveOverride&&saveOverride(p.name,k,val);
+                            },
+                            style:{width:"100%",background:"#1a2a1a",border:"1px solid #22c55e",
+                              borderRadius:4,color:"#4ade80",fontSize:11,padding:"2px 4px",
+                              textAlign:"center",outline:"none"}
+                          })
+                      ));
+                    })()
                   , React.createElement('td', {style:tdS}, p.slg)
                   , React.createElement('td', {style:tdS}, p.obp)
                   , React.createElement('td', {style:{...tdS,color:"#f59e0b",fontWeight:700}}, p.ops)
@@ -5478,11 +5536,20 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
 
       // 打撃成績
       , statsView==="batting" && React.createElement('div', null
+          , React.createElement('div',{style:{display:"flex",justifyContent:"flex-end",marginBottom:8}}
+            , React.createElement('button',{
+                onClick:()=>setEditMode(v=>!v),
+                style:{fontSize:11,padding:"4px 12px",borderRadius:6,cursor:"pointer",
+                  background:editMode?"#7c3aed33":"#0d1f35",
+                  border:"1.5px solid "+(editMode?"#a78bfa":"#1e3a5f"),
+                  color:editMode?"#c4b5fd":"#64748b",fontWeight:editMode?700:400}
+              }, editMode?"✏️ 修正中（タップで終了）":"✏️ 手動修正")
+          )
           , filteredGames.length===0
             ? React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:20}},"試合データがありません")
             : React.createElement('div', null
-                , React.createElement(BattingTable, {players:awayBat, teamName:primaryTeam, color:"#4ade80"})
-                , secondTeam && React.createElement(BattingTable, {players:homeBat, teamName:secondTeam, color:"#7dd3fc"})
+                , React.createElement(BattingTable, {players:awayBat, teamName:primaryTeam, color:"#4ade80", editMode, statOverrides, saveOverride, clearOverride})
+                , secondTeam && React.createElement(BattingTable, {players:homeBat, teamName:secondTeam, color:"#7dd3fc", editMode, statOverrides, saveOverride, clearOverride})
               )
         )
 

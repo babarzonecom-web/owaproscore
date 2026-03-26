@@ -2825,7 +2825,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v206")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v207")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2903,7 +2903,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v206")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v207")
         )
 
         // ===== 新規チーム作成 =====
@@ -3843,6 +3843,7 @@ function App() {
         , tab==="history"&&(React.createElement(React.Fragment, null
           , React.createElement(HistoryTab, {
               history:history,
+              teamShareCode:teamShareCode,
               onLoad:loadGame,
               onDelete:delHistory,
               onExcel:exportExcel,
@@ -5097,14 +5098,14 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
             if(c==="SAC") m.sac++;
             if(c==="SF") m.sf++;
           });
-            m.rbi += (v.rbi||0);
-            m.sb  += (v.sb||0);
-            m.cs  += (v.cs||0);
-            m.run += (v.run||0);
-            m.e   += (v.e||0);
-          });
+          m.rbi += (v.rbi||0);
+          m.sb  += (v.sb||0);
+          m.cs  += (v.cs||0);
+          m.run += (v.run||0);
+          m.e   += (v.e||0);
         });
       });
+    });
     });
     return Object.values(map).map(m=>{
       const pa = m.ab+m.bb+m.hbp+m.sac+m.sf;
@@ -5732,8 +5733,8 @@ function FirebaseTeamLoader({ onLoaded }) {
 }
 
 // ===== 履歴タブ =====
-function HistoryTab({ history, onLoad, onDelete, onExcel, onImport, onUpload }) {
-  const [fbTeamId, setFbTeamId] = useState("");
+function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload }) {
+  const [fbTeamId, setFbTeamId] = useState(teamShareCode||"");
   const [fbLoading, setFbLoading] = useState(false);
   const [fbMsg, setFbMsg] = useState("");
 

@@ -106,11 +106,12 @@ const RESULTS = [
   { code:"LO",  label:"ライナー",color:"#f97316", short:"LO"  },
   { code:"FF",  label:"邪飛",    color:"#f97316", short:"FF"  },
   { code:"DP",  label:"ゲッツー",color:"#f43f5e", short:"DP"  },
+  { code:"TP",  label:"トリプルプレー",color:"#dc2626", short:"TP"  },
   { code:"SAC", label:"犠打",    color:"#c084fc", short:"SAC" },
   { code:"SF",  label:"犠飛",    color:"#f472b6", short:"SF"  },
   { code:"OI",  label:"守備妨害アウト", color:"#dc2626", short:"OI" },
 ];
-const OUT_CODES_FOR_IP = new Set(["K","KL","GO","FO","LO","FF","SAC","SF","DP","OI"]);
+const OUT_CODES_FOR_IP = new Set(["K","KL","GO","FO","LO","FF","SAC","SF","DP","TP","OI"]);
 const DIR_CODES  = new Set(["H1","H2","H3","HR","GO","FO","LO","FF","DP","E","FC","SAC","SF"]);
 const HIT_CODES  = new Set(["H1","H2","H3","HR"]);
 const NOAB_CODES = new Set(["BB","HBP","SAC","SF","IBB","CI"]);
@@ -199,6 +200,9 @@ function applyResult(code, bases, outs, batterName) {
     case "FO": case "LO": case "FF": {
       // フライ/ファウルフライ: 打者アウト、ランナーはそのまま（タッチアップは調整モーダルで）
       newOuts=outs+1; b=[n1,n2,n3]; batterOn=-1; break;
+    }
+    case "TP": {
+      newOuts=outs+3; b=[null,null,null]; batterOn=-1; break;
     }
     case "DP": {
       // 併殺: 2アウト、1塁走者と打者アウト
@@ -835,7 +839,8 @@ const computePitcherStats = (g) => {
       if(!ps) return;
       const code = ab.entry.code;
       if(OUT_CODES.has(code) && !ab.hasError) ps._outsGot += 1;
-      if(code==="DP" && !ab.hasError) ps._outsGot += 1; 
+      if(code==="DP" && !ab.hasError) ps._outsGot += 1;
+      if(code==="TP" && !ab.hasError) ps._outsGot += 2; // TP=3アウト（1打席分含め合計3）
     });
 
     // baserunnerOuts（走塁アウト）も投球回に加算
@@ -1000,7 +1005,7 @@ const fbSaveGameToCode = (code, game) => {
       awayPitcherLog: game.awayPitcherLog||[],
       homePitcherLog: game.homePitcherLog||[],
       defenseLog: game.defenseLog||[],
-      log: (game.log||[]).slice(0,50),
+      log: (game.log||[]),
       pitcherResults: game.pitcherResults||{},
       finished: !!game.finished,
       endReason: game.endReason||"",
@@ -1810,7 +1815,8 @@ function App() {
       showToast(`${_optionalChain([rOf, 'call', _11 => _11(code), 'optionalAccess', _12 => _12.label])||code}${(runs||0)>0?` +${runs}点`:""} ✅`);
       
       setTimeout(()=>{
-        if((game.pitchMode||"result") !== "pitch") {
+        // 結果入力モードのみ次の打者を自動表示（1球モードは自動表示しない）
+        if((game.pitchMode||"result") === "result") {
           setModal({team, pidx:nextPidx, inning, step:"result"});
         } else {
           setModal(null);
@@ -2825,7 +2831,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v207")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v208")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2903,7 +2909,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v207")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v208")
         )
 
         // ===== 新規チーム作成 =====
@@ -3445,7 +3451,7 @@ function App() {
             )
             , game.log.length===0
               ?React.createElement('div', { style: {color:"#475569",fontSize:13},}, "まだ記録なし")
-              :game.log.slice(0,12).map((e,i)=>(
+              :game.log.slice().reverse().map((e,i)=>(
                 React.createElement('div', { key: i, style: {display:"flex",gap:10,padding:"6px 8px",
                   borderBottom:"1px solid #0f2040",
                   borderRadius:6,
@@ -3466,24 +3472,7 @@ function App() {
                 )
               ))
 
-            , !game.finished && React.createElement('div', {style:{marginTop:8,background:"#0a1628",borderRadius:8,padding:"10px 12px",border:"1px solid #1e3a5f"}}
-              , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}}, "打点（自動計算・手動修正可）")
-              , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6}}
-                , [...(game.awayLineup||[]),...(game.homeLineup||[])].map((p,i)=>(
-                    React.createElement('label', {key:p.id+"-"+i, style:{display:"flex",alignItems:"center",gap:3,fontSize:11}}
-                      , React.createElement('span', {style:{color:"#7db8e8",fontSize:10,minWidth:42,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, p.name)
-                      , React.createElement('input', {type:"number", value:p.rbi||0,
-                          onChange: e=>{
-                            const t = i < (game.awayLineup||[]).length ? "away" : "home";
-                            const pi = i < (game.awayLineup||[]).length ? i : i-(game.awayLineup||[]).length;
-                            editPlayer(t,pi,"rbi",parseInt(e.target.value)||0);
-                          },
-                          style:{width:36,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
-                            borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:12,outline:"none"}})
-                    )
-                  ))
-              )
-            )
+            // 打点カードは成績タブの手動修正機能に移行したため廃止
           )
           ) // else最後のcard閉じ
           ) // Fragment閉じ
@@ -5502,25 +5491,34 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
             "🔗 チーム名の紐づけ設定")
           , React.createElement('div', {style:{fontSize:10,color:"#475569",marginBottom:8}},
             "履歴に残っている別名を登録チームに紐づけます")
-          , [...new Set((history||[]).filter(g=>g.finished).flatMap(g=>[g.awayTeam,g.homeTeam]).filter(Boolean))].map(rawName=>{
+          , (()=>{
               const registered = [...(myTeam?[myTeam]:[]),...(opponents||[]),...(teams||[])];
-              const current = teamAliases[rawName] || "";
-              return React.createElement('div', {key:rawName, style:{
-                  display:"flex",alignItems:"center",gap:6,marginBottom:6}}
-                , React.createElement('span', {style:{fontSize:11,color:"#e2e8f0",minWidth:80,
-                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, rawName)
-                , React.createElement('span', {style:{fontSize:11,color:"#475569"}}, "→")
-                , React.createElement('select', {
-                    value: current,
-                    onChange: e=>saveAlias(rawName, e.target.value),
-                    style:{flex:1,background:"#0d1f35",border:"1px solid #1e3a5f",
-                      color:"#e2e8f0",borderRadius:6,padding:"4px 6px",fontSize:11}
-                  }
-                  , React.createElement('option', {value:""}, "（そのまま）")
-                  , registered.map(t=>React.createElement('option', {key:t.name,value:t.name}, t.name))
-                )
-              );
-            })
+              const registeredNames = new Set(registered.map(t=>t.name));
+              // 履歴に出てくるチーム名のうち、登録チームと完全一致しないものだけ表示
+              const histTeams = [...new Set((history||[]).filter(g=>g.finished).flatMap(g=>[g.awayTeam,g.homeTeam]).filter(Boolean))];
+              const needAlias = histTeams.filter(n=>!registeredNames.has(n));
+              if(needAlias.length===0) return React.createElement('div',{style:{fontSize:11,color:"#475569",padding:"8px 0"}},
+                "✅ 全チームが登録済みです（紐づけ不要）");
+              return needAlias.map(rawName=>{
+                const current = teamAliases[rawName] || "";
+                return React.createElement('div', {key:rawName, style:{
+                    display:"flex",alignItems:"center",gap:6,marginBottom:6}}
+                  , React.createElement('div',{style:{flex:1}}
+                    , React.createElement('div',{style:{fontSize:11,color:"#e2e8f0",marginBottom:2}}, rawName)
+                    , React.createElement('div',{style:{fontSize:9,color:"#475569"}}, "→ 登録チームに紐づけ")
+                  )
+                  , React.createElement('select', {
+                      value: current,
+                      onChange: e=>saveAlias(rawName, e.target.value),
+                      style:{flex:1,background:"#0d1f35",border:"1px solid "+(current?"#3b82f6":"#1e3a5f"),
+                        color:current?"#7dd3fc":"#e2e8f0",borderRadius:6,padding:"4px 6px",fontSize:11}
+                    }
+                    , React.createElement('option', {value:""}, "（未設定）")
+                    , registered.map(t=>React.createElement('option', {key:t.name,value:t.name}, t.name))
+                  )
+                );
+              });
+            })()
         )
       )
 
@@ -5556,8 +5554,17 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
 
       // 投手成績
       , statsView==="pitching" && React.createElement('div', null
-          , React.createElement(PitchingTable, {pitchers:awayPit, teamName:primaryTeam, color:"#fbbf24"})
-          , secondTeam && React.createElement(PitchingTable, {pitchers:homePit, teamName:secondTeam, color:"#7dd3fc"})
+          , React.createElement('div',{style:{display:"flex",justifyContent:"flex-end",marginBottom:8}}
+              , React.createElement('button',{
+                  onClick:()=>setEditPitchMode(v=>!v),
+                  style:{fontSize:11,padding:"4px 12px",borderRadius:6,cursor:"pointer",
+                    background:editPitchMode?"#4c1d9533":"#0d1f35",
+                    border:"1.5px solid "+(editPitchMode?"#a78bfa":"#1e3a5f"),
+                    color:editPitchMode?"#c4b5fd":"#64748b",fontWeight:editPitchMode?700:400}
+                }, editPitchMode?"✏️ 修正中（タップで終了）":"✏️ 手動修正")
+            )
+          , React.createElement(PitchingTable, {pitchers:awayPit, teamName:primaryTeam, color:"#fbbf24", editMode:editPitchMode, pitchOverrides, savePitchOverride})
+          , secondTeam && React.createElement(PitchingTable, {pitchers:homePit, teamName:secondTeam, color:"#7dd3fc", editMode:editPitchMode, pitchOverrides, savePitchOverride})
         )
 
       // 守備成績

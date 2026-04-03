@@ -2829,7 +2829,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v209")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v210")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2907,7 +2907,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v209")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v210")
         )
 
         // ===== 新規チーム作成 =====
@@ -3834,6 +3834,35 @@ function App() {
               onLoad:loadGame,
               onDelete:delHistory,
               onExcel:exportExcel,
+              onRestoreTeam:(g)=>{
+                // 試合のlineupからチームメンバーを復元
+                const restoreTeam = (teamName, lineupRaw, isMyTeam) => {
+                  if(!teamName||teamName==="ビジターチーム"||teamName==="ホームチーム") return;
+                  const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
+                  const members = lineup
+                    .filter(p=>p.name&&!p.name.startsWith("選手"))
+                    .map(p=>({name:p.name, pos:p.pos||""}));
+                  if(members.length===0) return;
+                  const teamObj = {id:Date.now().toString(36), name:teamName, members};
+                  setStorage(s=>{
+                    if(isMyTeam) {
+                      showToast("✅ 自チーム「"+teamName+"」を復元しました");
+                      return {...s, myTeam:teamObj};
+                    } else {
+                      const exists = (s.opponents||[]).some(t=>t.name===teamName);
+                      if(!exists) {
+                        showToast("✅ 「"+teamName+"」を対戦相手に復元しました");
+                        return {...s, opponents:[...(s.opponents||[]),teamObj]};
+                      }
+                      // 既存のチームを上書き復元
+                      showToast("✅ 「"+teamName+"」のメンバーを復元しました");
+                      return {...s, opponents:(s.opponents||[]).map(t=>t.name===teamName?teamObj:t)};
+                    }
+                  });
+                };
+                restoreTeam(g.awayTeam, g.awayLineup, false);
+                restoreTeam(g.homeTeam, g.homeLineup, myTeam&&myTeam.name===g.homeTeam);
+              },
               onImport:(games)=>{
                 // gamesは配列で一括受け取り
                 const arr = Array.isArray(games)?games:[games];
@@ -5738,7 +5767,7 @@ function FirebaseTeamLoader({ onLoaded }) {
 }
 
 // ===== 履歴タブ =====
-function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload }) {
+function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam }) {
   const [fbTeamId, setFbTeamId] = useState(teamShareCode||"");
   const [fbLoading, setFbLoading] = useState(false);
   const [fbMsg, setFbMsg] = useState("");
@@ -5835,6 +5864,8 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
                 , React.createElement('div', {style:{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}
                   , React.createElement('button', {onClick:()=>onLoad(g),
                       style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}}, "📂 読込")
+                  , React.createElement('button', {onClick:()=>onRestoreTeam&&onRestoreTeam(g),
+                      style:{...sBt("#f59e0b"),fontSize:11,padding:"4px 10px"}}, "👥 復元")
                   , React.createElement('button', {onClick:()=>onExcel(g),
                       style:{...sBt("#16a34a"),fontSize:11,padding:"4px 10px"}}, "📊 Excel")
                   , React.createElement('button', {onClick:()=>onUpload(g),

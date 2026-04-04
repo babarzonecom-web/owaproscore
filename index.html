@@ -2835,7 +2835,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v214")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v215")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2913,7 +2913,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v214")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v215")
         )
 
         // ===== 新規チーム作成 =====
@@ -5463,12 +5463,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
       , sortedTeamNames.length > 1 && React.createElement('div', {style:{marginBottom:12}}
         , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}}, "📋 チームを選択")
         , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
-          , React.createElement('button', {
-              onClick:()=>setSelectedTeam(null),
-              style:{padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
-                background:!selectedTeam?"#1d4ed8":"#0d1f35",
-                border:"1.5px solid "+(!selectedTeam?"#3b82f6":"#1e3a5f"),
-                color:!selectedTeam?"#fff":"#7db8e8"}}, "全チーム")
+
           , sortedTeamNames.map(name=>{
               const isReg = registeredTeams.some(t=>t.name===name);
               const isSel = selectedTeam===name;
@@ -5481,55 +5476,8 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
                 name, isReg&&React.createElement('span',{style:{fontSize:9,color:isSel?"#4ade80":"#22c55e",marginLeft:3}},"★"))
             })
         )
-        , React.createElement('div', {style:{display:"flex",alignItems:"center",marginTop:4,gap:8}}
-          , React.createElement('div', {style:{fontSize:10,color:"#475569",flex:1}},
-              filteredGames.length+"試合分の成績"+(selectedTeam?" ("+selectedTeam+"が出場した試合)":""))
-          , React.createElement('button', {
-              onClick:()=>setShowAlias(v=>!v),
-              style:{fontSize:10,padding:"2px 8px",borderRadius:5,cursor:"pointer",
-                background:showAlias?"#1d4ed833":"#0d1f35",
-                border:"1px solid "+(showAlias?"#3b82f6":"#1e3a5f"),
-                color:showAlias?"#7dd3fc":"#475569"}
-            }, "🔗 チーム名を紐づける")
-        )
-
-        // 別名設定UI
-        , showAlias && React.createElement('div', {style:{
-            background:"#060f1e",borderRadius:8,padding:10,marginTop:8,
-            border:"1px solid #1e3a5f"}}
-          , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}},
-            "🔗 チーム名の紐づけ設定")
-          , React.createElement('div', {style:{fontSize:10,color:"#475569",marginBottom:8}},
-            "履歴に残っている別名を登録チームに紐づけます")
-          , (()=>{
-              const registered = [...(myTeam?[myTeam]:[]),...(opponents||[]),...(teams||[])];
-              const registeredNames = new Set(registered.map(t=>t.name));
-              // 履歴に出てくるチーム名のうち、登録チームと完全一致しないものだけ表示
-              const histTeams = [...new Set((history||[]).filter(g=>g.finished).flatMap(g=>[g.awayTeam,g.homeTeam]).filter(Boolean))];
-              const needAlias = histTeams.filter(n=>!registeredNames.has(n));
-              if(needAlias.length===0) return React.createElement('div',{style:{fontSize:11,color:"#475569",padding:"8px 0"}},
-                "✅ 全チームが登録済みです（紐づけ不要）");
-              return needAlias.map(rawName=>{
-                const current = teamAliases[rawName] || "";
-                return React.createElement('div', {key:rawName, style:{
-                    display:"flex",alignItems:"center",gap:6,marginBottom:6}}
-                  , React.createElement('div',{style:{flex:1}}
-                    , React.createElement('div',{style:{fontSize:11,color:"#e2e8f0",marginBottom:2}}, rawName)
-                    , React.createElement('div',{style:{fontSize:9,color:"#475569"}}, "→ 登録チームに紐づけ")
-                  )
-                  , React.createElement('select', {
-                      value: current,
-                      onChange: e=>saveAlias(rawName, e.target.value),
-                      style:{flex:1,background:"#0d1f35",border:"1px solid "+(current?"#3b82f6":"#1e3a5f"),
-                        color:current?"#7dd3fc":"#e2e8f0",borderRadius:6,padding:"4px 6px",fontSize:11}
-                    }
-                    , React.createElement('option', {value:""}, "（未設定）")
-                    , registered.map(t=>React.createElement('option', {key:t.name,value:t.name}, t.name))
-                  )
-                );
-              });
-            })()
-        )
+        , React.createElement('div', {style:{fontSize:10,color:"#475569",marginTop:4}},
+            filteredGames.length+"試合分の成績"+(selectedTeam?" ("+selectedTeam+"が出場した試合)":""))
       )
 
       // 種別タブ切替
@@ -5832,12 +5780,12 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
               , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}
                 , React.createElement('div', {style:{flex:1,minWidth:0}}
                   , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:3}}, g.date||"—", g.venue?" @ "+g.venue:"")
-                  , React.createElement('div', {style:{fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:4,flexWrap:"nowrap",overflow:"hidden"}}
-                    , React.createElement('span', {style:{color:"#fbbf24",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:80,flexShrink:1}}, g.awayTeam)
-                    , React.createElement('span', {style:{fontSize:20,fontWeight:900,color:"#fbbf24",flexShrink:0,margin:"0 2px"}}, awayTotal)
-                    , React.createElement('span', {style:{color:"#475569",fontSize:12,flexShrink:0}}, "—")
-                    , React.createElement('span', {style:{fontSize:20,fontWeight:900,color:"#7dd3fc",flexShrink:0,margin:"0 2px"}}, homeTotal)
-                    , React.createElement('span', {style:{color:"#7dd3fc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:80,flexShrink:1}}, g.homeTeam)
+                  , React.createElement('div', {style:{fontSize:13,fontWeight:700}}
+                    , React.createElement('span', {style:{color:"#fbbf24"}}, g.awayTeam)
+                    , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:"#fbbf24",margin:"0 4px"}}, " "+awayTotal)
+                    , React.createElement('span', {style:{color:"#475569",fontSize:12,margin:"0 4px"}}, "—")
+                    , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:"#7dd3fc",margin:"0 4px"}}, homeTotal+" ")
+                    , React.createElement('span', {style:{color:"#7dd3fc"}}, g.homeTeam)
                   )
                   , React.createElement('div', {style:{fontSize:11,color:"#475569",marginTop:3}}
                     , g.finished?"✅ 試合終了":"⏸ 未完了"

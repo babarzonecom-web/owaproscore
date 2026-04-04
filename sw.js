@@ -1,5 +1,10 @@
-// v1000-nocache
-self.addEventListener('install', e => { self.skipWaiting(); });
+// v1001-auto-update
+const SW_VERSION = 'v1001';
+
+self.addEventListener('install', e => {
+  self.skipWaiting();
+});
+
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -9,6 +14,12 @@ self.addEventListener('activate', e => {
       .then(clients => clients.forEach(c => c.navigate(c.url)))
   );
 });
+
 self.addEventListener('fetch', e => {
-  e.respondWith(fetch(e.request, { cache: 'no-store' }));
+  // 常に最新を取得（キャッシュなし）
+  e.respondWith(
+    fetch(e.request, { cache: 'no-store' }).catch(() => {
+      return caches.match(e.request);
+    })
+  );
 });

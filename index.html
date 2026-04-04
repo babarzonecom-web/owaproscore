@@ -718,13 +718,16 @@ const computePitcherStats = (g) => {
         // 打順インデックスでソート（同一打順内はentryIdx順）
         halfAtBats.sort((a,b)=> a.pi!==b.pi ? a.pi-b.pi : a.ei-b.ei);
 
-        // outsInHalfを累積しながらallAtBatsに追加
+        // outsInHalfを累積しながらallAtBatsに追加（3アウトで上限）
         let outsInHalf = 0;
         halfAtBats.forEach(({pi, ei, e:ne})=>{
           const hasError = !!(ne.errorPos);
-          allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb:outsInHalf, hasError});
-          if(OUT_CODES_FOR_IP.has(ne.code) && !hasError) outsInHalf++;
-          if(ne.code==="DP" && !hasError) outsInHalf++;
+          allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb:Math.min(outsInHalf,2), hasError});
+          if(outsInHalf < 3){
+            if(OUT_CODES_FOR_IP.has(ne.code) && !hasError) outsInHalf++;
+            if(ne.code==="DP" && !hasError) outsInHalf++;
+            if(ne.code==="TP" && !hasError) outsInHalf += 2;
+          }
         });
       });
     });
@@ -1637,7 +1640,7 @@ function App() {
       const snap = JSON.parse(JSON.stringify(s.currentGame));
       const newGame = fn(s.currentGame);
       const newUndoStack = [snap, ...(s.undoStack||[])];
-      // 管理者モード：変更を即座にFirebaseへプッシュ（REST API直接・fbInit不要）
+      // 管理者モード：変更を即座にFirebaseへプッシュ（fbInit不要）
       if(window.__teamShareRole === "admin" && window.__teamShareCode) {
         try {
           window.__teamAdminPushing = true;
@@ -2749,7 +2752,7 @@ function App() {
                     display:"flex",alignItems:"center",justifyContent:"center",
                     fontSize:13,lineHeight:1,color:"#000",fontWeight:900,
                     boxShadow:"0 0 6px #f59e0b88",
-                  },}, "✕")
+                  },}, "●")
               ))
             )
           )
@@ -2829,7 +2832,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v210")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v211")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2907,7 +2910,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v210")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v211")
         )
 
         // ===== 新規チーム作成 =====
@@ -3834,35 +3837,6 @@ function App() {
               onLoad:loadGame,
               onDelete:delHistory,
               onExcel:exportExcel,
-              onRestoreTeam:(g)=>{
-                // 試合のlineupからチームメンバーを復元
-                const restoreTeam = (teamName, lineupRaw, isMyTeam) => {
-                  if(!teamName||teamName==="ビジターチーム"||teamName==="ホームチーム") return;
-                  const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
-                  const members = lineup
-                    .filter(p=>p.name&&!p.name.startsWith("選手"))
-                    .map(p=>({name:p.name, pos:p.pos||""}));
-                  if(members.length===0) return;
-                  const teamObj = {id:Date.now().toString(36), name:teamName, members};
-                  setStorage(s=>{
-                    if(isMyTeam) {
-                      showToast("✅ 自チーム「"+teamName+"」を復元しました");
-                      return {...s, myTeam:teamObj};
-                    } else {
-                      const exists = (s.opponents||[]).some(t=>t.name===teamName);
-                      if(!exists) {
-                        showToast("✅ 「"+teamName+"」を対戦相手に復元しました");
-                        return {...s, opponents:[...(s.opponents||[]),teamObj]};
-                      }
-                      // 既存のチームを上書き復元
-                      showToast("✅ 「"+teamName+"」のメンバーを復元しました");
-                      return {...s, opponents:(s.opponents||[]).map(t=>t.name===teamName?teamObj:t)};
-                    }
-                  });
-                };
-                restoreTeam(g.awayTeam, g.awayLineup, false);
-                restoreTeam(g.homeTeam, g.homeLineup, myTeam&&myTeam.name===g.homeTeam);
-              },
               onImport:(games)=>{
                 // gamesは配列で一括受け取り
                 const arr = Array.isArray(games)?games:[games];
@@ -3875,6 +3849,28 @@ function App() {
                   });
                   return {...s, history:hist.slice(0,50)};
                 });
+              },
+              onRestoreTeam:(g, myTeamSide)=>{
+                const restoreTeam = (teamName, lineupRaw, isMyTeam) => {
+                  if(!teamName||teamName==="ビジターチーム"||teamName==="ホームチーム") return;
+                  const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
+                  const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
+                  if(members.length===0) return;
+                  const teamObj = {id:Date.now().toString(36), name:teamName, members};
+                  setStorage(s=>{
+                    if(isMyTeam){
+                      showToast("✅ 自チーム「"+teamName+"」を復元しました");
+                      return {...s, myTeam:teamObj};
+                    } else {
+                      const exists=(s.opponents||[]).some(t=>t.name===teamName);
+                      if(!exists){ showToast("✅ 「"+teamName+"」を対戦相手に復元"); return {...s,opponents:[...(s.opponents||[]),teamObj]}; }
+                      showToast("✅ 「"+teamName+"」を更新しました");
+                      return {...s,opponents:(s.opponents||[]).map(t=>t.name===teamName?teamObj:t)};
+                    }
+                  });
+                };
+                restoreTeam(g.awayTeam, g.awayLineup, myTeamSide==="away");
+                restoreTeam(g.homeTeam, g.homeLineup, myTeamSide==="home");
               },
               onUpload:(g)=>{
                 const code = window.__teamShareCode;
@@ -4118,35 +4114,6 @@ function App() {
               )
           )
 
-          // GitHubデプロイカード
-          , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #30363d", marginTop:12}}
-            , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:10}}
-              , React.createElement('div', {style:S.ct}, "🚀 GitHubデプロイ")
-            )
-            , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}
-              , [["gh_owner","オーナー",ghOwner,setGhOwner],["gh_repo","リポジトリ",ghRepo,setGhRepo],["gh_branch","ブランチ",ghBranch,setGhBranch]].map(([k,l,v,s])=>
-                  React.createElement('div',{key:k,style:{display:"flex",alignItems:"center",gap:8}}
-                    ,React.createElement('span',{style:{fontSize:11,color:"#64748b",minWidth:72}},l)
-                    ,React.createElement('input',{value:v,onChange:e=>{s(e.target.value);localStorage.setItem(k,e.target.value);},style:{...S.si,flex:1,fontSize:12}})
-                  )
-                )
-              , React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8}}
-                ,React.createElement('span',{style:{fontSize:11,color:"#64748b",minWidth:72}},"PAT Token")
-                ,React.createElement('input',{type:"password",value:ghToken,
-                    onChange:e=>{setGhToken(e.target.value);localStorage.setItem("gh_token",e.target.value);},
-                    placeholder:"ghp_xxxxxx",
-                    style:{...S.si,flex:1,fontSize:12}})
-              )
-            )
-            , React.createElement('button',{
-                onClick:deployToGitHub,
-                disabled:ghDeploying||!ghToken,
-                style:{...sBt("#238636"),width:"100%",padding:"11px",fontSize:14,fontWeight:700,
-                  opacity:(!ghToken||ghDeploying)?0.5:1}
-              }, ghDeploying?"⏳ デプロイ中...":"🚀 GitHubにデプロイ")
-            , React.createElement('div',{style:{fontSize:10,color:"#475569",marginTop:6,lineHeight:1.5}},
-              "Settings → Developer settings → Personal access tokens → repo権限のトークンを発行して入力")
-          )
 
         )))
 
@@ -5849,12 +5816,12 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
               , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}
                 , React.createElement('div', {style:{flex:1,minWidth:0}}
                   , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:3}}, g.date||"—", g.venue?" @ "+g.venue:"")
-                  , React.createElement('div', {style:{fontSize:14,fontWeight:700}}
-                    , React.createElement('span', {style:{color:"#fbbf24"}}, g.awayTeam)
-                    , React.createElement('span', {style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#fbbf24",margin:"0 6px"}}, awayTotal)
-                    , React.createElement('span', {style:{color:"#475569",fontSize:12}}, "—")
-                    , React.createElement('span', {style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#7dd3fc",margin:"0 6px"}}, homeTotal)
-                    , React.createElement('span', {style:{color:"#7dd3fc"}}, g.homeTeam)
+                  , React.createElement('div', {style:{fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:4,flexWrap:"nowrap",overflow:"hidden"}}
+                    , React.createElement('span', {style:{color:"#fbbf24",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:80,flexShrink:1}}, g.awayTeam)
+                    , React.createElement('span', {style:{fontSize:20,fontWeight:900,color:"#fbbf24",flexShrink:0,margin:"0 2px"}}, awayTotal)
+                    , React.createElement('span', {style:{color:"#475569",fontSize:12,flexShrink:0}}, "—")
+                    , React.createElement('span', {style:{fontSize:20,fontWeight:900,color:"#7dd3fc",flexShrink:0,margin:"0 2px"}}, homeTotal)
+                    , React.createElement('span', {style:{color:"#7dd3fc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:80,flexShrink:1}}, g.homeTeam)
                   )
                   , React.createElement('div', {style:{fontSize:11,color:"#475569",marginTop:3}}
                     , g.finished?"✅ 試合終了":"⏸ 未完了"
@@ -5864,8 +5831,13 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
                 , React.createElement('div', {style:{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}
                   , React.createElement('button', {onClick:()=>onLoad(g),
                       style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}}, "📂 読込")
-                  , React.createElement('button', {onClick:()=>onRestoreTeam&&onRestoreTeam(g),
-                      style:{...sBt("#f59e0b"),fontSize:11,padding:"4px 10px"}}, "👥 復元")
+                  , React.createElement('button', {onClick:()=>{
+                      if(!onRestoreTeam) return;
+                      const choice = window.confirm(
+                        g.awayTeam+" vs "+g.homeTeam+"\n\nどちらを自チームとして復元しますか？\nOK → "+g.awayTeam+"（先攻）\nキャンセル → "+g.homeTeam+"（後攻）"
+                      );
+                      onRestoreTeam(g, choice ? "away" : "home");
+                    }, style:{...sBt("#f59e0b"),fontSize:11,padding:"4px 10px"}}, "👥 復元")
                   , React.createElement('button', {onClick:()=>onExcel(g),
                       style:{...sBt("#16a34a"),fontSize:11,padding:"4px 10px"}}, "📊 Excel")
                   , React.createElement('button', {onClick:()=>onUpload(g),

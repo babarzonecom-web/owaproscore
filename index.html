@@ -2835,7 +2835,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v215")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v216")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2913,7 +2913,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v215")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v216")
         )
 
         // ===== 新規チーム作成 =====
@@ -4103,11 +4103,11 @@ function App() {
                       , React.createElement('button', {
                           onClick:()=>{ setModal({step:"team_lineup",side:"away",preselect:t}); setTab("lineup"); },
                           style:{...sBt("#1d4ed8",true),fontSize:11,padding:"3px 8px"}
-                        }, "客")
+                        }, "V")
                       , React.createElement('button', {
                           onClick:()=>{ setModal({step:"team_lineup",side:"home",preselect:t}); setTab("lineup"); },
                           style:{...sBt("#0369a1",true),fontSize:11,padding:"3px 8px"}
-                        }, "主")
+                        }, "H")
                       , React.createElement('button', {
                           onClick:()=>setModal({step:"team_edit",teamType:"opponent",editTeam:t}),
                           style:{...sBt("#475569",true),fontSize:11,padding:"3px 8px"}
@@ -4949,7 +4949,9 @@ function App() {
 // ===== 成績タブ =====
 function StatsTab({ game, history, teams, myTeam, opponents }) {
   const [statsView, setStatsView] = useState("batting");
-  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [selectedTeam, setSelectedTeam] = useState(
+    ()=> myTeam ? myTeam.name : null
+  );
   const [sortKey, setSortKey] = useState("avg");
   const [sortDesc, setSortDesc] = useState(true);
   const [showAlias, setShowAlias] = useState(false);
@@ -5170,10 +5172,9 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
   // filteredGamesから実際のチーム名を取得（進行中試合のデフォルト名を避ける）
   const _refGame = filteredGames[0];
   const primaryTeam = selectedTeam
+    || (myTeam && myTeam.name)
     || (_refGame && _refGame.awayTeam) || "";
-  const secondTeam = selectedTeam
-    ? null
-    : (_refGame && _refGame.homeTeam) || "";
+  const secondTeam = selectedTeam ? null : "";
   const awayBat = aggregatePlayerStats(primaryTeam);
   const homeBat = secondTeam ? aggregatePlayerStats(secondTeam) : [];
   const awayPit = aggregatePitcherStats(primaryTeam);
@@ -5777,22 +5778,20 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
             const awayTotal = Object.values(g.awayScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
             const homeTotal = Object.values(g.homeScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
             return React.createElement('div', {key:g.id||i, style:{...S.card,marginBottom:10}}
-              , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}
-                , React.createElement('div', {style:{flex:1,minWidth:0}}
-                  , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:3}}, g.date||"—", g.venue?" @ "+g.venue:"")
-                  , React.createElement('div', {style:{fontSize:13,fontWeight:700}}
-                    , React.createElement('span', {style:{color:"#fbbf24"}}, g.awayTeam)
-                    , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:"#fbbf24",margin:"0 4px"}}, " "+awayTotal)
-                    , React.createElement('span', {style:{color:"#475569",fontSize:12,margin:"0 4px"}}, "—")
-                    , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:"#7dd3fc",margin:"0 4px"}}, homeTotal+" ")
-                    , React.createElement('span', {style:{color:"#7dd3fc"}}, g.homeTeam)
-                  )
-                  , React.createElement('div', {style:{fontSize:11,color:"#475569",marginTop:3}}
-                    , g.finished?"✅ 試合終了":"⏸ 未完了"
-                    , g.savedAt?" · "+g.savedAt:""
-                  )
+              , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:6}}
+                , React.createElement('div', {style:{fontSize:11,color:"#64748b"}}, g.date||"—", g.venue?" @ "+g.venue:"")
+                , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:4,flexWrap:"nowrap"}}
+                  , React.createElement('span', {style:{color:"#fbbf24",fontSize:12,flex:"1 1 0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}, g.awayTeam)
+                  , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:"#fbbf24",flexShrink:0}}, awayTotal)
+                  , React.createElement('span', {style:{color:"#475569",fontSize:11,flexShrink:0,margin:"0 2px"}}, "—")
+                  , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:"#7dd3fc",flexShrink:0}}, homeTotal)
+                  , React.createElement('span', {style:{color:"#7dd3fc",fontSize:12,flex:"1 1 0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0,textAlign:"right"}}, g.homeTeam)
                 )
-                , React.createElement('div', {style:{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}
+                , React.createElement('div', {style:{fontSize:11,color:"#475569"}}
+                  , g.finished?"✅ 試合終了":"⏸ 未完了"
+                  , g.savedAt?" · "+g.savedAt:""
+                )
+                , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
                   , React.createElement('button', {onClick:()=>onLoad(g),
                       style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}}, "📂 読込")
                   , React.createElement('button', {onClick:()=>{

@@ -1410,10 +1410,15 @@ function App() {
                   });
                 }).catch(()=>{});
 
-            // アップロード後にダウンロード（順序保証）
-            uploadMyTeams()
-              .then(()=>downloadTeams())
+            // まずダウンロード、その後にアップロード（ダウンロード優先）
+            // ローカルにデータがある場合のみアップロード
+            downloadTeams()
               .then(()=>downloadFromGame())
+              .then(()=>{
+                const localData = JSON.parse(localStorage.getItem("bb_v7")||"{}");
+                const hasData = localData.myTeam||(localData.opponents&&localData.opponents.length>0);
+                if(hasData) uploadMyTeams();
+              })
               .catch(()=>{});
           };
 
@@ -2832,7 +2837,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v211")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v212")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2910,7 +2915,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v211")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v212")
         )
 
         // ===== 新規チーム作成 =====

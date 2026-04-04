@@ -2837,7 +2837,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v212")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v213")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2915,7 +2915,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v212")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v213")
         )
 
         // ===== 新規チーム作成 =====
@@ -4956,6 +4956,19 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
   const [sortDesc, setSortDesc] = useState(true);
   const [showAlias, setShowAlias] = useState(false);
   const [editMode, setEditMode] = useState(false);   // 手動修正モード
+  const [editPitchMode, setEditPitchMode] = useState(false);
+  const [pitchOverrides, setPitchOverrides] = React.useState(()=>{
+    try { return JSON.parse(localStorage.getItem("pitchOverrides")||"{}"); } catch(e){ return {}; }
+  });
+  const savePitchOverride = (playerKey, field, val) => {
+    setPitchOverrides(prev=>{
+      const next = {...prev};
+      if(val===undefined){ if(next[playerKey]) delete next[playerKey][field]; }
+      else next[playerKey] = {...(next[playerKey]||{}), [field]:val};
+      localStorage.setItem("pitchOverrides", JSON.stringify(next));
+      return next;
+    });
+  };
   const [statOverrides, setStatOverrides] = React.useState(()=>{
     try { return JSON.parse(localStorage.getItem("statOverrides")||"{}"); } catch(e){ return {}; }
   });

@@ -1422,8 +1422,8 @@ function App() {
               .catch(()=>{});
           };
 
-          // 接続時に自動同期を実行
-          syncTeamsWithFirebase(tc, role);
+          // チーム自動同期は廃止（手動復元のみ）
+          // syncTeamsWithFirebase(tc, role);
 
           // 以下は削除（registerTeamFromDataに統合済み）
           const registerTeamFromData = (teamInfo, gameData) => {
@@ -2835,7 +2835,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v216")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v217")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2913,7 +2913,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v216")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v217")
         )
 
         // ===== 新規チーム作成 =====

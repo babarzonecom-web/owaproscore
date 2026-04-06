@@ -722,7 +722,7 @@ const computePitcherStats = (g) => {
         let outsInHalf = 0;
         halfAtBats.forEach(({pi, ei, e:ne})=>{
           const hasError = !!(ne.errorPos);
-          allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb:Math.min(outsInHalf,2), hasError});
+          allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb:Math.min(outsInHalf,2), hasError, seq:allAtBats.length});
           if(outsInHalf < 3){
             if(OUT_CODES_FOR_IP.has(ne.code) && !hasError) outsInHalf++;
             if(ne.code==="DP" && !hasError) outsInHalf++;
@@ -750,40 +750,55 @@ const computePitcherStats = (g) => {
     const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf===starterHalf && l.outsAtStart===0);
     const log = hasStarter ? rawLog : [starterEntry, ...rawLog];
 
-    // 打席時点で担当していた投手を特定するヘルパー
-    // outsAtAb = その打席が始まる前のアウト数
-    // outsAtStart = 投手交代時のアウト数
-    // 「交代時刻 <= 打席時刻」かつ「最も直近の交代」を選ぶ
-    const findActivePitcher = (abInning, abHalf, abOutsAtAb) => {
-      const abTime = abInning*2 + (abHalf==="top"?0:1);
-      let bestIdx = log[0].pitcherIdx;
-      let bestScore = -Infinity;
-      for(let i=0;i<log.length;i++){
-        const l = log[i];
+    // 打席の通し番号(seq)ベースで担当投手を特定するヘルパー
+    // 各交代エントリにfromSeq（何番目の打席から担当か）を紐づけて判定
+    // fromSeq以上のseqを持つ打席が新投手の担当
+    const buildSeqLog = () => {
+      // allAtBatsが構築済みなので、各交代エントリのfromSeqを計算する
+      // fromInning・fromHalf・outsAtStartに一致する最初の打席のseqを使う
+      return log.map((l, li) => {
         const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
         const outs = l.outsAtStart||0;
-        let score = null;
-        if(logTime < abTime) {
-          // 別イニング・ハーフで交代→有効
-          score = logTime * 1000 + outs;
-        } else if(logTime === abTime) {
-          // 同イニング・ハーフ内：outsAtStart <= outsAtAb で有効
-          // （交代した時点のアウト数以降の打席は新投手）
-          if(outs <= abOutsAtAb) {
-            score = logTime * 1000 + outs;
+        // このエントリ以降で最初に一致する打席のseqを探す
+        let fromSeq = 0;
+        if(li === 0) {
+          // 先発投手は0番目から
+          fromSeq = 0;
+        } else {
+          // 交代後：outsAtStart以降のアウト数を持つ最初の打席
+          // 同イニング・ハーフでoutsAtAb >= outsAtStartの最初の打席
+          let found = false;
+          for(let k=0; k<allAtBats.length; k++){
+            const ab = allAtBats[k];
+            const abTime = ab.inning*2 + (ab.half==="top"?0:1);
+            if(abTime < logTime) continue;
+            if(abTime === logTime && (ab.outsAtAb||0) < outs) continue;
+            if(abTime > logTime || (abTime === logTime && (ab.outsAtAb||0) >= outs)){
+              fromSeq = ab.seq;
+              found = true;
+              break;
+            }
           }
+          if(!found) fromSeq = allAtBats.length; // 担当打席なし
         }
-        // 有効で、これまでより新しい（スコアが大きい）ものを選ぶ
-        if(score !== null && score > bestScore) {
-          bestScore = score;
-          bestIdx = l.pitcherIdx;
+        return {...l, fromSeq};
+      });
+    };
+    const seqLog = buildSeqLog();
+
+    const findActivePitcher = (abSeq) => {
+      // seqLog中でfromSeq <= abSeqを満たす最後（最新）のエントリ
+      let bestIdx = seqLog[0].pitcherIdx;
+      for(let i=0; i<seqLog.length; i++){
+        if(seqLog[i].fromSeq <= abSeq){
+          bestIdx = seqLog[i].pitcherIdx;
         }
       }
       return bestIdx;
     };
 
     allAtBats.forEach(ab=>{
-      let activePIdx = findActivePitcher(ab.inning, ab.half, ab.outsAtAb||0);
+      let activePIdx = findActivePitcher(ab.seq);
 
       const ps = stats[activePIdx];
       if(!ps) return;
@@ -819,7 +834,7 @@ const computePitcherStats = (g) => {
               const isReach = ["H1","H2","H3","HR","BB","HBP","IBB","CI","KW","E","FC"].includes(pc);
               if(isReach) {
                 // この時点の投手を特定
-                runnerPitcherIdx = findActivePitcher(prev.inning, prev.half, prev.outsAtAb||0);
+                runnerPitcherIdx = findActivePitcher(prev.seq);
               }
             }
           }
@@ -841,7 +856,7 @@ const computePitcherStats = (g) => {
     
     allAtBats.forEach(ab=>{
       // findActivePitcherを使って統一（被安打・三振等と同じロジック）
-      const activePIdx = findActivePitcher(ab.inning, ab.half, ab.outsAtAb||0);
+      const activePIdx = findActivePitcher(ab.seq);
       const ps = stats[activePIdx];
       if(!ps) return;
       const code = ab.entry.code;
@@ -857,7 +872,17 @@ const computePitcherStats = (g) => {
       // このアウトが発生した時点のイニング・ハーフ・アウト数
       const boInning = bo.inning; const boHalf = bo.half; const boOuts = bo.outsAtTime||0;
       // 担当投手を特定
-      const activePIdx = findActivePitcher(boInning, boHalf, boOuts||0);
+      // baserunnerOutsはseqがないので、対応するallAtBatsのseqを逆引き
+      const boTime = boInning*2+(boHalf==="top"?0:1);
+      const boOutsN = boOuts||0;
+      let brSeq = 0;
+      for(let k=0;k<allAtBats.length;k++){
+        const ab=allAtBats[k];
+        const at=ab.inning*2+(ab.half==="top"?0:1);
+        if(at < boTime) brSeq = ab.seq;
+        else if(at === boTime && (ab.outsAtAb||0) <= boOutsN) brSeq = ab.seq;
+      }
+      const activePIdx = findActivePitcher(brSeq);
       const ps = stats[activePIdx];
       if(ps) ps._outsGot++;
     });
@@ -2568,7 +2593,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v233")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v234")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2646,7 +2671,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v233")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v234")
         )
 
         // ===== 新規チーム作成 =====

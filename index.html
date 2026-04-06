@@ -751,28 +751,33 @@ const computePitcherStats = (g) => {
     const log = hasStarter ? rawLog : [starterEntry, ...rawLog];
 
     // 打席時点で担当していた投手を特定するヘルパー
-    // 「打席の時点より前で、最も直近の交代エントリ」を返す
+    // outsAtAb = その打席が始まる前のアウト数
+    // outsAtStart = 投手交代時のアウト数
+    // 「交代時刻 <= 打席時刻」かつ「最も直近の交代」を選ぶ
     const findActivePitcher = (abInning, abHalf, abOutsAtAb) => {
       const abTime = abInning*2 + (abHalf==="top"?0:1);
       let bestIdx = log[0].pitcherIdx;
-      let bestScore = -Infinity; // 最も直近のエントリを選ぶスコア
+      let bestScore = -Infinity;
       for(let i=0;i<log.length;i++){
         const l = log[i];
         const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
         const outs = l.outsAtStart||0;
+        let score = null;
         if(logTime < abTime) {
-          // 別のイニング・ハーフ：より新しいものを優先
-          const score = logTime * 100;
-          if(score >= bestScore){ bestScore = score; bestIdx = l.pitcherIdx; }
+          // 別イニング・ハーフで交代→有効
+          score = logTime * 1000 + outs;
         } else if(logTime === abTime) {
-          // 同イニング・ハーフ：アウト数が打席時点より少ない場合のみ有効
-          // （outsAtStart < outsAtAb → この投手が投げた打席）
-          if(outs < abOutsAtAb) {
-            const score = abTime * 100 + outs;
-            if(score >= bestScore){ bestScore = score; bestIdx = l.pitcherIdx; }
+          // 同イニング・ハーフ内：outsAtStart <= outsAtAb で有効
+          // （交代した時点のアウト数以降の打席は新投手）
+          if(outs <= abOutsAtAb) {
+            score = logTime * 1000 + outs;
           }
         }
-        // logTime > abTime は未来の交代なので無視
+        // 有効で、これまでより新しい（スコアが大きい）ものを選ぶ
+        if(score !== null && score > bestScore) {
+          bestScore = score;
+          bestIdx = l.pitcherIdx;
+        }
       }
       return bestIdx;
     };
@@ -824,8 +829,8 @@ const computePitcherStats = (g) => {
             rps.autoRuns = (rps.autoRuns||0) + 1;
           }
         });
-        // scoredNamesがない場合は従来通り現在の投手に帰責
-        if(scoredNames.length === 0) {
+        // scoredNamesがない場合：batterScoredで既に加算していなければ加算
+        if(scoredNames.length === 0 && !batterScored) {
           ps.autoEr += runsScored;
           ps.autoRuns = (ps.autoRuns||0) + runsScored;
         }
@@ -2573,7 +2578,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v231")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v232")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2651,7 +2656,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v231")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v232")
         )
 
         // ===== 新規チーム作成 =====

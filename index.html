@@ -760,7 +760,9 @@ const computePitcherStats = (g) => {
           activePIdx = l.pitcherIdx;
         } else if(logTime === abTime) {
           // 同イニング・ハーフ内はアウトカウントで判定
-          if((l.outsAtStart||0) <= (ab.outsAtAb||0)) activePIdx = l.pitcherIdx;
+          // 交代時のアウト数より打席時のアウト数が多い場合のみ新投手に帰属
+          // 例：1アウトで交代→outsAtStart=1、打席のoutsAtAb=1なら前投手の記録
+          if((l.outsAtStart||0) < (ab.outsAtAb||0)) activePIdx = l.pitcherIdx;
         }
       }
 
@@ -2572,7 +2574,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v228")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v229")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2650,7 +2652,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v228")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v229")
         )
 
         // ===== 新規チーム作成 =====

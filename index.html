@@ -1300,9 +1300,9 @@ function App() {
             if(!data){ setTeamShareError("チームIDが見つかりません"); return; }
             if(data.teamPw && data.teamPw===pw.trim()){
               role = "member";
-            } else if(data.adminPw && data.adminPw===pw.trim()){
-              // 管理者PWでもメンバーとして入れる（後方互換）
-              role = "admin";
+            } else if(!data.teamPw && data.adminPw && data.adminPw===pw.trim()){
+              // 旧形式：adminPwしかない場合、そのPWでmemberとして入室
+              role = "member";
             } else if(!data.teamPw && !data.adminPw){
               // 旧形式（PWなし）→ メンバーとして接続
               role = "member";
@@ -1756,12 +1756,24 @@ function App() {
       // OUT_CODES_FOR_IPに含まれないコード（進塁手動アウト等）の場合のみ追加
       const codeIsIpOut = OUT_CODES_FOR_IP.has(code);
       let brOuts = [...(g.baserunnerOuts||[])];
-      if(newOuts !== undefined && !codeIsIpOut) {
-        const addedOuts = (newOuts || 0) - (g.outs || 0);
-        if(addedOuts > 0) {
+      if(newOuts !== undefined) {
+        const baseOutsFromCode = codeIsIpOut ? 1 : (code==="DP"?2:code==="TP"?3:0);
+        const totalOuts = (newOuts || 0);
+        const prevOuts = (g.outs || 0);
+        const addedOuts = totalOuts - prevOuts;
+        // 走塁アウト分（打撃結果コードで発生するアウト以外）
+        const runnerOuts = Math.max(0, addedOuts - baseOutsFromCode);
+        if(runnerOuts > 0) {
+          const defTeam = team==="away"?"home":"away";
+          for(let i=0;i<runnerOuts;i++){
+            brOuts.push({inning:g.inning, half:g.half, outsAtTime:prevOuts+baseOutsFromCode+i, defTeam});
+          }
+        }
+        // IPアウトコードでない追加アウト
+        if(!codeIsIpOut && addedOuts > 0) {
           const defTeam = team==="away"?"home":"away";
           for(let i=0;i<addedOuts;i++){
-            brOuts.push({inning:g.inning, half:g.half, outsAtTime:g.outs+i, defTeam});
+            brOuts.push({inning:g.inning, half:g.half, outsAtTime:prevOuts+i, defTeam});
           }
         }
       }
@@ -2840,7 +2852,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v219")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v220")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2918,7 +2930,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v219")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v220")
         )
 
         // ===== 新規チーム作成 =====

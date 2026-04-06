@@ -840,24 +840,14 @@ const computePitcherStats = (g) => {
     
     
     allAtBats.forEach(ab=>{
-      let activePIdx = log[0].pitcherIdx;
-      for(let i=0;i<log.length;i++){
-        const l = log[i];
-        const logTime = l.fromInning*2+(l.fromHalf==="top"?0:1);
-        const abTime  = ab.inning*2+(ab.half==="top"?0:1);
-        if(logTime < abTime) {
-          activePIdx = l.pitcherIdx;
-        } else if(logTime === abTime) {
-          // 交代時のアウト数より打席時のアウト数が多い場合のみ新投手（同数は前投手）
-          if((l.outsAtStart||0) < (ab.outsAtAb||0)) activePIdx = l.pitcherIdx;
-        }
-      }
+      // findActivePitcherを使って統一（被安打・三振等と同じロジック）
+      const activePIdx = findActivePitcher(ab.inning, ab.half, ab.outsAtAb||0);
       const ps = stats[activePIdx];
       if(!ps) return;
       const code = ab.entry.code;
       if(OUT_CODES.has(code) && !ab.hasError) ps._outsGot += 1;
       if(code==="DP" && !ab.hasError) ps._outsGot += 1;
-      if(code==="TP" && !ab.hasError) ps._outsGot += 2; // TP=3アウト（1打席分含め合計3）
+      if(code==="TP" && !ab.hasError) ps._outsGot += 2;
     });
 
     // baserunnerOuts（走塁アウト）も投球回に加算
@@ -2578,7 +2568,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v232")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v233")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2656,7 +2646,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v232")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v233")
         )
 
         // ===== 新規チーム作成 =====

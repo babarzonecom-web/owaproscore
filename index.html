@@ -1211,6 +1211,39 @@ function App() {
   // ===== チームコード接続 =====
 
   
+  const mutGame = useCallback((fn)=>{
+    // メンバーは記録操作不可
+    if(window.__teamShareRole === "member") {
+      showToast("👥 メンバーモードでは記録できません。管理者でログインしてください。");
+      return;
+    }
+    setStorage(s=>{
+      const snap = JSON.parse(JSON.stringify(s.currentGame));
+      const newGame = fn(s.currentGame);
+      const newUndoStack = [snap, ...(s.undoStack||[])];
+      // 管理者モード：変更を即座にFirebaseへプッシュ（fbInit不要）
+      if(window.__teamShareRole === "admin" && window.__teamShareCode) {
+        try {
+          window.__teamAdminPushing = true;
+          fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json",{
+              method:"PUT",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify(Object.assign({},newGame,{_ts:Date.now()}))
+            }).then(function(){ setTimeout(function(){ window.__teamAdminPushing=false; },2000); })
+            .catch(function(e){ console.error("[TEAM] push error",e); window.__teamAdminPushing=false; });
+          console.log("[TEAM ADMIN] pushed to", window.__teamShareCode);
+        } catch(e) { console.error("[TEAM] push error", e); window.__teamAdminPushing = false; }
+      }
+      // オートセーブ：currentGameをhistoryに反映（同一IDで上書き）
+      if(newGame && newGame.id){
+        const hist = [...(s.history||[])];
+        const idx = hist.findIndex(h=>h.id===newGame.id);
+        if(idx>=0) hist[idx]={...newGame, savedAt:hist[idx].savedAt};
+        return {...s, currentGame:newGame, undoStack:newUndoStack.slice(0,30), history:hist};
+      }
+      return {...s, currentGame:newGame, undoStack:newUndoStack.slice(0,30)};
+    });
+  },[setStorage]);
+
   const undoPlay = useCallback(()=>{
     setStorage(s=>{
       const stack = s.undoStack||[];
@@ -2405,7 +2438,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v225")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v226")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2483,7 +2516,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v225")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v226")
         )
 
         // ===== 新規チーム作成 =====

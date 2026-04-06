@@ -754,37 +754,35 @@ const computePitcherStats = (g) => {
     // 各交代エントリにfromSeq（何番目の打席から担当か）を紐づけて判定
     // fromSeq以上のseqを持つ打席が新投手の担当
     const buildSeqLog = () => {
-      // allAtBatsが構築済みなので、各交代エントリのfromSeqを計算する
-      // fromInning・fromHalf・outsAtStartに一致する最初の打席のseqを使う
       return log.map((l, li) => {
+        // atBatSeqが記録されている場合はそれをfromSeqとして直接使用
+        if(l.atBatSeq !== undefined && l.atBatSeq >= 0) {
+          return {...l, fromSeq: l.atBatSeq};
+        }
+        if(l.atBatSeq === -1) {
+          // 次のイニング頭から：logTime以降の最初の打席
+          const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
+          const nextAb = allAtBats.find(ab=>{
+            const abTime = ab.inning*2+(ab.half==="top"?0:1);
+            return abTime >= logTime;
+          });
+          return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
+        }
+        // 旧データ（atBatSeqなし）：inning/half/outsAtStartから推定
+        if(li === 0) return {...l, fromSeq: 0};
         const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
         const outs = l.outsAtStart||0;
-        // このエントリ以降で最初に一致する打席のseqを探す
-        let fromSeq = 0;
-        if(li === 0) {
-          // 先発投手は0番目から
-          fromSeq = 0;
-        } else {
-          // 交代後：outsAtStart以降のアウト数を持つ最初の打席
-          // 同イニング・ハーフでoutsAtAb >= outsAtStartの最初の打席
-          let found = false;
-          for(let k=0; k<allAtBats.length; k++){
-            const ab = allAtBats[k];
-            const abTime = ab.inning*2 + (ab.half==="top"?0:1);
-            if(abTime < logTime) continue;
-            if(abTime === logTime && (ab.outsAtAb||0) < outs) continue;
-            if(abTime > logTime || (abTime === logTime && (ab.outsAtAb||0) >= outs)){
-              fromSeq = ab.seq;
-              found = true;
-              break;
-            }
-          }
-          if(!found) fromSeq = allAtBats.length; // 担当打席なし
-        }
-        return {...l, fromSeq};
+        const prevFromSeq = log[li-1].atBatSeq !== undefined ? log[li-1].atBatSeq : 0;
+        const nextAb = allAtBats.find(ab=>{
+          const abTime = ab.inning*2+(ab.half==="top"?0:1);
+          if(abTime < logTime) return false;
+          if(abTime === logTime) return (ab.outsAtAb||0) >= outs;
+          return true;
+        });
+        return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
       });
     };
-    const seqLog = buildSeqLog();
+        const seqLog = buildSeqLog();
 
     const findActivePitcher = (abSeq) => {
       // seqLog中でfromSeq <= abSeqを満たす最後（最新）のエントリ
@@ -1912,11 +1910,16 @@ function App() {
     const newPitchers = [...pitchers, newPitcher];
     const newPIdx = newPitchers.length-1;
     const logKey = side+"PitcherLog";
+    const offLKey2 = side==="away" ? "homeLineup" : "awayLineup";
+    const offL2 = g[offLKey2]||[];
+    let abSeq2 = 0;
+    offL2.forEach(p=>{ Object.values(p.atBats||{}).forEach(abs=>{ abSeq2 += Array.isArray(abs)?abs.length:Object.values(abs||{}).length; }); });
     const newPitcherLog = [...(g[logKey]||[]), {
       pitcherIdx: newPIdx,
       fromInning: g.inning,
       fromHalf: g.half,
       outsAtStart: g.outs,
+      atBatSeq: abSeq2,
     }];
     return {...g,
       [side+"Pitchers"]: newPitchers,
@@ -2003,11 +2006,24 @@ function App() {
       const fromInning = sameHalf ? g.inning
         : (defTeam==="away" ? g.inning + 1 : g.inning);
       const fromHalf = pitchHalf;
+      // この時点での守備チームのlineupの総打席数を記録
+      const pitchLineupKey = defTeam==="away" ? "awayLineup" : "homeLineup";
+      // 実際には攻撃チームの打席数が重要：offTeam = defTeam==="away"?"home":"away"
+      const offLineupKey = defTeam==="away" ? "homeLineup" : "awayLineup";
+      const offLineup = g[offLineupKey]||[];
+      let atBatSeqNow = 0;
+      offLineup.forEach(p=>{
+        Object.values(p.atBats||{}).forEach(inningAbs=>{
+          const arr = Array.isArray(inningAbs)?inningAbs:Object.values(inningAbs||{});
+          atBatSeqNow += arr.length;
+        });
+      });
       const entry = {
         pitcherIdx: newPitcherIdx,
         fromInning,
         fromHalf,
         outsAtStart: sameHalf ? g.outs : 0,
+        atBatSeq: sameHalf ? atBatSeqNow : -1, // -1=次のイニング頭から
       };
       const newLog = [...(g[logKey]||[]), entry];
       const log=[{
@@ -2593,7 +2609,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v234")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v235")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2671,7 +2687,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v234")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v235")
         )
 
         // ===== 新規チーム作成 =====

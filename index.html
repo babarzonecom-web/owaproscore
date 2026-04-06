@@ -1198,6 +1198,21 @@ function App() {
 
   const showToast = (msg)=>{setToast(msg);setTimeout(()=>setToast(""),2600);};
 
+  const disconnectTeam = () => {
+    window.__teamShareCode = null;
+    window.__teamShareRole = null;
+    window.__teamAdminPushing = false;
+    if(window.__teamPollTimer){ clearInterval(window.__teamPollTimer); window.__teamPollTimer=null; }
+    if(window.__teamShareRef){ try{ window.__teamShareRef.off(); }catch(e){} window.__teamShareRef=null; }
+    setTeamShareCode("");
+    setTeamShareRole("");
+    setTeamShareError("");
+    localStorage.removeItem("tsCode");
+    localStorage.removeItem("tsRole");
+    setTab("login");
+    showToast("切断しました");
+  };
+
   // 自動再接続は削除（手動接続のみ）
 
   const startHosting = ()=>{
@@ -1210,7 +1225,125 @@ function App() {
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
   // ===== チームコード接続 =====
 
-  
+  // ===== 新接続ロジック =====
+  // role: "admin"（管理者PW一致）| "member"（チームPW一致）
+  const connectTeam = (code, pw, mode) => {
+    // mode: "new"（新規作成）| "member"（メンバー）| "admin"（管理者）
+    try {
+      const tc = (code||"").trim().toUpperCase();
+      if(!tc){ setTeamShareError("チームIDを入力してください"); return; }
+      if(!pw||!pw.trim()){ setTeamShareError("パスワードを入力してください"); return; }
+      setTeamShareError("接続中...");
+
+      const baseRestUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc;
+
+      fetch(baseRestUrl+".json", {cache:"no-store"}).then(r=>r.json()).then(data=>{
+        try {
+          if(data===undefined) data=null;
+          let role = null;
+
+          if(mode==="new") {
+            if(data && (data.teamPw || data.adminPw)) {
+              setTeamShareError("このチームIDは既に使われています。別のIDを選んでください。");
+              return;
+            }
+            const parts = pw.split("::");
+            const teamPw = parts[0]||pw;
+            const adminPw = parts[1]||pw;
+            fetch(baseRestUrl+".json",{method:"PUT",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({teamPw:teamPw.trim(), adminPw:adminPw.trim(), createdAt:Date.now()})});
+            role = "admin";
+
+          } else if(mode==="admin") {
+            if(!data){ setTeamShareError("チームIDが見つかりません"); return; }
+            if(data.adminPw && data.adminPw===pw.trim()){
+              role = "admin";
+            } else if(!data.adminPw && data.teamPw && data.teamPw===pw.trim()){
+              role = "admin";
+            } else if(!data.adminPw && !data.teamPw){
+              role = "admin";
+            } else {
+              setTeamShareError("管理者パスワードが違います"); return;
+            }
+
+          } else {
+            // メンバーログイン
+            if(!data){ setTeamShareError("チームIDが見つかりません"); return; }
+            if(data.teamPw && data.teamPw===pw.trim()){
+              role = "member";
+            } else if(!data.teamPw && data.adminPw && data.adminPw===pw.trim()){
+              role = "member";
+            } else if(!data.teamPw && !data.adminPw){
+              role = "member";
+            } else {
+              setTeamShareError("チームパスワードが違います"); return;
+            }
+          }
+
+          window.__teamShareCode = tc;
+          window.__teamShareRole = role;
+          window.__teamAdminPushing = false;
+
+          if(window.__teamShareRef) {
+            try { window.__teamShareRef.off(); } catch(e2) {}
+            window.__teamShareRef = null;
+          }
+
+          setTeamShareCode(tc);
+          setTeamShareRole(role);
+          setTeamShareError("");
+          localStorage.setItem("tsCode", tc);
+          localStorage.setItem("tsRole", role);
+          setTab("score");
+          const roleLabel = role==="admin" ? "🔑 管理者" : "👥 メンバー";
+          showToast(roleLabel+"として接続しました（"+tc+"）");
+
+          // member・adminどちらもFirebaseをポーリングして速報を受信
+          if(role === "member" || role === "admin") {
+            var lastTs = -1;
+            var restUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/currentGame.json";
+            window.__teamShareRef = restUrl;
+            var poll = function(){
+              if(window.__teamShareRole !== "member" && window.__teamShareRole !== "admin") return;
+              fetch(restUrl, {cache:"no-store"}).then(function(res){ return res.json(); }).then(function(data){
+                try {
+                  if(!data || typeof data !== "object") return;
+                  var ts = data._ts || 0;
+                  if(ts <= lastTs) return;
+                  lastTs = ts;
+                  var str = JSON.stringify(data);
+                  var obj = JSON.parse(str);
+                  delete obj._ts;
+                  var fixArrays = function(o) {
+                    if(!o || typeof o !== "object") return o;
+                    if(Array.isArray(o)) return o.map(fixArrays);
+                    var keys = Object.keys(o);
+                    var isArr = keys.length > 0 && keys.every(function(k,i){ return k === String(i); });
+                    if(isArr) return keys.map(function(k){ return fixArrays(o[k]); });
+                    var result = {};
+                    keys.forEach(function(k){ result[k] = fixArrays(o[k]); });
+                    return result;
+                  };
+                  obj = fixArrays(obj);
+                  if(window.__teamAdminPushing && window.__teamShareRole === "admin") return;
+                  if(window.__setStorage) {
+                    window.__setStorage(function(s){ return Object.assign({}, s, {currentGame: obj}); });
+                  }
+                } catch(pe){ console.error("[TEAM] poll apply error", pe&&pe.message||pe); }
+              }).catch(function(fe){ console.error("[TEAM] fetch error", fe&&fe.message||fe); });
+            };
+            poll();
+            window.__teamPollTimer = setInterval(poll, 3000);
+          }
+
+        } catch(e5){ setTeamShareError("接続エラー: "+e5.message); }
+      }).catch(function(e){ setTeamShareError("接続エラー: "+e.message); });
+
+    } catch(e){
+      setTeamShareError("エラー: "+(e&&e.message||e));
+    }
+  };
+
   const mutGame = useCallback((fn)=>{
     // メンバーは記録操作不可
     if(window.__teamShareRole === "member") {
@@ -2438,7 +2571,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v226")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v227")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2516,7 +2649,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v226")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v227")
         )
 
         // ===== 新規チーム作成 =====

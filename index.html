@@ -1075,16 +1075,30 @@ const lsLoad = () => {
   try {
     const raw = localStorage.getItem(SKEY);
     if (!raw) return {};
-    if (raw.length > 500000) { localStorage.removeItem(SKEY); return {}; } // 500KB超はクリア
+    // 大きすぎてもクリアしない（データを守る）
     return JSON.parse(raw) || {};
   } catch(e2) { return {}; }
 };
 const lsSave = (d) => { 
   try {
-    const s = JSON.stringify(d);
-    if (s.length > 500000) return; // 500KB超は保存しない
+    // currentGameとhistoryだけ保存し、ログは直近100件に絞ってサイズ削減
+    const saveData = {
+      ...d,
+      currentGame: d.currentGame ? {
+        ...d.currentGame,
+        log: (d.currentGame.log||[]).slice(-200), // 直近200件
+      } : d.currentGame,
+      history: (d.history||[]).slice(-50), // 履歴は直近50試合
+    };
+    const s = JSON.stringify(saveData);
     localStorage.setItem(SKEY, s);
-  } catch(e3) {}
+  } catch(e3) {
+    // 容量不足の場合はhistoryを削ってリトライ
+    try {
+      const slim = {...d, history:[], currentGame:d.currentGame};
+      localStorage.setItem(SKEY, JSON.stringify(slim));
+    } catch(e4) {}
+  }
 };
 function App() {
   const [storage, setStorage] = useState(()=>{
@@ -2393,7 +2407,7 @@ function App() {
       doExport(window.XLSX);
     } else {
       var s = document.createElement('script');
-      s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
       s.onload = function(){ doExport(window.XLSX); };
       s.onerror = function(){ alert('Excel機能の読み込みに失敗しました。'); };
       document.head.appendChild(s);
@@ -2852,7 +2866,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v220")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v222")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2930,7 +2944,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v220")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v222")
         )
 
         // ===== 新規チーム作成 =====

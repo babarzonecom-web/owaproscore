@@ -2200,8 +2200,9 @@ function App() {
       // アウトが0でない（試合中の途中状態）かつ3未満なら補完
       if(missing > 0 && missing < 3 && currentOuts > 0) {
         const defTeam = g.half==="top" ? "home" : "away";
+        const endPIdx = g[defTeam+"PitcherIdx"]||0;
         for(let i=0;i<missing;i++){
-          brOuts.push({inning:g.inning, half:g.half, outsAtTime:currentOuts+i, defTeam, endGame:true});
+          brOuts.push({inning:g.inning, half:g.half, outsAtTime:currentOuts+i, defTeam, endGame:true, pitcherIdx:endPIdx});
         }
       }
       return {...g, finished:true, endReason:reason, endInning, endNote:endNote||"",
@@ -2619,7 +2620,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v237")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v238")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2697,7 +2698,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v237")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v238")
         )
 
         // ===== 新規チーム作成 =====
@@ -3549,10 +3550,10 @@ function App() {
                           const auto = (pitcherStats[side]||[])[i]||{};
                           const isDefault = /^投手\d+$/.test(p.name||'');
                           const hasRecord = (auto._outsGot||0)>0||(auto.autoH||0)>0||(auto.autoBb||0)>0||(auto.autoK||0)>0;
-                          return !isDefault || hasRecord || i===curPIdx;
+                          return !isDefault || hasRecord || (!game.finished && i===curPIdx);
                         }).map((p,_i) => {
                           const i = pitchers.indexOf(p); // 元のインデックスを保持
-                          const isCur = i===curPIdx;
+                          const isCur = !game.finished && i===curPIdx;
                           const auto = (pitcherStats[side]||[])[i]||{};
                           const rawIp = auto.autoIp||0;
                           const ipDisp = Math.floor(rawIp/10)+"回"+(rawIp%10>0?(rawIp%10)+"/3":"");
@@ -5075,7 +5076,14 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
         ? (g.awayTeam===selectedTeam?["away"]:g.homeTeam===selectedTeam?["home"]:["away","home"])
         : ["away","home"];
       sides.forEach(side=>{
+        // 途中交代選手(_subOut/_subOuts)も含めて全選手を取得
+        const allPlayers5 = [];
         (g[side+"Lineup"]||[]).forEach(p=>{
+          allPlayers5.push(p);
+          if(p._subOut && !p._subOuts) allPlayers5.push(p._subOut);
+          (p._subOuts||[]).forEach(so=>allPlayers5.push(so));
+        });
+        allPlayers5.forEach(p=>{
           if(!p.name||p.name.startsWith("選手")) return;
           if(!players[p.name]) players[p.name]={name:p.name, games:Array(recent5.length).fill(null)};
           let ab=0,h=0,h2=0,h3=0,hr=0,rbi=0,bb=0,hbp=0,k=0,sb=0,run=0,tb=0;

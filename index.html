@@ -750,21 +750,35 @@ const computePitcherStats = (g) => {
     const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf===starterHalf && l.outsAtStart===0);
     const log = hasStarter ? rawLog : [starterEntry, ...rawLog];
 
-    allAtBats.forEach(ab=>{
-      let activePIdx = log[0].pitcherIdx;
+    // 打席時点で担当していた投手を特定するヘルパー
+    // 「打席の時点より前で、最も直近の交代エントリ」を返す
+    const findActivePitcher = (abInning, abHalf, abOutsAtAb) => {
+      const abTime = abInning*2 + (abHalf==="top"?0:1);
+      let bestIdx = log[0].pitcherIdx;
+      let bestScore = -Infinity; // 最も直近のエントリを選ぶスコア
       for(let i=0;i<log.length;i++){
         const l = log[i];
         const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
-        const abTime  = ab.inning*2 + (ab.half==="top"?0:1);
+        const outs = l.outsAtStart||0;
         if(logTime < abTime) {
-          activePIdx = l.pitcherIdx;
+          // 別のイニング・ハーフ：より新しいものを優先
+          const score = logTime * 100;
+          if(score >= bestScore){ bestScore = score; bestIdx = l.pitcherIdx; }
         } else if(logTime === abTime) {
-          // 同イニング・ハーフ内はアウトカウントで判定
-          // 交代時のアウト数より打席時のアウト数が多い場合のみ新投手に帰属
-          // 例：1アウトで交代→outsAtStart=1、打席のoutsAtAb=1なら前投手の記録
-          if((l.outsAtStart||0) < (ab.outsAtAb||0)) activePIdx = l.pitcherIdx;
+          // 同イニング・ハーフ：アウト数が打席時点より少ない場合のみ有効
+          // （outsAtStart < outsAtAb → この投手が投げた打席）
+          if(outs < abOutsAtAb) {
+            const score = abTime * 100 + outs;
+            if(score >= bestScore){ bestScore = score; bestIdx = l.pitcherIdx; }
+          }
         }
+        // logTime > abTime は未来の交代なので無視
       }
+      return bestIdx;
+    };
+
+    allAtBats.forEach(ab=>{
+      let activePIdx = findActivePitcher(ab.inning, ab.half, ab.outsAtAb||0);
 
       const ps = stats[activePIdx];
       if(!ps) return;
@@ -800,15 +814,7 @@ const computePitcherStats = (g) => {
               const isReach = ["H1","H2","H3","HR","BB","HBP","IBB","CI","KW","E","FC"].includes(pc);
               if(isReach) {
                 // この時点の投手を特定
-                let pIdx = log[0].pitcherIdx;
-                for(let li=0;li<log.length;li++){
-                  const l=log[li];
-                  const lt=l.fromInning*2+(l.fromHalf==="top"?0:1);
-                  const at=prev.inning*2+(prev.half==="top"?0:1);
-                  if(lt < at) pIdx=l.pitcherIdx;
-                  else if(lt===at && (l.outsAtStart||0)<(prev.outsAtAb||0)) pIdx=l.pitcherIdx;
-                }
-                runnerPitcherIdx = pIdx;
+                runnerPitcherIdx = findActivePitcher(prev.inning, prev.half, prev.outsAtAb||0);
               }
             }
           }
@@ -856,14 +862,7 @@ const computePitcherStats = (g) => {
       // このアウトが発生した時点のイニング・ハーフ・アウト数
       const boInning = bo.inning; const boHalf = bo.half; const boOuts = bo.outsAtTime||0;
       // 担当投手を特定
-      let activePIdx = log[0].pitcherIdx;
-      for(let i=0;i<log.length;i++){
-        const l=log[i];
-        const lt=l.fromInning*2+(l.fromHalf==="top"?0:1);
-        const bt=boInning*2+(boHalf==="top"?0:1);
-        if(lt < bt) activePIdx=l.pitcherIdx;
-        else if(lt===bt && (l.outsAtStart||0)<(boOuts||0)) activePIdx=l.pitcherIdx;
-      }
+      const activePIdx = findActivePitcher(boInning, boHalf, boOuts||0);
       const ps = stats[activePIdx];
       if(ps) ps._outsGot++;
     });
@@ -2574,7 +2573,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v229")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v231")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2652,7 +2651,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v229")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v231")
         )
 
         // ===== 新規チーム作成 =====
@@ -3518,7 +3517,7 @@ function App() {
                           const hbp = auto.autoHbp||0;
                           const hr  = auto.autoHr||0;
                           const runs = auto.autoRuns||0;
-                          const er  = p.manualOverride ? (p.autoEr!==undefined?p.autoEr:(p.er||0)) : (auto.autoEr||0);
+                          const er  = p.manualOverride ? (p.er!==undefined?p.er:(p.autoEr||0)) : (auto.autoEr||0);
                           const era = ipNum>0 ? (er*9/ipNum).toFixed(2) : (er>0?"∞":"—");
                           return React.createElement('tr', {key:p.id||i,
                             style:{background:isCur?(color+"22"):i%2===0?"#0a1628":"transparent",
@@ -3572,7 +3571,7 @@ function App() {
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}
                               , React.createElement('input', {type:"number", min:0,
                                   value:er,
-                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoEr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],er:v,autoEr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
                             )

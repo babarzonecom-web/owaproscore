@@ -1438,7 +1438,7 @@ function App() {
     const runs = (scoredNames||[]).length;
     const batterName = (() => { try { return _optionalChain([game, 'access', _4 => _4[team+"Lineup"], 'access', _5 => _5[pidx], 'optionalAccess', _6 => _6.name])||""; } catch(e){return "";} })();
     const batterScored = (scoredNames||[]).includes(batterName);
-    const entry = {code, ...(dir?{dir}:{}), runs, ...(batterScored?{scored:true}:{}), ...(errorPos?{errorPos}:{})};
+    const entry = {code, ...(dir?{dir}:{}), runs, ...(batterScored?{scored:true}:{}), ...(errorPos?{errorPos}:{}), ...((scoredNames||[]).length>0?{scoredNames:scoredNames}:{})};
     let nextPidx = -1;
     mutGame(g=>{
       const lk=team+"Lineup";
@@ -2609,7 +2609,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v235")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v236")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2687,7 +2687,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v235")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v236")
         )
 
         // ===== 新規チーム作成 =====

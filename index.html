@@ -1142,11 +1142,7 @@ function App() {
   const [teamShareCode, setTeamShareCode] = useState(localStorage.getItem("tsCode")||"");
   const [teamSharePw,   setTeamSharePw]   = useState("");
   const [teamShareInput,setTeamShareInput]= useState(localStorage.getItem("tsCode")||"");
-  const [ghToken,   setGhToken]   = useState(()=>localStorage.getItem("gh_token")||"");
-  const [ghOwner,   setGhOwner]   = useState(()=>localStorage.getItem("gh_owner")||"babarzonecom-web");
-  const [ghRepo,    setGhRepo]    = useState(()=>localStorage.getItem("gh_repo")||"owaproscore");
-  const [ghBranch,  setGhBranch]  = useState(()=>localStorage.getItem("gh_branch")||"main");
-  const [ghDeploying, setGhDeploying] = useState(false);
+
   const [teamSharePwInput,setTeamSharePwInput]= useState("");
   const [teamShareRole, setTeamShareRole] = useState(localStorage.getItem("tsRole")||""); // "admin"|"viewer"|""
   const [teamShareError,setTeamShareError]= useState("");
@@ -1213,482 +1209,6 @@ function App() {
   };
   const stopHosting = ()=>{ setSyncMode("off"); setSyncGameId(""); showToast("配信終了"); };
   // ===== チームコード接続 =====
-  const deployToGitHub = async () => {
-    if(!ghToken||!ghOwner||!ghRepo){ showToast("GitHubの設定を入力してください"); return; }
-    setGhDeploying(true);
-    try {
-      const path = "index.html";
-      const apiBase = "https://api.github.com/repos/"+ghOwner+"/"+ghRepo+"/contents/"+path;
-      const headers = {
-        "Authorization": "token "+ghToken,
-        "Content-Type": "application/json",
-        "Accept": "application/vnd.github.v3+json",
-      };
-      // 現在のSHAを取得
-      const getRes = await fetch(apiBase+"?ref="+ghBranch, {headers});
-      const getData = await getRes.json();
-      const sha = getData.sha;
-      if(!sha){ showToast("❌ SHA取得失敗: "+JSON.stringify(getData).slice(0,100)); setGhDeploying(false); return; }
-      // 現在のindex.htmlをfetchしてBase64エンコード
-      const htmlRes = await fetch(location.href.split("?")[0]+"?nocache="+Date.now());
-      const htmlText = await htmlRes.text();
-      const bytes = new TextEncoder().encode(htmlText);
-      let binary = "";
-      const chunkSize = 8192;
-      for(let i=0;i<bytes.length;i+=chunkSize){
-        binary += String.fromCharCode(...bytes.slice(i,i+chunkSize));
-      }
-      const b64 = btoa(binary);
-      // プッシュ
-      const pushRes = await fetch(apiBase, {
-        method:"PUT", headers,
-        body: JSON.stringify({
-          message:"deploy: owaproscore "+new Date().toLocaleString("ja-JP"),
-          content: b64, sha, branch: ghBranch,
-        })
-      });
-      const pushData = await pushRes.json();
-      if(pushRes.ok){
-        showToast("✅ デプロイ完了！数十秒後に反映されます");
-        localStorage.setItem("gh_token",ghToken);
-        localStorage.setItem("gh_owner",ghOwner);
-        localStorage.setItem("gh_repo",ghRepo);
-        localStorage.setItem("gh_branch",ghBranch);
-      } else {
-        showToast("❌ "+(pushData.message||pushRes.status));
-      }
-    } catch(e){ showToast("❌ "+e.message); }
-    setGhDeploying(false);
-  };
-
-  // ===== 新接続ロジック =====
-  // role: "admin"（管理者PW一致）| "member"（チームPW一致）
-  const connectTeam = (code, pw, mode) => {
-    // mode: "new"（新規作成）| "member"（メンバー）| "admin"（管理者）
-    try {
-      const tc = (code||"").trim().toUpperCase();
-      if(!tc){ setTeamShareError("チームIDを入力してください"); return; }
-      if(!pw||!pw.trim()){ setTeamShareError("パスワードを入力してください"); return; }
-      setTeamShareError("接続中...");
-
-      const baseRestUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc;
-
-      fetch(baseRestUrl+".json", {cache:"no-store"}).then(r=>r.json()).then(data=>{
-        try {
-          if(data===undefined) data=null;
-          let role = null;
-
-          if(mode==="new") {
-            // 新規チーム作成
-            if(data && (data.teamPw || data.adminPw)) {
-              setTeamShareError("このチームIDは既に使われています。別のIDを選んでください。");
-              return;
-            }
-            // Firebaseに登録（teamPw・adminPwを分離して保存）
-            // pwは "teamPW::adminPW" 形式で渡す
-            const parts = pw.split("::");
-            const teamPw = parts[0]||pw;
-            const adminPw = parts[1]||pw;
-            fetch(baseRestUrl+".json",{method:"PUT",headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({teamPw:teamPw.trim(), adminPw:adminPw.trim(), createdAt:Date.now()})});
-            role = "admin";
-
-          } else if(mode==="admin") {
-            // 管理者ログイン
-            if(!data){ setTeamShareError("チームIDが見つかりません"); return; }
-            // 後方互換：adminPwまたはteamPwのどちらか
-            if(data.adminPw && data.adminPw===pw.trim()){
-              role = "admin";
-            } else if(!data.adminPw && data.teamPw && data.teamPw===pw.trim()){
-              // 旧形式（adminPwなし）→ 管理者として接続
-              role = "admin";
-            } else if(!data.adminPw && !data.teamPw){
-              // 旧旧形式（PWなし）→ 管理者として接続
-              role = "admin";
-            } else {
-              setTeamShareError("管理者パスワードが違います"); return;
-            }
-
-          } else {
-            // メンバーログイン（mode==="member"）
-            if(!data){ setTeamShareError("チームIDが見つかりません"); return; }
-            if(data.teamPw && data.teamPw===pw.trim()){
-              role = "member";
-            } else if(!data.teamPw && data.adminPw && data.adminPw===pw.trim()){
-              // 旧形式：adminPwしかない場合、そのPWでmemberとして入室
-              role = "member";
-            } else if(!data.teamPw && !data.adminPw){
-              // 旧形式（PWなし）→ メンバーとして接続
-              role = "member";
-            } else {
-              setTeamShareError("チームパスワードが違います"); return;
-            }
-          }
-
-          // windowグローバルに保存
-          window.__teamShareCode = tc;
-          window.__teamShareRole = role;
-          window.__teamAdminPushing = false;
-
-          // 既存の購読を解除
-          if(window.__teamShareRef) {
-            try { window.__teamShareRef.off(); } catch(e2) {}
-            window.__teamShareRef = null;
-          }
-
-          // state更新
-          setTeamShareCode(tc);
-          setTeamShareRole(role);
-          setTeamShareError("");
-          localStorage.setItem("tsCode", tc);
-          localStorage.setItem("tsRole", role);
-          setTab("score");
-          const roleLabel = role==="admin" ? "🔑 管理者" : "👥 メンバー";
-          showToast(roleLabel+"として接続しました（"+tc+"）");
-          console.log("[TEAM] Connected role="+role+" code="+tc);
-
-          // ===== チーム自動同期（コード接続時に双方向） =====
-          const syncTeamsWithFirebase = (tc, role) => {
-            const baseUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc;
-
-            // 自分のチームをアップロード（登録があれば）
-            // Firebaseキーに使えない文字を除去（日本語・記号等）
-            const toFirebaseKey = str => (str||"").replace(/[.#$\[\]%\/]/g,"_").replace(/[^\x00-\x7F]/g, c=>"u"+c.codePointAt(0).toString(16)).slice(0,64)||"team";
-
-            const uploadMyTeams = () => {
-              const localData = JSON.parse(localStorage.getItem("bb_v7")||"{}");
-              const allTeams = [
-                ...(localData.myTeam ? [{...localData.myTeam, isMyTeam:true}] : []),
-                ...(localData.opponents||[]).map(t=>({...t, isMyTeam:false})),
-              ];
-              if(allTeams.length === 0) return Promise.resolve();
-              return Promise.all(allTeams.map(t=>{
-                const safeKey = toFirebaseKey(t.name);
-                return fetch(baseUrl+"/teams/"+safeKey+".json", {
-                  method:"PUT", headers:{"Content-Type":"application/json"},
-                  body:JSON.stringify({id:t.id||t.name, name:t.name, members:t.members||[], isMyTeam:t.isMyTeam, _ts:Date.now()})
-                });
-              }));
-            };
-
-            // Firebaseのチームをダウンロードして登録
-            const downloadTeams = () =>
-              fetch(baseUrl+"/teams.json", {cache:"no-store"})
-                .then(r=>r.json())
-                .then(data=>{
-                  if(!data) return;
-                  const arr = Array.isArray(data) ? data : Object.values(data);
-                  if(arr.length===0) return;
-                  setStorage(s=>{
-                    let ns = {...s};
-                    let added = [];
-                    arr.forEach(t=>{
-                      if(!t||!t.name) return;
-                      const members = Array.isArray(t.members)?t.members:(t.members?Object.values(t.members):[]);
-                      const teamObj = {id:t.id||t.name, name:t.name, members};
-                      if(t.isMyTeam) {
-                        if(!ns.myTeam||ns.myTeam.name!==t.name){
-                          ns={...ns, myTeam:teamObj};
-                          added.push("自チーム:"+t.name);
-                        }
-                      } else {
-                        if(!(ns.opponents||[]).some(o=>o.name===t.name)){
-                          ns={...ns, opponents:[...(ns.opponents||[]),teamObj]};
-                          added.push(t.name);
-                        }
-                      }
-                    });
-                    if(added.length>0) showToast("👥 チーム同期: "+added.join(", "));
-                    return ns;
-                  });
-                }).catch(()=>{});
-
-            // currentGameからも補完（teamInfoがない古いデータ向け）
-            const downloadFromGame = () =>
-              fetch(baseUrl+"/currentGame.json", {cache:"no-store"})
-                .then(r=>r.json())
-                .then(gameData=>{
-                  if(!gameData) return;
-                  setStorage(s=>{
-                    let ns = {...s};
-                    const addFromLineup = (teamName, lineupRaw, isMyTeam) => {
-                      if(!teamName||teamName==="ビジターチーム"||teamName==="ホームチーム") return;
-                      const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
-                      const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
-                      if(members.length===0) return;
-                      if(isMyTeam) {
-                        if(!ns.myTeam||ns.myTeam.name!==teamName) ns={...ns,myTeam:{id:tc+"_my",name:teamName,members}};
-                      } else {
-                        if(!(ns.opponents||[]).some(o=>o.name===teamName))
-                          ns={...ns,opponents:[...(ns.opponents||[]),{id:tc+"_opp",name:teamName,members}]};
-                      }
-                    };
-                    addFromLineup(gameData.awayTeam, gameData.awayLineup, false);
-                    addFromLineup(gameData.homeTeam, gameData.homeLineup, false);
-                    return ns;
-                  });
-                }).catch(()=>{});
-
-            // まずダウンロード、その後にアップロード（ダウンロード優先）
-            // ローカルにデータがある場合のみアップロード
-            downloadTeams()
-              .then(()=>downloadFromGame())
-              .then(()=>{
-                const localData = JSON.parse(localStorage.getItem("bb_v7")||"{}");
-                const hasData = localData.myTeam||(localData.opponents&&localData.opponents.length>0);
-                if(hasData) uploadMyTeams();
-              })
-              .catch(()=>{});
-          };
-
-          // チーム自動同期は廃止（手動復元のみ）
-          // syncTeamsWithFirebase(tc, role);
-
-          // 以下は削除（registerTeamFromDataに統合済み）
-          const registerTeamFromData = (teamInfo, gameData) => {
-            const teamsToRegister = [];
-
-            // teamInfoがある場合
-            if(teamInfo && teamInfo.name) {
-              const rawMembers = teamInfo.members;
-              const members = Array.isArray(rawMembers)
-                ? rawMembers
-                : (rawMembers ? Object.values(rawMembers) : []);
-              teamsToRegister.push({
-                id: teamInfo.id || tc,
-                name: teamInfo.name,
-                members: members,
-                isMyTeam: teamInfo.isMyTeam || false,
-              });
-            }
-
-            // currentGameのlineupからもチームを復元（teamInfoがない場合の補完）
-            if(gameData && gameData.awayTeam && gameData.awayTeam !== "ビジターチーム") {
-              const alreadyHas = teamsToRegister.some(t=>t.name===gameData.awayTeam);
-              if(!alreadyHas) {
-                const rawLineup = gameData.awayLineup;
-                const lineup = Array.isArray(rawLineup) ? rawLineup : (rawLineup ? Object.values(rawLineup) : []);
-                const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
-                if(members.length > 0) {
-                  teamsToRegister.push({id:tc+"_away", name:gameData.awayTeam, members, isMyTeam:false});
-                }
-              }
-            }
-            if(gameData && gameData.homeTeam && gameData.homeTeam !== "ホームチーム") {
-              const alreadyHas = teamsToRegister.some(t=>t.name===gameData.homeTeam);
-              if(!alreadyHas) {
-                const rawLineup = gameData.homeLineup;
-                const lineup = Array.isArray(rawLineup) ? rawLineup : (rawLineup ? Object.values(rawLineup) : []);
-                const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
-                if(members.length > 0) {
-                  teamsToRegister.push({id:tc+"_home", name:gameData.homeTeam, members, isMyTeam:false});
-                }
-              }
-            }
-
-            if(teamsToRegister.length === 0) return;
-
-            setStorage(s=>{
-              let ns = {...s};
-              let msgs = [];
-              teamsToRegister.forEach(team=>{
-                if(team.isMyTeam) {
-                  if(!ns.myTeam || ns.myTeam.name !== team.name) {
-                    ns = {...ns, myTeam: {id:team.id,name:team.name,members:team.members}};
-                    msgs.push("🏟 "+team.name+" を自チームにセット");
-                  }
-                } else {
-                  const exists = (ns.opponents||[]).some(t=>t.name===team.name);
-                  if(!exists) {
-                    ns = {...ns, opponents:[...(ns.opponents||[]), {id:team.id,name:team.name,members:team.members}]};
-                    msgs.push("⚔️ "+team.name+" を対戦相手に追加");
-                  }
-                }
-              });
-              if(msgs.length > 0) showToast(msgs.join(" / "));
-              return ns;
-            });
-          };
-
-          // (旧registerTeamFromData呼び出しはsyncTeamsWithFirebaseに統合)
-
-          // 閲覧者のみFirebase購読（管理者は購読しない）
-          if(role === "member") {
-            // Firebase SDKを使わずREST APIでポーリング
-            var lastTs = -1; // -1=初回は必ず取得
-            var restUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc+"/currentGame.json";
-            window.__teamShareRef = restUrl;
-            var poll = function(){
-              if(window.__teamShareRole !== "member" && window.__teamShareRole !== "admin") return;
-              fetch(restUrl, {cache:"no-store"}).then(function(res){ return res.json(); }).then(function(data){
-                try {
-                  if(!data || typeof data !== "object") return;
-                  var ts = data._ts || 0;
-                  if(ts <= lastTs) return;
-                  lastTs = ts;
-                  console.log("[TEAM] REST poll new data ts="+ts);
-                  var str = JSON.stringify(data);
-                  var obj = JSON.parse(str);
-                  delete obj._ts;
-                  // Firebaseがarrayをobjectに変換するのを元に戻す
-                  var fixArrays = function(o) {
-                    if(!o || typeof o !== "object") return o;
-                    if(Array.isArray(o)) return o.map(fixArrays);
-                    // 0,1,2...の連続キーのみのオブジェクトは配列に変換
-                    var keys = Object.keys(o);
-                    var isArr = keys.length > 0 && keys.every(function(k,i){ return k === String(i); });
-                    if(isArr) return keys.map(function(k){ return fixArrays(o[k]); });
-                    var result = {};
-                    keys.forEach(function(k){ result[k] = fixArrays(o[k]); });
-                    return result;
-                  };
-                  obj = fixArrays(obj);
-                  // window.__setStorageで直接React stateを更新
-                  if(window.__setStorage) {
-                    window.__setStorage(function(s){ return Object.assign({}, s, {currentGame: obj}); });
-                    console.log("[TEAM] REST poll applied via __setStorage OK");
-                  } else {
-                    // fallback: localStorage経由
-                    var existing = localStorage.getItem("bb_v7");
-                    var existObj = existing ? JSON.parse(existing) : {};
-                    existObj.currentGame = obj;
-                    localStorage.setItem("bb_v7", JSON.stringify(existObj));
-                    window.dispatchEvent(new Event("teamgameupdate"));
-                    console.log("[TEAM] REST poll applied via localStorage OK");
-                  }
-                } catch(pe){ console.error("[TEAM] poll apply error", pe&&pe.message||pe); }
-              }).catch(function(fe){ console.error("[TEAM] fetch error", fe&&fe.message||fe); });
-            };
-            poll();
-            window.__teamPollTimer = setInterval(poll, 3000);
-            console.log("[TEAM] REST polling started for "+tc);
-          }
-
-        } catch(e5){ setTeamShareError("接続エラー: "+e5.message); }
-      }).catch(function(e){ setTeamShareError("接続エラー: "+e.message); });
-
-    } catch(e){ 
-      console.error("[connectTeam] outer catch:", e&&e.message||e, e&&e.stack||"");
-      setTeamShareError("予期しないエラー: "+(e&&e.message||e)); 
-    }
-  };
-
-  const disconnectTeam = () => {
-    setTab("login");
-    if(window.__teamShareRef) {
-      try { window.__teamShareRef.off("value"); } catch(e) {}
-      window.__teamShareRef = null;
-    }
-    if(window.__teamShareTimer) { clearInterval(window.__teamShareTimer); window.__teamShareTimer = null; }
-    window.__teamShareCode = "";
-    window.__teamShareRole = "";
-    window.__teamAdminPushing = false;
-    setTeamShareCode(""); setTeamShareRole(""); setTeamShareError("");
-    localStorage.removeItem("tsCode");
-    localStorage.removeItem("tsRole");
-    showToast("切断しました");
-  };
-
-  const startViewing = (id)=>{
-    try {
-      var uid = (id||'').trim().toUpperCase();
-      if(uid.length!==6){ showToast("6桁のコードを入力してください"); return; }
-      var cfg = window.__FB_CONFIG__;
-      if(!cfg){ showToast("Firebase設定なし"); return; }
-      var fb = window.firebase;
-      if(!fb){ showToast("Firebase SDKなし"); return; }
-      if(!fb.apps || !fb.apps.length) fb.initializeApp(cfg);
-      if(!fbDB) fbDB = fb.database();
-      setSyncGameId(uid);
-      setSyncMode("member");
-      showToast("観戦開始: "+uid);
-      // ポーリングで3秒ごとに取得
-      if(window.__viewerTimer) clearInterval(window.__viewerTimer);
-      window.__viewerTimer = setInterval(function(){
-        fbDB.ref("games/"+uid).once("value").then(function(snap){
-          try {
-            if(!snap||!snap.exists()) return;
-            var d = snap.val();
-            if(!d || typeof d !== 'object') return;
-            delete d._ts;
-            setViewerGame(d);
-          } catch(e2){}
-        }).catch(function(){});
-      }, 1000);
-    } catch(e){ showToast("エラー: "+e.message); }
-  };
-  // fbWatchTeams useEffect 無効化（クラッシュ原因のため）
-
-  const startViewingTeam = (tid)=>{
-    const id = (tid||"").trim();
-    if(!id){ showToast("チームIDを入力してください"); return; }
-    if(!fbInit()){ showToast("Firebase未接続"); return; }
-    fbDB.ref("shared_teams/"+id).once("value").then(snap=>{
-      if(!snap||!snap.exists()){ showToast("チームが見つかりません"); return; }
-      setViewerTeamData(snap.val());
-      // リアルタイム更新
-      fbDB.ref("shared_teams/"+id).on("value", s=>{ if(s&&s.val()) setViewerTeamData(s.val()); });
-    });
-  };
-
-  // 成績タブ用チーム読み込み
-  const startStatsTabTeam = (tid)=>{
-    const id = (tid||"").trim();
-    if(!id){ showToast("チームIDを入力してください"); return; }
-    if(!fbInit()){ showToast("Firebase未接続"); return; }
-    setStatsTabLoading(true);
-    fbDB.ref("shared_teams/"+id).once("value").then(snap=>{
-      setStatsTabLoading(false);
-      if(!snap||!snap.exists()){ showToast("チームが見つかりません"); setStatsTabTeamData(null); return; }
-      setStatsTabTeamData(snap.val());
-      fbDB.ref("shared_teams/"+id).on("value", s=>{ if(s&&s.val()) setStatsTabTeamData(s.val()); });
-    }).catch(()=>{ setStatsTabLoading(false); showToast("読み込みエラー"); });
-  };
-
-  const stopViewing = ()=>{
-    if(syncGameId && fbDB) {
-      try { fbDB.ref("games/"+syncGameId).off("value"); } catch(e){}
-    }
-    if(window.__viewerTimer){clearInterval(window.__viewerTimer);window.__viewerTimer=null;} setSyncMode("off"); setSyncGameId(""); showToast("観戦終了");
-  };
-
-  
-  const mutGame = useCallback((fn)=>{
-    // window経由で常に最新のroleを参照（stateのクロージャ問題を回避）
-    console.log("[mutGame] called, window.__teamShareRole="+window.__teamShareRole);
-    if(window.__teamShareRole === "member") {
-      showToast("👁 閲覧モードでは操作できません");
-      return;
-    }
-    setStorage(s=>{
-      const snap = JSON.parse(JSON.stringify(s.currentGame));
-      const newGame = fn(s.currentGame);
-      const newUndoStack = [snap, ...(s.undoStack||[])];
-      // 管理者モード：変更を即座にFirebaseへプッシュ（fbInit不要）
-      if(window.__teamShareRole === "admin" && window.__teamShareCode) {
-        try {
-          window.__teamAdminPushing = true;
-          fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json",{
-              method:"PUT",headers:{"Content-Type":"application/json"},
-              body:JSON.stringify(Object.assign({},newGame,{_ts:Date.now()}))
-            }).then(function(){ setTimeout(function(){ window.__teamAdminPushing=false; },2000); })
-            .catch(function(e){ console.error("[TEAM] push error",e); window.__teamAdminPushing=false; });
-          console.log("[TEAM ADMIN] pushed to", window.__teamShareCode);
-        } catch(e) { console.error("[TEAM] push error", e); window.__teamAdminPushing = false; }
-      }
-      // オートセーブ：currentGameをhistoryに反映（同一IDで上書き）
-      if(newGame && newGame.id){
-        const savedGame = {...newGame, savedAt:new Date().toLocaleString("ja-JP")};
-        const hist = (s.history||[]);
-        const exists = hist.some(h=>h.id===newGame.id);
-        const newHist = exists
-          ? hist.map(h=>h.id===newGame.id ? savedGame : h)
-          : hist; // 新規はendGame/saveGameのタイミングで追加
-        return {...s, currentGame:newGame, undoStack:newUndoStack, history:newHist};
-      }
-      return {...s, currentGame:newGame, undoStack:newUndoStack};
-    });
-  },[]);
 
   
   const undoPlay = useCallback(()=>{
@@ -1769,9 +1289,11 @@ function App() {
       // 手動調整でアウトが増えた分をbaserunnerOutsに記録（投球回計算用）
       // OUT_CODES_FOR_IPに含まれないコード（進塁手動アウト等）の場合のみ追加
       const codeIsIpOut = OUT_CODES_FOR_IP.has(code);
+      // コードが発生させるアウト数（投球回計算で既にカウントされる分）
+      const codeOutCount = code==="TP" ? 3 : code==="DP" ? 2 : codeIsIpOut ? 1 : 0;
       let brOuts = [...(g.baserunnerOuts||[])];
       if(newOuts !== undefined) {
-        const baseOutsFromCode = codeIsIpOut ? 1 : (code==="DP"?2:code==="TP"?3:0);
+        const baseOutsFromCode = codeOutCount;
         const totalOuts = (newOuts || 0);
         const prevOuts = (g.outs || 0);
         const addedOuts = totalOuts - prevOuts;
@@ -2401,7 +1923,24 @@ function App() {
       wsDef["!cols"] = [6,4,10,10,6,10,6,8,6].map(w=>({wch:w}));
       XLSX.utils.book_append_sheet(wb, wsDef, "守備交代");
     }
-      XLSX.writeFile(wb, fname);
+      // iOSのWebView対応：ダウンロードリンクを表示
+      try {
+        const wbout = XLSX.write(wb, {bookType:'xlsx', type:'base64'});
+        const dataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbout;
+        const a = document.createElement('a');
+        a.href = dataUri;
+        a.download = fname;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(()=>document.body.removeChild(a), 1000);
+        showToast('📊 Excelを出力しました');
+      } catch(e2) {
+        // fallback
+        try { XLSX.writeFile(wb, fname); } catch(e3) {
+          alert('Excelの出力に失敗しました。ブラウザで開いてお試しください。');
+        }
+      }
     };
     if(window.XLSX) {
       doExport(window.XLSX);
@@ -2409,7 +1948,7 @@ function App() {
       var s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
       s.onload = function(){ doExport(window.XLSX); };
-      s.onerror = function(){ alert('Excel機能の読み込みに失敗しました。'); };
+      s.onerror = function(){ showToast('❌ Excel機能の読み込みに失敗しました'); };
       document.head.appendChild(s);
     }
   }, [game]);
@@ -2866,7 +2405,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v222")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v225")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2944,7 +2483,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v222")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v225")
         )
 
         // ===== 新規チーム作成 =====
@@ -4028,78 +3567,20 @@ function App() {
 
               )
             ) : (
-              // 未接続：モード選択UI
+              // 未接続：ログイン画面へ誘導
               React.createElement(React.Fragment, null
                 , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:14}}
-                  , React.createElement('div', {style:S.ct}, "📡 チーム同期")
+                  , React.createElement('div', {style:S.ct}, "📡 チーム接続")
                 )
 
-                // モード切替タブ
-                , React.createElement('div', {style:{display:"flex",gap:6,marginBottom:14}}
-                  , [["viewer","👁 観戦・閲覧","#3b82f6"],["admin","✏️ スコア記録","#22c55e"]].map(([mode,label,color])=>
-                      React.createElement('button', {key:mode,
-                        onClick:()=>setTeamSharePwInput(mode==="viewer"?"__viewer__":""),
-                        style:{flex:1,padding:"10px 8px",borderRadius:9,cursor:"pointer",fontSize:13,fontWeight:700,
-                          background:(teamSharePwInput==="__viewer__"&&mode==="viewer")||(teamSharePwInput!=="__viewer__"&&mode==="admin")
-                            ? color+"22" : "#0d1f35",
-                          border:"2px solid "+((teamSharePwInput==="__viewer__"&&mode==="viewer")||(teamSharePwInput!=="__viewer__"&&mode==="admin")
-                            ? color : "#1e3a5f"),
-                          color:(teamSharePwInput==="__viewer__"&&mode==="viewer")||(teamSharePwInput!=="__viewer__"&&mode==="admin")
-                            ? color : "#475569"}
-                      }, label)
-                    )
+                , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:10}}
+                  , React.createElement('button', {
+                      onClick:()=>setTab("login"),
+                      style:{...sBt("#22c55e"),width:"100%",padding:"12px",fontSize:14,fontWeight:700}
+                    }, "🏟 チームを作る / ログイン")
+                  , React.createElement('div', {style:{fontSize:11,color:"#475569",textAlign:"center"}},
+                    "ログイン画面からチームを作成するか、既存チームに参加してください")
                 )
-
-                // チームコード入力
-                , React.createElement('div', {style:{marginBottom:10}}
-                  , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:6,marginBottom:4}}
-                    , React.createElement('div', {style:{fontSize:11,color:"#94a3b8"}}, "チームコード")
-                    , React.createElement('button', {
-                        onClick:()=>{
-                          const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-                          const code=Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
-                          setTeamShareInput(code);
-                        },
-                        style:{fontSize:10,padding:"2px 8px",borderRadius:5,cursor:"pointer",marginLeft:"auto",
-                          background:"#1e3a5f",border:"1px solid #3b82f6",color:"#7dd3fc"}
-                      }, "🎲 ランダム生成")
-                  )
-                  , React.createElement('input', {
-                      value: teamShareInput,
-                      onChange: e=>setTeamShareInput(e.target.value.toUpperCase()),
-                      placeholder:"例: TIGERS",
-                      style:{width:"100%",padding:"9px 12px",borderRadius:8,background:"#0d1f35",
-                        border:"1.5px solid #3730a3",color:"#e2e8f0",fontSize:16,
-                        fontFamily:"monospace",letterSpacing:2,outline:"none",boxSizing:"border-box"}
-                    })
-                )
-
-                // スコア記録モードのみパスワード表示
-                , teamSharePwInput !== "__viewer__" && React.createElement('div', {style:{marginBottom:14}}
-                  , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}},
-                    "パスワード",
-                    React.createElement('span',{style:{color:"#475569",fontSize:10,marginLeft:4}},"（チーム作成時に設定したパスワード）"))
-                  , React.createElement('input', {
-                      type:"password",
-                      value: teamSharePwInput,
-                      onChange: e=>setTeamSharePwInput(e.target.value),
-                      placeholder:"パスワードを入力",
-                      style:{width:"100%",padding:"9px 12px",borderRadius:8,background:"#0d1f35",
-                        border:"1.5px solid #1e3a5f",color:"#e2e8f0",fontSize:14,
-                        outline:"none",boxSizing:"border-box"}
-                    })
-                )
-
-                , teamShareError && React.createElement('div', {style:{color:"#f87171",fontSize:12,marginBottom:8}}, teamShareError)
-                , React.createElement('button', {
-                    onClick:()=>connectTeam(teamShareInput, teamSharePwInput==="__viewer__"?"":teamSharePwInput),
-                    style:{...sBt(teamSharePwInput==="__viewer__"?"#3b82f6":"#22c55e"),
-                      width:"100%",padding:"11px",fontSize:14,fontWeight:700}
-                  }, teamSharePwInput==="__viewer__" ? "👁 観戦・閲覧で接続" : "✏️ 記録者として接続")
-                , React.createElement('div', {style:{fontSize:10,color:"#475569",marginTop:8,textAlign:"center"}},
-                  teamSharePwInput==="__viewer__"
-                    ? "チームコードがあれば観戦・成績閲覧できます"
-                    : "新規の場合は好きなコードとパスワードを設定してください")
               )
             )
           )
@@ -5013,7 +4494,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
   );
   const [sortKey, setSortKey] = useState("avg");
   const [sortDesc, setSortDesc] = useState(true);
-  const [showAlias, setShowAlias] = useState(false);
+
   const [editMode, setEditMode] = useState(false);   // 手動修正モード
   const [editPitchMode, setEditPitchMode] = useState(false);
   const [pitchOverrides, setPitchOverrides] = React.useState(()=>{
@@ -5046,20 +4527,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
       return next;
     });
   };
-  // チーム名エイリアス: {履歴のチーム名 -> 登録チーム名}
-  const [teamAliases, setTeamAliases] = React.useState(()=>{
-    try { return JSON.parse(localStorage.getItem("teamAliases")||"{}"); } catch(e){ return {}; }
-  });
-  const saveAlias = (from, to) => {
-    setTeamAliases(prev=>{
-      const next = {...prev};
-      if(to) next[from]=to; else delete next[from];
-      localStorage.setItem("teamAliases", JSON.stringify(next));
-      return next;
-    });
-  };
-  // エイリアスを適用してゲームのチーム名を正規化
-  const normalizeTeamName = name => teamAliases[name] || name;
+  const normalizeTeamName = name => name;
 
   // 全試合データ（現在の試合 + 履歴）
   // 成績集計は試合終了（finished）した試合のみ対象

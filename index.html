@@ -2620,7 +2620,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v238")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v239")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2698,7 +2698,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v238")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v239")
         )
 
         // ===== 新規チーム作成 =====
@@ -3602,17 +3602,40 @@ function App() {
                                       color,fontWeight:700,whiteSpace:"nowrap"}
                                   }, "登板")
                             )
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, ipDisp||"0回")
+                            , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
+                              , React.createElement('input', {type:"text", value:ipDisp||"0回",
+                                  onChange:e=>{
+                                    const v=e.target.value;
+                                    mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],ipDisp:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};});
+                                  },
+                                  style:{width:40,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
+                                    borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
+                            )
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}
                               , React.createElement('span', {style:{
                                   fontSize:14,fontWeight:700,
                                   color:(p.pitchCount||0)>=100?"#f87171":(p.pitchCount||0)>=80?"#fbbf24":"#4ade80"
                                 }}, (game.pitchMode||"result")==="pitch" ? (p.pitchCount||0) : "—")
                             )
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, h)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
+                              , React.createElement('input', {type:"number", min:0, value:h,
+                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoH:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
+                                    borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
+                            )
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hr)
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, k)
-                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}, bb)
+                            , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
+                              , React.createElement('input', {type:"number", min:0, value:k,
+                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoK:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
+                                    borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
+                            )
+                            , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
+                              , React.createElement('input', {type:"number", min:0, value:bb,
+                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoBb:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
+                                    borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
+                            )
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hbp)
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}, runs)
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}
@@ -4718,7 +4741,8 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
   const savePitchOverride = (playerKey, field, val) => {
     setPitchOverrides(prev=>{
       const next = {...prev};
-      if(val===undefined){ if(next[playerKey]) delete next[playerKey][field]; }
+      if(field==="_clear") { delete next[playerKey]; }
+      else if(val===undefined){ if(next[playerKey]) { delete next[playerKey][field]; if(Object.keys(next[playerKey]).length===0) delete next[playerKey]; } }
       else next[playerKey] = {...(next[playerKey]||{}), [field]:val};
       localStorage.setItem("pitchOverrides", JSON.stringify(next));
       return next;
@@ -4729,7 +4753,14 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
   });
   const saveOverride = (playerKey, field, val) => {
     setStatOverrides(prev=>{
-      const next = {...prev, [playerKey]:{...(prev[playerKey]||{}), [field]:val}};
+      let next;
+      if(field === "_merge") {
+        // 特定フィールドを削除して残りを保持
+        next = {...prev, [playerKey]: val};
+        if(!val || Object.keys(val).length === 0) { next = {...prev}; delete next[playerKey]; }
+      } else {
+        next = {...prev, [playerKey]:{...(prev[playerKey]||{}), [field]:val}};
+      }
       localStorage.setItem("statOverrides", JSON.stringify(next));
       return next;
     });
@@ -4970,13 +5001,23 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
                   , React.createElement('td', {style:tdS}, p.pa)
                   , (()=>{
                       const ov = (statOverrides||{})[p.name]||{};
-                      const fields = [
+                      const allFields = [
                         ["ab",p.ab,tdS],
                         ["h",p.h,{...tdS,color:"#4ade80",fontWeight:700}],
                         ["avg",p.avg,{...tdS,color:"#fbbf24",fontWeight:900}],
+                        ["slg",p.slg,tdS],
+                        ["obp",p.obp,tdS],
+                        ["ops",p.ops,{...tdS,color:"#f59e0b",fontWeight:700}],
+                        ["hr",p.hr,{...tdS,color:"#f87171"}],
+                        ["rbi",p.rbi,{...tdS,color:"#fb923c"}],
+                        ["run",p.run,tdS],
+                        ["bb",p.bb,{...tdS,color:"#60a5fa"}],
+                        ["k",p.k,{...tdS,color:"#94a3b8"}],
+                        ["sb",p.sb,{...tdS,color:"#4ade80"}],
+                        ["e",p.e||0,{...tdS,color:p.e>0?"#f87171":"#475569"}],
                       ];
-                      if(!editMode) return fields.map(([k,v,s])=>React.createElement('td',{key:k,style:s},ov[k]!==undefined?ov[k]:v));
-                      return fields.map(([k,v,s])=>React.createElement('td',{key:k,style:{...s,padding:2}}
+                      if(!editMode) return allFields.map(([k,v,s])=>React.createElement('td',{key:k,style:s},ov[k]!==undefined?ov[k]:v));
+                      return allFields.map(([k,v,s])=>React.createElement('td',{key:k,style:{...s,padding:2}}
                         , React.createElement('input',{
                             type:"text",
                             defaultValue: ov[k]!==undefined?ov[k]:v,
@@ -4991,16 +5032,6 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
                           })
                       ));
                     })()
-                  , React.createElement('td', {style:tdS}, p.slg)
-                  , React.createElement('td', {style:tdS}, p.obp)
-                  , React.createElement('td', {style:{...tdS,color:"#f59e0b",fontWeight:700}}, p.ops)
-                  , React.createElement('td', {style:{...tdS,color:"#f87171"}}, p.hr)
-                  , React.createElement('td', {style:{...tdS,color:"#fb923c"}}, p.rbi)
-                  , React.createElement('td', {style:tdS}, p.run)
-                  , React.createElement('td', {style:{...tdS,color:"#60a5fa"}}, p.bb)
-                  , React.createElement('td', {style:{...tdS,color:"#94a3b8"}}, p.k)
-                  , React.createElement('td', {style:{...tdS,color:"#4ade80"}}, p.sb)
-                  , React.createElement('td', {style:{...tdS,color:p.e>0?"#f87171":"#475569"}}, p.e||0)
                 )
               )
             , React.createElement('tr', {style:{background:"#1e3a5f",fontWeight:700}}
@@ -5027,7 +5058,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
     )
   );
 
-  const PitchingTable = ({pitchers, teamName, color}) => (
+  const PitchingTable = ({pitchers, teamName, color, editMode, pitchOverrides, savePitchOverride}) => (
     React.createElement('div', {style:{marginBottom:24}}
       , React.createElement('div', {style:{fontSize:14,fontWeight:700,color,marginBottom:8,
           borderLeft:`4px solid ${color}`,paddingLeft:10}}, teamName+" 投手成績")
@@ -5040,17 +5071,43 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
             )
           )
           , React.createElement('tbody', null
-            , pitchers.map((p,i)=>
-                React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0a1628":"#0d1f35"}}
-                  , React.createElement('td', {style:{...tdN,color:"#e2e8f0"}}, p.name)
+            , pitchers.map((p,i)=>{
+                const ov = (pitchOverrides||{})[p.name]||{};
+                const editableFields = [
+                  ["ipDisp", p.ipDisp, tdS],
+                  ["h", p.h, tdS],
+                  ["er", p.er, {...tdS,color:"#f87171"}],
+                  ["era", p.era, {...tdS,color:parseFloat(p.era)<3?"#4ade80":parseFloat(p.era)<5?"#fbbf24":"#f87171",fontWeight:900}],
+                  ["whip", p.whip, tdS],
+                  ["bb", p.bb, {...tdS,color:"#60a5fa"}],
+                  ["k", p.k, {...tdS,color:"#a78bfa"}],
+                ];
+                return React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0a1628":"#0d1f35"}}
+                  , React.createElement('td', {style:{...tdN,color:"#e2e8f0"}}
+                    , p.name
+                    , editMode && ov && Object.keys(ov).length>0 && React.createElement('button',{
+                        onClick:()=>savePitchOverride&&savePitchOverride(p.name,"_clear",null),
+                        style:{fontSize:9,marginLeft:4,background:"#4c1d9533",border:"1px solid #a78bfa",
+                          borderRadius:4,color:"#c4b5fd",cursor:"pointer",padding:"1px 4px"}
+                      },"解除")
+                  )
                   , React.createElement('td', {style:tdS}, p.games)
-                  , React.createElement('td', {style:tdS}, p.ipDisp)
-                  , React.createElement('td', {style:tdS}, p.h)
-                  , React.createElement('td', {style:{...tdS,color:"#f87171"}}, p.er)
-                  , React.createElement('td', {style:{...tdS,color:parseFloat(p.era)<3?"#4ade80":parseFloat(p.era)<5?"#fbbf24":"#f87171",fontWeight:900}}, p.era)
-                  , React.createElement('td', {style:tdS}, p.whip)
-                  , React.createElement('td', {style:{...tdS,color:"#60a5fa"}}, p.bb)
-                  , React.createElement('td', {style:{...tdS,color:"#a78bfa"}}, p.k)
+                  , editableFields.map(([k,v,s])=>React.createElement('td',{key:k,style:editMode?{...s,padding:2}:s}
+                      , editMode
+                        ? React.createElement('input',{
+                            type:"text",
+                            defaultValue: ov[k]!==undefined?ov[k]:v,
+                            onBlur:e=>{
+                              const val=e.target.value.trim();
+                              if(val===""||val===String(v)){if(ov[k]!==undefined&&savePitchOverride)savePitchOverride(p.name,k,undefined);}
+                              else if(savePitchOverride) savePitchOverride(p.name,k,val);
+                            },
+                            style:{width:"100%",background:"#1a1535",border:"1px solid #a78bfa",
+                              borderRadius:4,color:"#c4b5fd",fontSize:11,padding:"2px 4px",
+                              textAlign:"center",outline:"none"}
+                          })
+                        : (ov[k]!==undefined?ov[k]:v)
+                    ))
                   , React.createElement('td', {style:tdS}, p.hbp)
                   , React.createElement('td', {style:{...tdS,color:p.hr>0?"#f87171":"#475569"}}, p.hr)
                   , React.createElement('td', {style:{...tdS,color:(p.win||0)>0?"#4ade80":"#475569",fontWeight:(p.win||0)>0?700:400}}, p.win||0)
@@ -5058,8 +5115,8 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
                   , React.createElement('td', {style:{...tdS,color:(p.save||0)>0?"#fbbf24":"#475569",fontWeight:(p.save||0)>0?700:400}}, p.save||0)
                   , React.createElement('td', {style:{...tdS,color:(p.hold||0)>0?"#60a5fa":"#475569"}}, p.hold||0)
                   , React.createElement('td', {style:{...tdS,color:(p.bs||0)>0?"#fb923c":"#475569"}}, p.bs||0)
-                )
-              )
+                );
+              })
           )
         )
       )

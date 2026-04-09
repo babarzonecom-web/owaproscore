@@ -2704,10 +2704,7 @@ function App() {
         )
 
         // ===== 新規チーム作成 =====
-        , tab==="login_new"&&(()=>{
-          const [newTeamPw, setNewTeamPw] = React.useState("");
-          const [newAdminPw, setNewAdminPw] = React.useState("");
-          return React.createElement('div', {style:{
+        , tab==="login_new"&&React.createElement('div', {style:{
               minHeight:"80vh",display:"flex",flexDirection:"column",
               alignItems:"center",justifyContent:"center",padding:"24px 20px"}}
             , React.createElement('div', {style:{width:"100%",maxWidth:340}}
@@ -2716,7 +2713,6 @@ function App() {
                 "← 戻る")
               , React.createElement('div', {style:{fontSize:20,fontWeight:900,color:"#e2e8f0",marginBottom:4}}, "🏟 新規チームを作る")
               , React.createElement('div', {style:{fontSize:12,color:"#475569",marginBottom:20}}, "チームID・チームPW・管理者PWを設定してください")
-
               , React.createElement('div', {style:{marginBottom:10}}
                 , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:6,marginBottom:4}}
                   , React.createElement('span', {style:{fontSize:11,color:"#94a3b8"}}, "チームID（例: TIGERS）")
@@ -2768,8 +2764,7 @@ function App() {
                     color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}
                 }, "✅ チームを作って開始")
             )
-          );
-        })()
+          )
 
         // ===== メンバーとして参加 =====
         , tab==="login_member"&&React.createElement('div', {style:{

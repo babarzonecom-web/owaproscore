@@ -1228,18 +1228,41 @@ function App() {
   const showToast = (msg)=>{setToast(msg);setTimeout(()=>setToast(""),2600);};
 
   const disconnectTeam = () => {
+    // ポーリング停止
     window.__teamShareCode = null;
     window.__teamShareRole = null;
     window.__teamAdminPushing = false;
     if(window.__teamPollTimer){ clearInterval(window.__teamPollTimer); window.__teamPollTimer=null; }
     if(window.__teamShareRef){ try{ window.__teamShareRef.off(); }catch(e){} window.__teamShareRef=null; }
+
+    // ローカルストレージを全消去（セキュリティ強化）
+    localStorage.removeItem("tsCode");
+    localStorage.removeItem("tsRole");
+    localStorage.removeItem("bb_v7");
+    localStorage.removeItem("statOverrides");
+    localStorage.removeItem("pitchOverrides");
+
+    // React stateをリセット
     setTeamShareCode("");
     setTeamShareRole("");
     setTeamShareError("");
-    localStorage.removeItem("tsCode");
-    localStorage.removeItem("tsRole");
+    setTeamShareInput("");
+    setNewTeamPw("");
+    setNewAdminPw("");
+
+    // ゲームデータをリセット
+    const freshGame = newGame();
+    setStorage({
+      currentGame: freshGame,
+      history: [],
+      undoStack: [],
+      teams: [],
+      myTeam: null,
+      opponents: [],
+    });
+
     setTab("login");
-    showToast("切断しました");
+    showToast("ログアウトしました。データをクリアしました。");
   };
 
   // 自動再接続は削除（手動接続のみ）
@@ -2632,7 +2655,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v241")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v242")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2710,7 +2733,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v241")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v242")
         )
 
         // ===== 新規チーム作成 =====

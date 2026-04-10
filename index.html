@@ -1167,6 +1167,8 @@ function App() {
   const [teamShareInput,setTeamShareInput]= useState(localStorage.getItem("tsCode")||"");
   const [newTeamPw, setNewTeamPw] = useState("");
   const [newAdminPw, setNewAdminPw] = useState("");
+  const [confirmTeamPw, setConfirmTeamPw] = useState("");
+  const [confirmAdminPw, setConfirmAdminPw] = useState("");
 
   const [teamSharePwInput,setTeamSharePwInput]= useState("");
   const [teamShareRole, setTeamShareRole] = useState(localStorage.getItem("tsRole")||""); // "admin"|"viewer"|""
@@ -1285,6 +1287,7 @@ function App() {
       const tc = (code||"").trim().toUpperCase();
       if(!tc){ setTeamShareError("チームIDを入力してください"); return; }
       if(!pw||!pw.trim()){ setTeamShareError("パスワードを入力してください"); return; }
+      // 新規作成以外でも最低1文字チェック（新規は画面側で6文字チェック済み）
       setTeamShareError("接続中...");
 
       const baseRestUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+tc;
@@ -2655,7 +2658,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v242")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v243")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2733,7 +2736,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v242")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v243")
         )
 
         // ===== 新規チーム作成 =====
@@ -2771,31 +2774,61 @@ function App() {
               , React.createElement('input', {
                   type:"password", value:newTeamPw,
                   onChange:e=>setNewTeamPw(e.target.value),
-                  placeholder:"メンバー全員が使うPW",
+                  placeholder:"6文字以上",
                   style:{width:"100%",padding:"11px 12px",borderRadius:8,background:"#0d1f35",
-                    border:"1.5px solid #4c1d95",color:"#e2e8f0",fontSize:14,
-                    outline:"none",boxSizing:"border-box",marginBottom:10}
+                    border:"1.5px solid "+(newTeamPw&&newTeamPw.length<6?"#f87171":"#4c1d95"),
+                    color:"#e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:4}
                 })
-              , React.createElement('div', {style:{fontSize:11,color:"#7dd3fc",marginBottom:4}}, "🔑 管理者PW（記録者・責任者のみ）")
+              , newTeamPw&&newTeamPw.length<6&&React.createElement('div',{style:{fontSize:10,color:"#f87171",marginBottom:4}},"⚠️ 6文字以上必要です")
+              , React.createElement('div', {style:{fontSize:11,color:"#a78bfa",marginBottom:4}}, "👥 チームPW（確認）")
+              , React.createElement('input', {
+                  type:"password", value:confirmTeamPw,
+                  onChange:e=>setConfirmTeamPw(e.target.value),
+                  placeholder:"もう一度入力",
+                  style:{width:"100%",padding:"11px 12px",borderRadius:8,background:"#0d1f35",
+                    border:"1.5px solid "+(confirmTeamPw&&confirmTeamPw!==newTeamPw?"#f87171":"#4c1d95"),
+                    color:"#e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:4}
+                })
+              , confirmTeamPw&&confirmTeamPw!==newTeamPw&&React.createElement('div',{style:{fontSize:10,color:"#f87171",marginBottom:4}},"⚠️ チームPWが一致しません")
+              , React.createElement('div', {style:{fontSize:11,color:"#7dd3fc",marginBottom:4,marginTop:8}}, "🔑 管理者PW（記録者・責任者のみ）")
               , React.createElement('input', {
                   type:"password", value:newAdminPw,
                   onChange:e=>setNewAdminPw(e.target.value),
-                  placeholder:"管理者だけが使うPW",
+                  placeholder:"6文字以上",
                   style:{width:"100%",padding:"11px 12px",borderRadius:8,background:"#0d1f35",
-                    border:"1.5px solid #1e3a5f",color:"#e2e8f0",fontSize:14,
-                    outline:"none",boxSizing:"border-box",marginBottom:16}
+                    border:"1.5px solid "+(newAdminPw&&newAdminPw.length<6?"#f87171":"#1e3a5f"),
+                    color:"#e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:4}
                 })
-              , React.createElement('div', {style:{fontSize:10,color:"#475569",marginBottom:12,lineHeight:1.6}},
+              , newAdminPw&&newAdminPw.length<6&&React.createElement('div',{style:{fontSize:10,color:"#f87171",marginBottom:4}},"⚠️ 6文字以上必要です")
+              , React.createElement('div', {style:{fontSize:11,color:"#7dd3fc",marginBottom:4}}, "🔑 管理者PW（確認）")
+              , React.createElement('input', {
+                  type:"password", value:confirmAdminPw,
+                  onChange:e=>setConfirmAdminPw(e.target.value),
+                  placeholder:"もう一度入力",
+                  style:{width:"100%",padding:"11px 12px",borderRadius:8,background:"#0d1f35",
+                    border:"1.5px solid "+(confirmAdminPw&&confirmAdminPw!==newAdminPw?"#f87171":"#1e3a5f"),
+                    color:"#e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:4}
+                })
+              , confirmAdminPw&&confirmAdminPw!==newAdminPw&&React.createElement('div',{style:{fontSize:10,color:"#f87171",marginBottom:4}},"⚠️ 管理者PWが一致しません")
+              , React.createElement('div', {style:{fontSize:10,color:"#475569",marginBottom:12,marginTop:8,lineHeight:1.6}},
                 "※ チームPWでメンバーが速報・成績を閲覧できます", React.createElement('br',null),
                 "※ 管理者PWでスコア入力・成績修正ができます")
               , teamShareError&&React.createElement('div',{style:{color:"#f87171",fontSize:12,marginBottom:8}},teamShareError)
-              , React.createElement('button', {
-                  onClick:()=>{ connectTeam(teamShareInput, newTeamPw+"::"+newAdminPw, "new"); },
-                  disabled:!teamShareInput||!newTeamPw||!newAdminPw,
-                  style:{width:"100%",padding:"14px",borderRadius:10,border:"none",
-                    background:(!teamShareInput||!newTeamPw||!newAdminPw)?"#1e3a5f":"#16a34a",
-                    color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}
-                }, "✅ チームを作って開始")
+              , (()=>{
+                  const ok = teamShareInput && newTeamPw && newTeamPw.length>=6
+                    && newAdminPw && newAdminPw.length>=6
+                    && newTeamPw===confirmTeamPw && newAdminPw===confirmAdminPw;
+                  return React.createElement('button', {
+                    onClick:()=>{
+                      if(!ok) return;
+                      connectTeam(teamShareInput, newTeamPw+"::"+newAdminPw, "new");
+                    },
+                    disabled:!ok,
+                    style:{width:"100%",padding:"14px",borderRadius:10,border:"none",
+                      background:ok?"#16a34a":"#1e3a5f",
+                      color:"#fff",fontSize:15,fontWeight:700,cursor:ok?"pointer":"not-allowed",fontFamily:"inherit"}
+                  }, "✅ チームを作って開始");
+                })()
             )
           )
 
@@ -5558,7 +5591,7 @@ function PasswordChangeCard({ teamCode, showToast }) {
   const handleChange = () => {
     if(!newPw.trim()){ showToast("新しいパスワードを入力してください"); return; }
     if(newPw !== confirmPw){ showToast("パスワードが一致しません"); return; }
-    if(newPw.length < 4){ showToast("4文字以上で設定してください"); return; }
+    if(newPw.length < 6){ showToast("6文字以上で設定してください"); return; }
     setLoading(true);
     const field = mode==="team" ? "teamPw" : "adminPw";
     const url = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+teamCode+"/"+field+".json";

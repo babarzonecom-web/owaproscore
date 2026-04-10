@@ -1209,6 +1209,10 @@ function App() {
 
     useEffect(()=>lsSave(storage),[storage]);
   window.__setStorage = setStorage;
+  // pitchModeをdata属性に同期（commitAtBatのクロージャ問題を回避）
+  useEffect(()=>{
+    document.body.setAttribute("data-pitch-mode", game.pitchMode||"result");
+  }, [game.pitchMode]);
  useEffect(()=>{
     if(isHost && syncGameId) {
       if(!fbInit()){ showToast("Firebase未設定"); return; }
@@ -1566,9 +1570,11 @@ function App() {
     } else {
       showToast(`${_optionalChain([rOf, 'call', _11 => _11(code), 'optionalAccess', _12 => _12.label])||code}${(runs||0)>0?` +${runs}点`:""} ✅`);
       
+      // pitchModeはgameから直接取得（クロージャの古い値を避けるため）
+      const currentPitchMode = document.body.getAttribute("data-pitch-mode") || "result";
       setTimeout(()=>{
         // 結果入力モードのみ次の打者を自動表示（1球モードは自動表示しない）
-        if((game.pitchMode||"result") === "result") {
+        if(currentPitchMode === "result") {
           setModal({team, pidx:nextPidx, inning, step:"result"});
         } else {
           setModal(null);
@@ -1759,12 +1765,16 @@ function App() {
 
   
   const _viewerBlock = () => { showToast("👁 閲覧モードでは操作できません"); return true; };
-  const openNew     = (team,pidx,inning) => {  setSelDir(null); setTab("score"); setModal({team,pidx,inning,step:"result"}); };
+  const openNew     = (team,pidx,inning) => {
+    if(window.__teamShareRole==="member"){ showToast("👥 メンバーは記録できません"); return; }
+    setSelDir(null); setTab("score"); setModal({team,pidx,inning,step:"result"});
+  };
   const openSB      = (team,pidx)        => {  setModal({team,pidx,step:"sb"}); };
   const openEdit    = (team,pidx,inning) => {  setSelDir(null); setTab("score"); setModal({team,pidx,inning,step:"edit_list"}); };
   const openSpecial = (team)             => {  setModal({team,step:"special"}); };
   
   const openCurrentBatter = (team,inning) => {
+    if(window.__teamShareRole==="member"){ showToast("👥 メンバーは記録できません"); return; }
     
     const batterKey = team+"BatterIdx";
     const idx = game[batterKey]||0;
@@ -2622,7 +2632,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v240")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v241")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2700,7 +2710,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v240")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v241")
         )
 
         // ===== 新規チーム作成 =====
@@ -4493,15 +4503,27 @@ function App() {
                   , _optionalChain([mLineup, 'access', _48 => _48[(modal.pidx+1)%mLineup.length], 'optionalAccess', _49 => _49.name]), " ▶"
                 )
               )
-              , React.createElement('div', { style: {display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8},}
-                , RESULTS.map(r=>(
-                  React.createElement('button', { key: r.code, className: "hv", onClick: ()=>onPickResult(r.code),
-                    style: {background:r.color+"20",border:`1.5px solid ${r.color}`,
-                      borderRadius:9,color:r.color,padding:"10px 4px",cursor:"pointer",textAlign:"center"},}
-                    , React.createElement('div', { style: {fontSize:17,fontWeight:900,fontFamily:"'Bebas Neue',sans-serif"},}, r.short)
-                    , React.createElement('div', { style: {fontSize:10,opacity:.9},}, r.label)
-                  )
-                ))
+              , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:8}}
+                , [
+                    {label:"ヒット", color:"#22c55e", tc:"#4ade80", bg:"#0d2a1a", bc:"#22c55e", codes:["H1","H2","H3","HR"]},
+                    {label:"出塁",   color:"#60a5fa", tc:"#7dd3fc", bg:"#0d1f35", bc:"#3b82f6", codes:["BB","HBP","IBB","KW","E","FC","CI"]},
+                    {label:"アウト", color:"#f87171", tc:"#fca5a5", bg:"#1a0d0d", bc:"#f87171", codes:["K","KL","GO","FO","LO","FF","SAC","SF","DP","TP","OI"]},
+                  ].map(g=>React.createElement('div', {key:g.label}
+                    , React.createElement('div', {style:{fontSize:10,color:g.color,fontWeight:700,marginBottom:5,paddingLeft:2,letterSpacing:1}}, g.label)
+                    , React.createElement('div', {style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}
+                      , g.codes.map(code=>{
+                          const r=RESULTS.find(x=>x.code===code); if(!r) return null;
+                          return React.createElement('button', {
+                              key:code, className:"hv", onClick:()=>onPickResult(code),
+                              style:{background:g.bg,border:`1.5px solid ${g.bc}44`,borderRadius:9,
+                                padding:"10px 4px",cursor:"pointer",textAlign:"center"}
+                            }
+                            , React.createElement('div', {style:{fontSize:16,fontWeight:900,color:g.tc,fontFamily:"monospace",letterSpacing:-1}}, r.short)
+                            , React.createElement('div', {style:{fontSize:9,color:g.tc,opacity:0.8,marginTop:2}}, r.label)
+                          );
+                        })
+                    )
+                  ))
               )
               , React.createElement('button', { onClick: ()=>setModal(null), style: {...S.cBtn,marginTop:10},}, "閉じる")
             )

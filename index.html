@@ -2127,16 +2127,30 @@ function App() {
       pitchers.forEach((p,i)=>{
         const auto = autoStats[i]||{autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0};
         const isOverride = p.manualOverride;
-        const ip  = isOverride ? p.ip   : auto.autoIp;
-        const h   = isOverride ? p.h    : auto.autoH;
-        const er  = isOverride ? p.er   : auto.autoEr;
-        const bb  = isOverride ? p.bb   : auto.autoBb;
-        const k   = isOverride ? p.k    : auto.autoK;
+        // manualOverrideの場合：投手タブで保存したauto系フィールドを優先
+        const ip  = isOverride ? (p.autoIp!==undefined?p.autoIp:(p.ip||auto.autoIp)) : auto.autoIp;
+        const h   = isOverride ? (p.autoH!==undefined?p.autoH:(p.h||auto.autoH))   : auto.autoH;
+        const er  = isOverride ? (p.er!==undefined?p.er:auto.autoEr)               : auto.autoEr;
+        const bb  = isOverride ? (p.autoBb!==undefined?p.autoBb:(p.bb||auto.autoBb)): auto.autoBb;
+        const k   = isOverride ? (p.autoK!==undefined?p.autoK:(p.k||auto.autoK))   : auto.autoK;
         
         const ipNum = Math.floor(ip/10) + (ip%10)/3;
         const era = ipNum>0 ? (er*(g.innings||9)/ipNum).toFixed(2) : "---";
-        const ipDisp = `${Math.floor(ip/10)}.${ip%10}`;
-        pitRows.push([teamName,p.name,ipDisp,h,er,bb,k,era]);
+        const rawIpDisp = p.manualOverride && p.ipDisp ? p.ipDisp : `${Math.floor(ip/10)}.${ip%10}`;
+        const ipDisp = rawIpDisp;
+        // pitchOverridesを適用（成績タブの手動修正）
+        const pov = pitOv[p.name]||{};
+        const finalIpDisp = pov.ipDisp !== undefined ? pov.ipDisp : ipDisp;
+        const finalH  = pov.h  !== undefined ? Number(pov.h)  : h;
+        const finalEr = pov.er !== undefined ? Number(pov.er) : er;
+        const finalBb = pov.bb !== undefined ? Number(pov.bb) : bb;
+        const finalK  = pov.k  !== undefined ? Number(pov.k)  : k;
+        const finalIpNum2 = (() => {
+          const parts = String(finalIpDisp).split(".");
+          return parseInt(parts[0]||0) + (parseInt(parts[1]||0)/3);
+        })();
+        const finalEra = finalIpNum2>0 ? (finalEr*(g.innings||9)/finalIpNum2).toFixed(2) : "---";
+        pitRows.push([teamName,p.name,finalIpDisp,finalH,finalEr,finalBb,finalK,finalEra]);
       });
       pitRows.push([]);
     });
@@ -2175,22 +2189,65 @@ function App() {
       wsDef["!cols"] = [6,4,10,10,6,10,6,8,6].map(w=>({wch:w}));
       XLSX.utils.book_append_sheet(wb, wsDef, "守備交代");
     }
-      // iOSのWebView対応：ダウンロードリンクを表示
-      try {
-        const wbout = XLSX.write(wb, {bookType:'xlsx', type:'base64'});
-        const dataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbout;
-        const a = document.createElement('a');
-        a.href = dataUri;
-        a.download = fname;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(()=>document.body.removeChild(a), 1000);
-        showToast('📊 Excelを出力しました');
-      } catch(e2) {
-        // fallback
-        try { XLSX.writeFile(wb, fname); } catch(e3) {
-          alert('Excelの出力に失敗しました。ブラウザで開いてお試しください。');
+      // CSV生成（全シートを結合）
+      const buildCsv = (rows) => rows.map(row=>
+        row.map(cell=>{
+          const s = String(cell===null||cell===undefined?"":cell);
+          return s.includes(",")||s.includes("\n")||s.includes("\"") ? `"${s.replace(/"/g,'""')}"` : s;
+        }).join(",")
+      ).join("\n");
+
+      const csvParts = [
+        `=== ${g.awayTeam} vs ${g.homeTeam} (${g.date}) ===`,
+        "",
+        "【スコアボード】",
+        buildCsv(scoreRows),
+        "",
+        "【打撃成績】",
+        buildCsv(batRows),
+        "",
+        "【投手成績】",
+        buildCsv(pitRows),
+      ].join("\n");
+
+      // iOS判定
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+        (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+
+      if(isIOS) {
+        // iOSはクリップボードにCSVをコピー
+        navigator.clipboard.writeText(csvParts).then(()=>{
+          showToast("📋 CSVをコピーしました！メモ帳やスプレッドシートに貼り付けてください");
+        }).catch(()=>{
+          // クリップボードAPIが使えない場合はtextareaで選択
+          const ta = document.createElement("textarea");
+          ta.value = csvParts;
+          ta.style.cssText = "position:fixed;top:0;left:0;width:100%;height:200px;z-index:9999;font-size:12px;";
+          document.body.appendChild(ta);
+          ta.focus(); ta.select();
+          showToast("📋 テキストを選択しました。コピーしてください");
+          setTimeout(()=>document.body.removeChild(ta), 8000);
+        });
+      } else {
+        // PC・Android：Excelファイルとしてダウンロード
+        try {
+          const wbout = XLSX.write(wb, {bookType:'xlsx', type:'base64'});
+          const dataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbout;
+          const a = document.createElement('a');
+          a.href = dataUri;
+          a.download = fname;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(()=>document.body.removeChild(a), 1000);
+          showToast('📊 Excelを出力しました');
+        } catch(e2) {
+          try { XLSX.writeFile(wb, fname); } catch(e3) {
+            // fallback: CSVコピー
+            navigator.clipboard.writeText(csvParts).then(()=>{
+              showToast("📋 CSVをコピーしました");
+            });
+          }
         }
       }
     };
@@ -2658,7 +2715,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v244")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v247")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2736,7 +2793,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v244")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v247")
         )
 
         // ===== 新規チーム作成 =====
@@ -3606,7 +3663,7 @@ function App() {
                         , React.createElement('th', {style:S.th}, "登板")
                         , React.createElement('th', {style:S.th}, "投球回")
                         , React.createElement('th', {style:S.th}, "球数")
-                        , React.createElement('th', {style:S.th}, "K%")
+                        , React.createElement('th', {style:S.th}, "St%")
                         , React.createElement('th', {style:S.th}, "被安打")
                         , React.createElement('th', {style:S.th}, "被本")
                         , React.createElement('th', {style:S.th}, "三振")
@@ -3638,6 +3695,10 @@ function App() {
                           const hr  = auto.autoHr||0;
                           const runs = auto.autoRuns||0;
                           const er  = p.manualOverride ? (p.er!==undefined?p.er:(p.autoEr||0)) : (auto.autoEr||0);
+                          // manualOverrideの場合はauto系フィールドを優先表示
+                          const hDisp  = p.manualOverride && p.autoH!==undefined ? p.autoH : auto.autoH||0;
+                          const bbDisp = p.manualOverride && p.autoBb!==undefined ? p.autoBb : auto.autoBb||0;
+                          const kDisp  = p.manualOverride && p.autoK!==undefined ? p.autoK : auto.autoK||0;
                           const era = ipNum>0 ? (er*9/ipNum).toFixed(2) : (er>0?"∞":"—");
                           return React.createElement('tr', {key:p.id||i,
                             style:{background:isCur?(color+"22"):i%2===0?"#0a1628":"transparent",
@@ -3702,20 +3763,20 @@ function App() {
                                 })()
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                              , React.createElement('input', {type:"number", min:0, value:h,
+                              , React.createElement('input', {type:"number", min:0, value:hDisp,
                                   onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoH:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}, hr)
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                              , React.createElement('input', {type:"number", min:0, value:k,
+                              , React.createElement('input', {type:"number", min:0, value:kDisp,
                                   onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoK:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                              , React.createElement('input', {type:"number", min:0, value:bb,
+                              , React.createElement('input', {type:"number", min:0, value:bbDisp,
                                   onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoBb:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
@@ -3754,7 +3815,7 @@ function App() {
               teamShareCode:teamShareCode,
               onLoad:loadGame,
               onDelete:delHistory,
-              onExcel:exportExcel,
+              onExcel:(g)=>exportExcel(g, {stat:statOverrides, pitch:pitchOverrides}),
               onImport:(games)=>{
                 // gamesは配列で一括受け取り
                 const arr = Array.isArray(games)?games:[games];
@@ -5162,7 +5223,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
         , React.createElement('table', {style:{...S.table,minWidth:480}}
           , React.createElement('thead', null
             , React.createElement('tr', null
-              , ["投手","試","投球回","球数","K%","被安打","自責点","防御率","WHIP","四球","奪三振","死球","被本塁"].map(h=>
+              , ["投手","試","投球回","球数","St%","被安打","自責点","防御率","WHIP","四球","奪三振","死球","被本塁"].map(h=>
                   React.createElement('th', {key:h,style:thS}, h))
             )
           )

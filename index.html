@@ -582,7 +582,7 @@ const toList = (ab,inn) => { if(!ab||ab[inn]==null) return []; return Array.isAr
 
 const makePlayer  = (i) => ({ id:i, name:`選手${i}`, pos:"", atBats:{}, rbi:0, sb:0, cs:0 });
 const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:0,
-  pitchCount:0,
+  pitchCount:0, strikeCount:0, ballCount:0,
   autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0,
   manualOverride:false, 
 });
@@ -2658,7 +2658,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v243")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v244")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2736,7 +2736,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v243")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v244")
         )
 
         // ===== 新規チーム作成 =====
@@ -3157,7 +3157,10 @@ function App() {
                           mutGame(g=>{
                             const pitchers=[...g[defSide+"Pitchers"]||[]];
                             const pidx=g[defSide+"PitcherIdx"]||0;
-                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
+                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],
+                              pitchCount:(pitchers[pidx].pitchCount||0)+1,
+                              ballCount:(pitchers[pidx].ballCount||0)+1
+                            };
                             return{...g,[defSide+"Pitchers"]:pitchers};
                           });
                           if(newB>=4){
@@ -3179,7 +3182,10 @@ function App() {
                           mutGame(g=>{
                             const pitchers=[...g[defSide+"Pitchers"]||[]];
                             const pidx=g[defSide+"PitcherIdx"]||0;
-                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
+                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],
+                              pitchCount:(pitchers[pidx].pitchCount||0)+1,
+                              strikeCount:(pitchers[pidx].strikeCount||0)+1
+                            };
                             return{...g,[defSide+"Pitchers"]:pitchers};
                           });
                           if(newS>=3){
@@ -3201,7 +3207,10 @@ function App() {
                           mutGame(g=>{
                             const pitchers=[...g[defSide+"Pitchers"]||[]];
                             const pidx=g[defSide+"PitcherIdx"]||0;
-                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:(pitchers[pidx].pitchCount||0)+1};
+                            if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],
+                              pitchCount:(pitchers[pidx].pitchCount||0)+1,
+                              strikeCount:(pitchers[pidx].strikeCount||0)+1
+                            };
                             return{...g,[defSide+"Pitchers"]:pitchers};
                           });
                         },
@@ -3597,6 +3606,7 @@ function App() {
                         , React.createElement('th', {style:S.th}, "登板")
                         , React.createElement('th', {style:S.th}, "投球回")
                         , React.createElement('th', {style:S.th}, "球数")
+                        , React.createElement('th', {style:S.th}, "K%")
                         , React.createElement('th', {style:S.th}, "被安打")
                         , React.createElement('th', {style:S.th}, "被本")
                         , React.createElement('th', {style:S.th}, "三振")
@@ -3679,6 +3689,17 @@ function App() {
                                   fontSize:14,fontWeight:700,
                                   color:(p.pitchCount||0)>=100?"#f87171":(p.pitchCount||0)>=80?"#fbbf24":"#4ade80"
                                 }}, (game.pitchMode||"result")==="pitch" ? (p.pitchCount||0) : "—")
+                            )
+                            , React.createElement('td', {style:{...S.td, textAlign:"center"}}
+                              , (()=>{
+                                  if((game.pitchMode||"result")!=="pitch") return React.createElement('span',{style:{color:"#475569"}},"—");
+                                  const total = p.pitchCount||0;
+                                  const strikes = p.strikeCount||0;
+                                  if(total===0) return React.createElement('span',{style:{color:"#475569"}},"—");
+                                  const rate = Math.round(strikes/total*100);
+                                  const color = rate>=65?"#4ade80":rate>=55?"#fbbf24":"#f87171";
+                                  return React.createElement('span',{style:{fontSize:13,fontWeight:700,color}}, rate+"%");
+                                })()
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {type:"number", min:0, value:h,
@@ -5141,7 +5162,7 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
         , React.createElement('table', {style:{...S.table,minWidth:480}}
           , React.createElement('thead', null
             , React.createElement('tr', null
-              , ["投手","試","投球回","被安打","自責点","防御率","WHIP","四球","奪三振","死球","被本塁"].map(h=>
+              , ["投手","試","投球回","球数","K%","被安打","自責点","防御率","WHIP","四球","奪三振","死球","被本塁"].map(h=>
                   React.createElement('th', {key:h,style:thS}, h))
             )
           )
@@ -5167,6 +5188,13 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
                       },"解除")
                   )
                   , React.createElement('td', {style:tdS}, p.games)
+                  , React.createElement('td', {style:tdS}, p.pitchCount||0)
+                  , React.createElement('td', {style:tdS}, (()=>{
+                      const total=p.pitchCount||0; const strikes=p.strikeCount||0;
+                      if(total===0) return "—";
+                      const rate=Math.round(strikes/total*100);
+                      return rate+"%";
+                    })())
                   , editableFields.map(([k,v,s])=>React.createElement('td',{key:k,style:editMode?{...s,padding:2}:s}
                       , editMode
                         ? React.createElement('input',{

@@ -2701,6 +2701,11 @@ function App() {
                , undoStack.length>0&&React.createElement('span', { style: {fontSize:10,opacity:.7,marginLeft:2},}, "(", undoStack.length, ")")
             )
             , !game.finished ? (React.createElement(React.Fragment, null
+              , game.inning >= (game.innings||7) && window.__teamShareRole !== "member" && React.createElement('button', {
+                  onClick: addExtraInning,
+                  style:{background:"#1a1a0d",border:"2px solid #fbbf24",borderRadius:9,
+                    color:"#fbbf24",padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:700}
+                }, "延長+1回")
               , React.createElement('button', { onClick: ()=>{ if(window.__teamShareRole==="member"){showToast("👁 閲覧モードでは操作できません");return;} changeInning(); }, style: {...sBt("#16a34a"),opacity:window.__teamShareRole==="member"?0.4:1},}, "チェンジ ▶" )
               , React.createElement('button', { onClick: ()=>{ if(window.__teamShareRole==="member"){showToast("👁 閲覧モードでは操作できません");return;} saveGame(); }, style: {...sBt("#1d4ed8"),opacity:window.__teamShareRole==="member"?0.4:1},}, "💾 保存" )
               
@@ -2709,7 +2714,7 @@ function App() {
               , React.createElement('span', { style: {background:"#dc2626",borderRadius:6,padding:"4px 10px",
                 fontSize:12,fontWeight:700,color:"#fff"},}
                 , game.endReason==="cold"?`コールド(${game.endInning}回)`:
-                 game.endReason==="mercy"?"コールド成立":"試合終了"
+                 game.endReason==="mercy"?"コールド成立":game.endReason==="extra"?"延長戦":game.endReason==="tiebreak"?"タイブレーク":"試合終了"
               )
               , React.createElement('button', { onClick: resumeGame, style: sBt("#475569",true),}, "再開")
             ))
@@ -2720,7 +2725,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v250")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v251")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2798,7 +2803,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v250")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v251")
         )
 
         // ===== 新規チーム作成 =====

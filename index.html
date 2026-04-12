@@ -722,7 +722,7 @@ const computePitcherStats = (g) => {
         let outsInHalf = 0;
         halfAtBats.forEach(({pi, ei, e:ne})=>{
           const hasError = !!(ne.errorPos);
-          allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb:Math.min(outsInHalf,2), hasError, seq:allAtBats.length});
+          allAtBats.push({inning:inn, half, playerIdx:pi, entryIdx:ei, entry:ne, outsAtAb:Math.min(outsInHalf,2), hasError, seq:allAtBats.length, _seqValid:true});
           if(outsInHalf < 3){
             if(OUT_CODES_FOR_IP.has(ne.code) && !hasError) outsInHalf++;
             if(ne.code==="DP" && !hasError) outsInHalf++;
@@ -785,8 +785,10 @@ const computePitcherStats = (g) => {
         const seqLog = buildSeqLog();
 
     const findActivePitcher = (abSeq) => {
+      // seqがundefined（旧データ）の場合は先発投手を返す
+      if(abSeq === undefined || abSeq === null) return log[0].pitcherIdx;
       // seqLog中でfromSeq <= abSeqを満たす最後（最新）のエントリ
-      let bestIdx = seqLog[0].pitcherIdx;
+      let bestIdx = seqLog[0] ? seqLog[0].pitcherIdx : 0;
       for(let i=0; i<seqLog.length; i++){
         if(seqLog[i].fromSeq <= abSeq){
           bestIdx = seqLog[i].pitcherIdx;
@@ -1231,10 +1233,11 @@ function App() {
 
   const disconnectTeam = () => {
     // ポーリング停止
+    // ポーリングを先に無効化してからnullセット（競合防止）
+    if(window.__teamPollTimer){ clearInterval(window.__teamPollTimer); window.__teamPollTimer=null; }
     window.__teamShareCode = null;
     window.__teamShareRole = null;
     window.__teamAdminPushing = false;
-    if(window.__teamPollTimer){ clearInterval(window.__teamPollTimer); window.__teamPollTimer=null; }
     if(window.__teamShareRef){ try{ window.__teamShareRef.off(); }catch(e){} window.__teamShareRef=null; }
 
     // ローカルストレージを全消去（セキュリティ強化）
@@ -2128,9 +2131,11 @@ function App() {
         const auto = autoStats[i]||{autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0};
         const isOverride = p.manualOverride;
         // manualIp（アウト数ベース）が最優先、次にmanualOverride、最後にauto
+        // autoIpは10進数形式（52=5回2/3）→アウト数に変換
+        const toOuts = (autoIp) => Math.floor(autoIp/10)*3 + (autoIp%10);
         const ip  = p.manualIp !== undefined ? p.manualIp
-                  : isOverride ? (p.autoIp!==undefined?p.autoIp:(p.ip||auto.autoIp))
-                  : auto.autoIp;
+                  : isOverride ? toOuts(p.autoIp!==undefined?p.autoIp:(p.ip||auto.autoIp))
+                  : toOuts(auto.autoIp);
         const h   = isOverride ? (p.autoH!==undefined?p.autoH:(p.h||auto.autoH))   : auto.autoH;
         const er  = isOverride ? (p.er!==undefined?p.er:auto.autoEr)               : auto.autoEr;
         const bb  = isOverride ? (p.autoBb!==undefined?p.autoBb:(p.bb||auto.autoBb)): auto.autoBb;
@@ -2725,7 +2730,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v251")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v252")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2803,7 +2808,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v251")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v252")
         )
 
         // ===== 新規チーム作成 =====

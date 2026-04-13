@@ -1021,6 +1021,7 @@ const fbSaveGameToCode = (code, game) => {
     const payload = {
       id: game.id,
       date: game.date||"",
+      venue: game.venue||"",
       innings: game.innings||9,
       awayTeam: game.awayTeam||"",
       homeTeam: game.homeTeam||"",
@@ -1530,8 +1531,8 @@ function App() {
             brOuts.push({inning:g.inning, half:g.half, outsAtTime:prevOuts+baseOutsFromCode+i, defTeam, pitcherIdx:curPIdx});
           }
         }
-        // IPアウトコードでない追加アウト
-        if(!codeIsIpOut && addedOuts > 0) {
+        // IPアウトコードでない追加アウト（走塁アウトは上のrunnerOutsで処理済みなので追加しない）
+        if(!codeIsIpOut && codeOutCount===0 && addedOuts > 0) {
           const defTeam = team==="away"?"home":"away";
           const curPIdx2 = g[defTeam+"PitcherIdx"]||0;
           for(let i=0;i<addedOuts;i++){
@@ -1667,7 +1668,7 @@ function App() {
 
       // 盗塁/刺カウントを各ランナーに加算
       // SB→盗塁+1、CS/PO→盗塁刺+1、RO→カウントなし（走塁死は盗塁関連に含まない）
-      const isCsType = type==="CS" || type==="PO"; // 盗塁刺・牽制死のみcs加算
+      const isCsType = type==="CS"; // 盗塁刺のみcs加算（牽制死POはcsに含まない）
       if(isSB || isCsType) {
         lineup = lineup.map(p=>{
           const mv = moves.find(m=>m.runner.name===p.name);
@@ -1675,7 +1676,7 @@ function App() {
           const stayed = !mv.isOut && mv.destBi === mv.runner.bi;
           if(stayed) return p;
           if(isSB && !mv.isOut) return {...p, sb:(p.sb||0)+1};  // 盗塁成功
-          if(isCsType && mv.isOut) return {...p, cs:(p.cs||0)+1}; // 盗塁刺・牽制死
+          if(isCsType && mv.isOut) return {...p, cs:(p.cs||0)+1}; // 盗塁刺のみ
           return p;
         });
       }
@@ -2740,7 +2741,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v254")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v255")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2818,7 +2819,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v254")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v255")
         )
 
         // ===== 新規チーム作成 =====

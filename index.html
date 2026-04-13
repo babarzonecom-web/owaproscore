@@ -1847,6 +1847,16 @@ function App() {
   };
 
   
+  const addExtraInning = () => {
+    mutGame(g=>{
+      const newInnings = (g.innings||7) + 1;
+      const newAwayScore = {...(g.awayScore||{}), [newInnings]:0};
+      const newHomeScore = {...(g.homeScore||{}), [newInnings]:0};
+      return {...g, innings:newInnings, awayScore:newAwayScore, homeScore:newHomeScore};
+    });
+    showToast("延長+"+(game.innings+1)+"回を追加しました");
+  };
+
   const changeInning=()=>{
     mutGame(g=>{
       // アウトが3未満でチェンジする場合、不足分をbaserunnerOutsに補完（投球回計算用）
@@ -2730,7 +2740,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v252")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v254")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2808,7 +2818,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v252")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v254")
         )
 
         // ===== 新規チーム作成 =====
@@ -3701,8 +3711,10 @@ function App() {
                           const isCur = !game.finished && i===curPIdx;
                           const auto = (pitcherStats[side]||[])[i]||{};
                           const rawIp = auto.autoIp||0;
+                          // autoIpは10進数形式(6回=60)→アウト数に変換(6回=18)
+                          const autoIpOuts = Math.floor(rawIp/10)*3 + (rawIp%10);
                           // manualIpがある場合は優先（アウト数ベース）
-                          const effectiveIp = p.manualIp !== undefined ? p.manualIp : rawIp;
+                          const effectiveIp = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
                           const ipDisp = Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?(effectiveIp%3)+"/3":"");
                           const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
                           const h   = auto.autoH||0;

@@ -2748,7 +2748,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v259")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v260")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2826,7 +2826,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v259")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v260")
         )
 
         // ===== 新規チーム作成 =====
@@ -5141,15 +5141,20 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
           const m = map[p.name];
           m.games.add(g.id);
           const a = autoArr[i]||{};
-          const outsGot = a._outsGot||0;
+          const autoOutsGot = a._outsGot||0;
+          // manualIpがある場合はアウト数として優先（投手タブでの手動修正）
+          // autoIpは10進数形式（6回=60）→アウト数（6回=18）に変換
+          const autoIpOuts = Math.floor((a.autoIp||0)/10)*3 + ((a.autoIp||0)%10);
+          const outsGot = p.manualIp !== undefined ? p.manualIp : autoOutsGot;
           m.outs += outsGot;
-          m.h    += (a.autoH||0);
-          m.er   += (a.autoEr||0);
-          m.bb   += (a.autoBb||0);
-          m.k    += (a.autoK||0);
-          m.hbp  += (a.autoHbp||0);
-          m.hr   += (a.autoHr||0);
-          m.runs += (a.autoRuns||0);
+          // 手動修正値を優先
+          m.h    += p.manualOverride&&p.autoH!==undefined ? p.autoH : (a.autoH||0);
+          m.er   += p.er!==undefined&&p.manualOverride ? p.er : (a.autoEr||0);
+          m.bb   += p.manualOverride&&p.autoBb!==undefined ? p.autoBb : (a.autoBb||0);
+          m.k    += p.manualOverride&&p.autoK!==undefined ? p.autoK : (a.autoK||0);
+          m.hbp  += p.manualOverride&&p.autoHbp!==undefined ? p.autoHbp : (a.autoHbp||0);
+          m.hr   += p.manualOverride&&p.autoHr!==undefined ? p.autoHr : (a.autoHr||0);
+          m.runs += p.manualOverride&&p.autoRuns!==undefined ? p.autoRuns : (a.autoRuns||0);
           // 防御率計算用：投球アウト数×試合のイニング数を累積
           m.outsXinnings += outsGot * (g.innings||9);
         });

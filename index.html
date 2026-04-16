@@ -2748,7 +2748,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v257")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v258")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2826,7 +2826,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v257")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v258")
         )
 
         // ===== 新規チーム作成 =====
@@ -5216,13 +5216,42 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
                   , React.createElement('td', {style:tdS}, p.pa)
                   , (()=>{
                       const ov = (statOverrides||{})[p.name]||{};
-                      const allFields = [
+                      // overrideされた値を優先して取得するヘルパー
+                      const getV = (k, defaultVal) => ov[k]!==undefined ? Number(ov[k]) : defaultVal;
+                      // 編集可能な基本数値フィールド（単純な増減）
+                      const editable = [
                         ["ab",p.ab,tdS],
                         ["h",p.h,{...tdS,color:"#4ade80",fontWeight:700}],
-                        ["avg",p.avg,{...tdS,color:"#fbbf24",fontWeight:900}],
-                        ["slg",p.slg,tdS],
-                        ["obp",p.obp,tdS],
-                        ["ops",p.ops,{...tdS,color:"#f59e0b",fontWeight:700}],
+                      ];
+                      // 自動再計算される派生指標
+                      const effectiveAb = getV("ab", p.ab);
+                      const effectiveH  = getV("h",  p.h);
+                      const effectiveBb = getV("bb", p.bb);
+                      const effectiveHbp = getV("hbp", p._hbp||0);
+                      const effectiveHr = getV("hr", p.hr);
+                      const effectiveSf = p._sf||0;
+                      // 打率 = 安打 / 打数
+                      const recalcAvg = effectiveAb>0 ? (effectiveH/effectiveAb).toFixed(3).replace(/^0/,"") : ".---";
+                      // 塁打 = 安打 + 二塁打 + 三塁打*2 + 本塁打*3
+                      // ただしhの内訳はoverrideでは追跡できないので、既存のslg/obpを維持
+                      const recalcSlg = p.slg;  // 簡略化：slgは手動修正されない限り元のまま
+                      // 出塁率 = (安打 + 四球 + 死球) / (打数 + 四球 + 死球 + 犠飛)
+                      const obpDenom = effectiveAb + effectiveBb + effectiveHbp + effectiveSf;
+                      const recalcObp = obpDenom>0 ? ((effectiveH+effectiveBb+effectiveHbp)/obpDenom).toFixed(3).replace(/^0/,"") : ".---";
+                      // OPS = OBP + SLG
+                      const recalcOps = (()=>{
+                        const slgNum = parseFloat((recalcSlg||"0").replace(/^\./,"0."))||0;
+                        const obpNum = parseFloat((recalcObp||"0").replace(/^\./,"0."))||0;
+                        const sum = slgNum + obpNum;
+                        return sum>0 ? sum.toFixed(3).replace(/^0/,"") : ".---";
+                      })();
+                      const readonly = [
+                        ["avg", recalcAvg, {...tdS,color:"#fbbf24",fontWeight:900}],
+                        ["slg", recalcSlg, tdS],
+                        ["obp", recalcObp, tdS],
+                        ["ops", recalcOps, {...tdS,color:"#f59e0b",fontWeight:700}],
+                      ];
+                      const editable2 = [
                         ["hr",p.hr,{...tdS,color:"#f87171"}],
                         ["rbi",p.rbi,{...tdS,color:"#fb923c"}],
                         ["run",p.run,tdS],
@@ -5231,21 +5260,29 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
                         ["sb",p.sb,{...tdS,color:"#4ade80"}],
                         ["e",p.e||0,{...tdS,color:p.e>0?"#f87171":"#475569"}],
                       ];
-                      if(!editMode) return allFields.map(([k,v,s])=>React.createElement('td',{key:k,style:s},ov[k]!==undefined?ov[k]:v));
-                      return allFields.map(([k,v,s])=>React.createElement('td',{key:k,style:{...s,padding:2}}
-                        , React.createElement('input',{
-                            type:"text",
-                            defaultValue: ov[k]!==undefined?ov[k]:v,
-                            onBlur:e=>{
-                              const val = e.target.value.trim();
-                              if(val===""||val===String(v)) { if(ov[k]!==undefined){const n={...ov};delete n[k];saveOverride&&saveOverride(p.name,"_merge",n);} }
-                              else saveOverride&&saveOverride(p.name,k,val);
-                            },
-                            style:{width:"100%",background:"#1a2a1a",border:"1px solid #22c55e",
-                              borderRadius:4,color:"#4ade80",fontSize:11,padding:"2px 4px",
-                              textAlign:"center",outline:"none"}
-                          })
-                      ));
+                      const renderEditableCell = ([k,v,s]) => {
+                        if(!editMode) return React.createElement('td',{key:k,style:s},ov[k]!==undefined?ov[k]:v);
+                        return React.createElement('td',{key:k,style:{...s,padding:2}}
+                          , React.createElement('input',{
+                              type:"text",
+                              defaultValue: ov[k]!==undefined?ov[k]:v,
+                              onBlur:e=>{
+                                const val = e.target.value.trim();
+                                if(val===""||val===String(v)) { if(ov[k]!==undefined){const n={...ov};delete n[k];saveOverride&&saveOverride(p.name,"_merge",n);} }
+                                else saveOverride&&saveOverride(p.name,k,val);
+                              },
+                              style:{width:"100%",background:"#1a2a1a",border:"1px solid #22c55e",
+                                borderRadius:4,color:"#4ade80",fontSize:11,padding:"2px 4px",
+                                textAlign:"center",outline:"none"}
+                            })
+                        );
+                      };
+                      const renderReadonlyCell = ([k,v,s]) => React.createElement('td',{key:k,style:{...s,opacity:editMode?0.6:1}},v);
+                      return [
+                        ...editable.map(renderEditableCell),
+                        ...readonly.map(renderReadonlyCell),
+                        ...editable2.map(renderEditableCell),
+                      ];
                     })()
                 )
               )
@@ -5288,14 +5325,32 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
           , React.createElement('tbody', null
             , pitchers.map((p,i)=>{
                 const ov = (pitchOverrides||{})[p.name]||{};
-                const editableFields = [
-                  ["ipDisp", p.ipDisp, tdS],
-                  ["h", p.h, tdS],
-                  ["er", p.er, {...tdS,color:"#f87171"}],
-                  ["era", p.era, {...tdS,color:parseFloat(p.era)<3?"#4ade80":parseFloat(p.era)<5?"#fbbf24":"#f87171",fontWeight:900}],
-                  ["whip", p.whip, tdS],
-                  ["bb", p.bb, {...tdS,color:"#60a5fa"}],
-                  ["k", p.k, {...tdS,color:"#a78bfa"}],
+                // 手動修正した値から再計算
+                const getPV = (k, d) => ov[k]!==undefined ? ov[k] : d;
+                const effIpDisp = getPV("ipDisp", p.ipDisp);
+                const effH  = Number(getPV("h", p.h))||0;
+                const effEr = Number(getPV("er", p.er))||0;
+                const effBb = Number(getPV("bb", p.bb))||0;
+                const effK  = Number(getPV("k", p.k))||0;
+                // ipDispからイニング数を算出（例: "6回2/3" → 6.667）
+                const parseIp = (s) => {
+                  const m = String(s||"").match(/(\d+)回(?:(\d+)\/3)?/);
+                  if(!m) return 0;
+                  return Number(m[1]) + (Number(m[2]||0)/3);
+                };
+                const effIpNum = parseIp(effIpDisp);
+                const recalcEra = effIpNum>0 ? (effEr*9/effIpNum).toFixed(2) : (effEr>0?"∞":"—");
+                const recalcWhip = effIpNum>0 ? ((effBb+effH)/effIpNum).toFixed(2) : "—";
+
+                // 表示順を維持：投球回・被安打・自責点・防御率・WHIP・四球・三振
+                const displayFields = [
+                  {k:"ipDisp", v:p.ipDisp, s:tdS, editable:true},
+                  {k:"h", v:p.h, s:tdS, editable:true},
+                  {k:"er", v:p.er, s:{...tdS,color:"#f87171"}, editable:true},
+                  {k:"era", v:recalcEra, s:{...tdS,color:parseFloat(recalcEra)<3?"#4ade80":parseFloat(recalcEra)<5?"#fbbf24":"#f87171",fontWeight:900}, editable:false},
+                  {k:"whip", v:recalcWhip, s:tdS, editable:false},
+                  {k:"bb", v:p.bb, s:{...tdS,color:"#60a5fa"}, editable:true},
+                  {k:"k", v:p.k, s:{...tdS,color:"#a78bfa"}, editable:true},
                 ];
                 return React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0a1628":"#0d1f35"}}
                   , React.createElement('td', {style:{...tdN,color:"#e2e8f0",whiteSpace:"nowrap",minWidth:70}}
@@ -5314,22 +5369,29 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
                       const rate=Math.round(strikes/total*100);
                       return rate+"%";
                     })())
-                  , editableFields.map(([k,v,s])=>React.createElement('td',{key:k,style:editMode?{...s,padding:2}:s}
-                      , editMode
-                        ? React.createElement('input',{
-                            type:"text",
-                            defaultValue: ov[k]!==undefined?ov[k]:v,
-                            onBlur:e=>{
-                              const val=e.target.value.trim();
-                              if(val===""||val===String(v)){if(ov[k]!==undefined&&savePitchOverride)savePitchOverride(p.name,k,undefined);}
-                              else if(savePitchOverride) savePitchOverride(p.name,k,val);
-                            },
-                            style:{width:"100%",background:"#1a1535",border:"1px solid #a78bfa",
-                              borderRadius:4,color:"#c4b5fd",fontSize:11,padding:"2px 4px",
-                              textAlign:"center",outline:"none"}
-                          })
-                        : (ov[k]!==undefined?ov[k]:v)
-                    ))
+                  , displayFields.map(f=>{
+                      const {k,v,s,editable}=f;
+                      if(!editable) {
+                        // 自動再計算フィールド：編集不可
+                        return React.createElement('td',{key:k,style:{...s,opacity:editMode?0.6:1}}, v);
+                      }
+                      return React.createElement('td',{key:k,style:editMode?{...s,padding:2}:s}
+                        , editMode
+                          ? React.createElement('input',{
+                              type:"text",
+                              defaultValue: ov[k]!==undefined?ov[k]:v,
+                              onBlur:e=>{
+                                const val=e.target.value.trim();
+                                if(val===""||val===String(v)){if(ov[k]!==undefined&&savePitchOverride)savePitchOverride(p.name,k,undefined);}
+                                else if(savePitchOverride) savePitchOverride(p.name,k,val);
+                              },
+                              style:{width:"100%",background:"#1a1535",border:"1px solid #a78bfa",
+                                borderRadius:4,color:"#c4b5fd",fontSize:11,padding:"2px 4px",
+                                textAlign:"center",outline:"none"}
+                            })
+                          : (ov[k]!==undefined?ov[k]:v)
+                      );
+                    })
                   , React.createElement('td', {style:tdS}, p.hbp)
                   , React.createElement('td', {style:{...tdS,color:p.hr>0?"#f87171":"#475569"}}, p.hr)
                   , React.createElement('td', {style:{...tdS,color:(p.win||0)>0?"#4ade80":"#475569",fontWeight:(p.win||0)>0?700:400}}, p.win||0)

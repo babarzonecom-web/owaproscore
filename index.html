@@ -16,8 +16,7 @@
 </head>
 <body>
 <div id="root"></div>
-<div id="__debug_console" style="position:fixed;bottom:0;left:0;right:0;max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.92);color:#4ade80;font-family:monospace;font-size:11px;padding:8px;z-index:99999;border-top:2px solid #22c55e;">
-  <div style="color:#fbbf24;font-weight:700;margin-bottom:4px;">🐛 Debug Console <button onclick="document.getElementById('__debug_console').style.display='none'" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:8px;font-size:10px">閉じる</button></div>
+<div id="__debug_console" style="display:none">
   <div id="__debug_log"></div>
 </div>
 <script>
@@ -420,13 +419,20 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
 
   
   const cycleRunner = (idx) => {
-    setRunners(rs => rs.map((r, i) => {
-      if (i !== idx) return r;
-      const cycle = [0, 1, 2, "scored", "out"];
-      const cur = cycle.indexOf(r.to);
-      const next = cycle[(cur + 1) % cycle.length];
-      return { ...r, to: next };
-    }));
+    setRunners(rs => {
+      const newRunners = rs.map((r, i) => {
+        if (i !== idx) return r;
+        const cycle = [0, 1, 2, "scored", "out"];
+        const cur = cycle.indexOf(r.to);
+        const next = cycle[(cur + 1) % cycle.length];
+        return { ...r, to: next };
+      });
+      // ランナーの「out」の数からadjOutsを自動更新
+      const runnerOuts = newRunners.filter(r => r.to === "out").length;
+      const baseOuts = outs; // 打撃結果コードによるアウト数（初期値）
+      setAdjOuts(Math.min(baseOuts + runnerOuts, 3));
+      return newRunners;
+    });
   };
 
   
@@ -2053,6 +2059,7 @@ function App() {
   },[mutGame]);
 
   const changePitcher = useCallback((defTeam, newPitcherIdx)=>{
+    if(window.__teamShareRole==="member"){ showToast("👥 メンバーは操作できません"); return; }
     mutGame(g=>{
       const logKey = defTeam+"PitcherLog";
       // 新投手が実際に投げるハーフ
@@ -2741,7 +2748,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v255")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v256")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2819,7 +2826,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v255")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v256")
         )
 
         // ===== 新規チーム作成 =====
@@ -3389,7 +3396,7 @@ function App() {
                   const pi = curLineup.findIndex(p=>p.name===runnerName);
                   return (
                     React.createElement('button', { key: bi,
-                      onClick: ()=>setModal({team:curTeam,pidx:pi>=0?pi:0,step:"sb",runnerMoves:{[bi]:{destBi:bi+1,isOut:false}},primaryBi:bi}),
+                      onClick: ()=>setModal({team:curTeam,pidx:pi>=0?pi:0,step:"sb",runnerMoves:{[bi]:{destBi:Math.min(bi+1,2),isOut:false}},primaryBi:bi}),
                       style: {background:"#1a2e1a",border:"1px solid #22c55e",borderRadius:8,
                         color:"#4ade80",padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,
                         display:"flex",alignItems:"center",gap:6},}

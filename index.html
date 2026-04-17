@@ -2297,7 +2297,7 @@ function App() {
     if(f==="name"||f==="pos") return syncPitcherFromLineup(updated, t);
     return updated;
   });
-  const editPitcher = (t,i,f,v)=>mutGame(g=>({...g,[t+"Pitchers"]:g[t+"Pitchers"].map((p,j)=>j===i?{...p,[f]:isNaN(v)?v:Number(v)}:p)}));
+  const editPitcher = (t,i,f,v)=>mutGame(g=>({...g,[t+"Pitchers"]:g[t+"Pitchers"].map((p,j)=>j===i?{...p,[f]:v}:p)}));
   const addPlayer   = (t)=>mutGame(g=>{const lk=t+"Lineup";const n=g[lk].length+1;return{...g,[lk]:[...g[lk],makePlayer(n)]};});
 
   
@@ -2748,7 +2748,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v260")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v261")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2826,7 +2826,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v260")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v261")
         )
 
         // ===== 新規チーム作成 =====
@@ -3822,41 +3822,41 @@ function App() {
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {type:"number", min:0, value:hDisp,
-                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoH:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoH:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {type:"number", min:0, value:p.manualOverride&&p.autoHr!==undefined?p.autoHr:hr,
-                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoHr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoHr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {type:"number", min:0, value:kDisp,
-                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoK:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoK:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {type:"number", min:0, value:bbDisp,
-                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoBb:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoBb:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {type:"number", min:0, value:p.manualOverride&&p.autoHbp!==undefined?p.autoHbp:hbp,
-                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoHbp:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoHbp:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {type:"number", min:0, value:p.manualOverride&&p.autoRuns!==undefined?p.autoRuns:runs,
-                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoRuns:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoRuns:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}
                               , React.createElement('input', {type:"number", min:0,
                                   value:er,
-                                  onChange:e=>{ const v=parseInt(e.target.value)||0; mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],er:v,autoEr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
+                                  onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],er:v,autoEr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
                             )

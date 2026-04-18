@@ -2754,7 +2754,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v267")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v268")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2832,7 +2832,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v267")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v268")
         )
 
         // ===== 新規チーム作成 =====
@@ -4442,29 +4442,103 @@ function App() {
           )
         );
 
-        // ===== 選手交代 step2: 交代される選手選択 =====
+        // ===== 選手交代 step2: 交代される選手・投手交代選択 =====
         if(modal.step==="player_change_out") {
           const pcTeam = modal.team;
           const pcLineup = game[pcTeam+"Lineup"]||[];
+          const pcPitchers = (game[pcTeam+"Pitchers"]||[]);
+          const curPIdx = game[pcTeam+"PitcherIdx"]||0;
+          const regT = [...(teams||[]),...(opponents||[])].find(t=>t.name===game[pcTeam+"Team"]);
+          const allMembers = ((regT&&regT.members)||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean);
+          const newPitcherCandidates = allMembers.filter(m=>!pcPitchers.some(p=>p.name===m));
           return (
             React.createElement('div', {style:S.overlay, onClick:()=>setModal(null)}
-              , React.createElement('div', {style:{...S.mBox,maxWidth:340,maxHeight:"80vh",overflowY:"auto"}, onClick:e=>e.stopPropagation()}
+              , React.createElement('div', {style:{...S.mBox,maxWidth:340,maxHeight:"85vh",overflowY:"auto"}, onClick:e=>e.stopPropagation()}
                 , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}}
                   , React.createElement('button', {onClick:()=>setModal({step:"player_change_team"}), style:S.backBtn}, "←")
-                  , React.createElement('div', {style:S.mt}, "🔄 ", game[pcTeam+"Team"], " — 交代する選手")
+                  , React.createElement('div', {style:S.mt}, "🔄 ", game[pcTeam+"Team"], " — 交代")
                 )
-                , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:10}}, "退く選手を選んでください")
+
+                , React.createElement('div', {style:{fontSize:11,color:"#4ade80",fontWeight:700,marginBottom:6}}, "⚾ 投手交代")
+                , React.createElement('div', {style:{marginBottom:14}}
+                  , pcPitchers.filter(p=>!/^投手\d+$/.test(p.name||'')||pcPitchers.indexOf(p)===curPIdx).map((p)=>{
+                      const realIdx = pcPitchers.indexOf(p);
+                      const isCur = realIdx===curPIdx;
+                      return React.createElement('button', {key:realIdx,
+                        disabled:isCur,
+                        onClick:()=>{ changePitcher(pcTeam, realIdx); setModal(null); showToast(p.name+" 登板"); },
+                        style:{width:"100%",marginBottom:5,padding:"9px 14px",borderRadius:8,
+                          border:"1.5px solid "+(isCur?"#4ade80":"#1e3a5f"),
+                          background:isCur?"#0d2a1a":"#0d1f35",
+                          color:isCur?"#4ade80":"#e2e8f0",fontSize:13,
+                          cursor:isCur?"default":"pointer",
+                          textAlign:"left",display:"flex",alignItems:"center",gap:10,opacity:isCur?0.6:1}
+                      }
+                      , React.createElement('span',{style:{fontSize:10,minWidth:44,color:isCur?"#4ade80":"#64748b"}},isCur?"▶登板中":"→登板")
+                      , React.createElement('span',{style:{fontWeight:700}},p.name)
+                      );
+                    })
+                  , (()=>{
+                      const [inputName, setInputName] = React.useState("");
+                      const registerAndMount = (name) => {
+                        if(!name.trim()) return;
+                        mutGame(g=>{
+                          const ps=[...g[pcTeam+"Pitchers"]];
+                          ps.push({id:ps.length+1,name:name.trim(),ip:0,h:0,er:0,bb:0,k:0,
+                            pitchCount:0,strikeCount:0,ballCount:0,
+                            autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0,manualOverride:false});
+                          const newIdx=ps.length-1;
+                          const logKey=pcTeam+"PitcherLog";
+                          const offKey=pcTeam==="away"?"homeLineup":"awayLineup";
+                          let seq=0;
+                          (g[offKey]||[]).forEach(p=>{Object.values(p.atBats||{}).forEach(abs=>{
+                            const arr=Array.isArray(abs)?abs:Object.values(abs||{});seq+=arr.length;});});
+                          const entry={pitcherIdx:newIdx,fromInning:g.inning,fromHalf:g.half,outsAtStart:g.outs,atBatSeq:seq};
+                          return {...g,[pcTeam+"Pitchers"]:ps,[pcTeam+"PitcherIdx"]:newIdx,[logKey]:[...(g[logKey]||[]),entry]};
+                        });
+                        setModal(null); showToast(name.trim()+" 登板");
+                      };
+                      return React.createElement('div', {style:{marginTop:6}}
+                        , newPitcherCandidates.length>0&&React.createElement('div',{style:{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}
+                          , newPitcherCandidates.map(name=>React.createElement('button',{key:name,
+                              onClick:()=>registerAndMount(name),
+                              style:{padding:"4px 10px",borderRadius:6,border:"1px solid #22c55e",
+                                background:"#0d2a1a",color:"#4ade80",fontSize:11,cursor:"pointer",fontWeight:700}
+                            },name))
+                        )
+                        , React.createElement('div',{style:{display:"flex",gap:6}}
+                          , React.createElement('input',{
+                              value:inputName, onChange:e=>setInputName(e.target.value),
+                              placeholder:"新しい投手名を入力",
+                              style:{flex:1,padding:"7px 10px",borderRadius:7,border:"1px solid #1e3a5f",
+                                background:"#0d1f35",color:"#e2e8f0",fontSize:12,outline:"none"}
+                            })
+                          , React.createElement('button',{
+                              onClick:()=>registerAndMount(inputName),
+                              disabled:!inputName.trim(),
+                              style:{padding:"7px 12px",borderRadius:7,border:"none",
+                                background:inputName.trim()?"#16a34a":"#1e3a5f",color:"#fff",
+                                fontSize:12,fontWeight:700,cursor:inputName.trim()?"pointer":"not-allowed"}
+                            },"登板")
+                        )
+                      );
+                    })()
+                )
+
+                , React.createElement('div', {style:{borderTop:"1px solid #1e3a5f",paddingTop:12,marginBottom:8}})
+                , React.createElement('div', {style:{fontSize:11,color:"#7dd3fc",fontWeight:700,marginBottom:6}}, "👤 野手交代")
+                , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:8}}, "退く選手を選んでください")
                 , pcLineup.map((p,idx)=>
                     React.createElement('button', {key:idx,
                       onClick:()=>setModal({step:"sub", team:pcTeam, pidx:idx}),
-                      style:{width:"100%",marginBottom:6,padding:"10px 14px",borderRadius:8,
+                      style:{width:"100%",marginBottom:5,padding:"9px 14px",borderRadius:8,
                         border:"1.5px solid #1e3a5f",background:"#0d1f35",
                         color:"#e2e8f0",fontSize:13,cursor:"pointer",
                         textAlign:"left",display:"flex",alignItems:"center",gap:10}
                     }
-                    , React.createElement('span', {style:{color:"#64748b",fontSize:11,minWidth:20}}, idx+1+".")
-                    , React.createElement('span', {style:{fontWeight:700}}, p.name)
-                    , React.createElement('span', {style:{color:"#475569",fontSize:11,marginLeft:"auto"}}, p.pos||"—")
+                    , React.createElement('span',{style:{color:"#64748b",fontSize:11,minWidth:20}},idx+1+".")
+                    , React.createElement('span',{style:{fontWeight:700}},p.name)
+                    , React.createElement('span',{style:{color:"#475569",fontSize:11,marginLeft:"auto"}},p.pos||"—")
                     )
                 )
                 , React.createElement('button', {onClick:()=>setModal(null), style:{...S.cBtn,marginTop:8}}, "キャンセル")
@@ -4473,7 +4547,7 @@ function App() {
           );
         }
 
-        if(modal.step==="sub") {
+                if(modal.step==="sub") {
           return React.createElement(SubstituteModal, {
             player: mPlayer,
             team: modal.team,

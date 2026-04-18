@@ -905,9 +905,10 @@ const computePitcherStats = (g) => {
   return result;
 };
 
-const newGame = (innings=7, pitchMode="result") => ({
+const newGame = (innings=7, pitchMode="result", season=null) => ({
   id:Date.now(),
   date:new Date().toISOString().split("T")[0],
+  season: season || new Date().getFullYear(),
   innings: innings,
   pitchMode: pitchMode,
   venue:"", awayTeam:"ビジターチーム", homeTeam:"ホームチーム", started:false,
@@ -1166,6 +1167,7 @@ function App() {
   const [modal, setModal] = useState(null);
   const [newInnings, setNewInnings] = useState(7);
   const [newPitchMode, setNewPitchMode] = useState("result");
+  const [newSeason, setNewSeason] = useState(()=>new Date().getFullYear());
   const [tournament, setTournament] = useState(null); // 現在参加中の大会データ
   const [tournamentCode, setTournamentCode] = useState(""); // 入力中のコード
   const [tournamentMsg, setTournamentMsg] = useState("");
@@ -2754,7 +2756,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v269")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v270")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2832,7 +2834,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v269")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v270")
         )
 
         // ===== 新規チーム作成 =====
@@ -4272,7 +4274,7 @@ function App() {
           const selHome = modal._selHome || null;
 
           const startGame = (save) => {
-            const g = newGame(newInnings, newPitchMode);
+            const g = newGame(newInnings, newPitchMode, newSeason);
             g.started = true;
 
             // チーム選択があれば名前とlineupを直接セット
@@ -4341,6 +4343,18 @@ function App() {
                   "選択したチームのメンバーがオーダーに自動セットされます（9名）")
               )
 
+              , React.createElement('div', {style:{fontSize:13,color:"#7dd3fc",marginBottom:8,fontWeight:700}}, "シーズン")
+              , React.createElement('div', {style:{display:"flex",gap:8,justifyContent:"center",marginBottom:16}}
+                , [new Date().getFullYear()-1, new Date().getFullYear(), new Date().getFullYear()+1].map(y=>
+                    React.createElement('button', {key:y,
+                      onClick:()=>setNewSeason(y),
+                      style:{padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",
+                        background:newSeason===y?"#1d4ed8":"#0d1f35",
+                        border:`2px solid ${newSeason===y?"#3b82f6":"#1e3a5f"}`,
+                        color:newSeason===y?"#fff":"#64748b"}
+                    }, y+"年")
+                )
+              )
               , React.createElement('div', { style: {fontSize:13,color:"#94a3b8",marginBottom:14,lineHeight:1.6},}, "イニング数を選択してください")
               , React.createElement('div', { style: {display:"flex",gap:8,marginBottom:12,justifyContent:"center"},}
                 , [5,7,9].map(n=>React.createElement('button', {
@@ -5176,10 +5190,13 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
     ...allTeamNames.filter(n=>!registeredTeams.some(t=>t.name===n)),
   ];
 
-  // 選択中チームでフィルタした試合
-  const filteredGames = selectedTeam
-    ? allGames.filter(g=>g.awayTeam===selectedTeam||g.homeTeam===selectedTeam)
-    : allGames;
+  // 選択中チーム・シーズンでフィルタした試合
+  const filteredGames = allGames.filter(g=>{
+    const gYear = g.season || (g.date ? new Date(g.date).getFullYear() : new Date().getFullYear());
+    const seasonMatch = !selectedSeason || gYear===selectedSeason;
+    const teamMatch = !selectedTeam || g.awayTeam===selectedTeam || g.homeTeam===selectedTeam;
+    return seasonMatch && teamMatch;
+  });
 
   // 守備成績集計（失策・ポジション別）
   const aggregateDefenseStats = (filterTeamName) => {
@@ -5716,6 +5733,22 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
 
   return (
     React.createElement('div', null
+
+      // シーズン選択
+      , React.createElement('div', {style:{marginBottom:12}}
+        , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}}, "📅 シーズン")
+        , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
+          , [0, new Date().getFullYear()-1, new Date().getFullYear(), new Date().getFullYear()+1].map(y=>
+              React.createElement('button', {key:y,
+                onClick:()=>setSelectedSeason(y),
+                style:{padding:"5px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
+                  background:selectedSeason===y?"#1d4ed8":"#0d1f35",
+                  border:`1.5px solid ${selectedSeason===y?"#3b82f6":"#1e3a5f"}`,
+                  color:selectedSeason===y?"#fff":"#64748b"}
+              }, y===0?"全期間":y+"年")
+          )
+        )
+      )
 
       // シーズン選択
       , React.createElement('div', {style:{marginBottom:12}}

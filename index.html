@@ -2754,7 +2754,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v265")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v266")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2832,7 +2832,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v265")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v266")
         )
 
         // ===== 新規チーム作成 =====
@@ -3589,9 +3589,18 @@ function App() {
                           color:idx<DEFAULT_PLAYERS?"#7db8e8":"#64748b"},}, idx+1)
                         , React.createElement('td', { style: S.td,}
                           , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:3},}
-                            , React.createElement('input', { value: p.name, onChange: e=>editPlayer(team,idx,"name",e.target.value),
-                              style: {background:"transparent",border:"none",color:p.subbed?"#fbbf24":"#e2e8f0",
-                                fontSize:12,outline:"none",width:70},})
+                            , React.createElement(MemberPicker, {
+                                name: p.name,
+                                onChange: v=>editPlayer(team,idx,"name",v),
+                                members: (()=>{
+                                  const regT = [...(teams||[]),...(opponents||[])].find(t=>t.name===game[team+"Team"]);
+                                  const used = new Set(game[team+"Lineup"].map(pl=>pl.name));
+                                  return ((regT&&regT.members)||[])
+                                    .map(m=>typeof m==="string"?m:(m.name||""))
+                                    .filter(m=>m && (!used.has(m)||m===p.name));
+                                })(),
+                                placeholder: "選手名"
+                              })
                             , p.subbed&&React.createElement('span', { style: {fontSize:8,color:"#fbbf24",
                                 background:"#3a2000",border:"1px solid #f59e0b",borderRadius:3,
                                 padding:"0 3px",flexShrink:0}}, "代")
@@ -6606,6 +6615,35 @@ function EndGameModal({ game, onConfirm, onCancel }) {
     )
   );
 }
+function MemberPicker({ name, onChange, members, placeholder }) {
+  const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState(name||"");
+  React.useEffect(()=>{ setQuery(name||""); }, [name]);
+  const filtered = members.filter(m=>m&&(!query||m.toLowerCase().includes(query.toLowerCase())));
+  return React.createElement('div', {style:{position:"relative",width:"100%"}}
+    , React.createElement('input', {
+        value: query,
+        onChange: e=>{ setQuery(e.target.value); onChange(e.target.value); setOpen(true); },
+        onFocus: ()=>setOpen(true),
+        onBlur: ()=>setTimeout(()=>setOpen(false),150),
+        placeholder: placeholder||"選手名",
+        style:{background:"transparent",border:"none",color:"#e2e8f0",
+          fontSize:12,outline:"none",width:"100%"}
+      })
+    , open && filtered.length>0 && React.createElement('div', {
+        style:{position:"absolute",top:"100%",left:0,zIndex:9999,
+          background:"#0d1f35",border:"1px solid #3b82f6",borderRadius:8,
+          maxHeight:180,overflowY:"auto",minWidth:140,boxShadow:"0 4px 12px rgba(0,0,0,0.5)"}
+      }
+      , filtered.map(m=>React.createElement('div', {key:m,
+          onMouseDown:()=>{ onChange(m); setQuery(m); setOpen(false); },
+          style:{padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#e2e8f0",
+            borderBottom:"1px solid #1e3a5f"}
+        }, m))
+    )
+  );
+}
+
 function PitcherPicker({ members, teams, currentTeamName, onSelect }) {
   const [open, setOpen] = useState(false);
   const btnRef = React.useRef(null);

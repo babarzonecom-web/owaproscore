@@ -2754,7 +2754,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v266")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v267")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2832,7 +2832,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v266")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v267")
         )
 
         // ===== 新規チーム作成 =====
@@ -3587,7 +3587,7 @@ function App() {
                           borderTop: subOuts.length>0 ? "1px solid #22c55e33" : "none"},}
                         , React.createElement('td', { style: {...S.td,textAlign:"center",fontSize:11,
                           color:idx<DEFAULT_PLAYERS?"#7db8e8":"#64748b"},}, idx+1)
-                        , React.createElement('td', { style: S.td,}
+                        , React.createElement('td', { style: {...S.td, minWidth:80},}
                           , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:3},}
                             , React.createElement(MemberPicker, {
                                 name: p.name,
@@ -4482,25 +4482,32 @@ function App() {
             teams: teams,
             onConfirm: (newName,newPos,reason)=>{
               substitutePlayer(modal.team,modal.pidx,newName,newPos,reason);
-              // 投手交代も自動処理
+              // 投手交代も自動処理（substitutePlayer後にmutGameで更新）
               if(newPos==="投") {
                 const defTeam = modal.team;
-                const pitchers = game[defTeam+"Pitchers"]||[];
-                const newPIdx = pitchers.findIndex(p=>p.name===newName);
-                if(newPIdx>=0) changePitcher(defTeam, newPIdx);
-                else {
-                  // 新しい投手として追加
+                setTimeout(()=>{
                   mutGame(g=>{
                     const ps=[...g[defTeam+"Pitchers"]];
-                    ps.push({id:ps.length+1,name:newName,ip:0,h:0,er:0,bb:0,k:0,
-                      pitchCount:0,strikeCount:0,ballCount:0,
-                      autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0,manualOverride:false});
-                    const newPIdx2 = ps.length-1;
+                    // 既存投手リストから探す
+                    let newPIdx = ps.findIndex(p=>p.name===newName);
+                    if(newPIdx<0){
+                      // 新しい投手として追加
+                      ps.push({id:ps.length+1,name:newName,ip:0,h:0,er:0,bb:0,k:0,
+                        pitchCount:0,strikeCount:0,ballCount:0,
+                        autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0,manualOverride:false});
+                      newPIdx = ps.length-1;
+                    }
                     const logKey = defTeam+"PitcherLog";
-                    const entry = {pitcherIdx:newPIdx2, fromInning:g.inning, fromHalf:g.half, outsAtStart:g.outs, atBatSeq:0};
-                    return {...g,[defTeam+"Pitchers"]:ps,[defTeam+"PitcherIdx"]:newPIdx2,[logKey]:[...(g[logKey]||[]),entry]};
+                    const offKey = defTeam==="away"?"homeLineup":"awayLineup";
+                    let atBatSeqNow=0;
+                    (g[offKey]||[]).forEach(p=>{Object.values(p.atBats||{}).forEach(abs=>{
+                      const arr=Array.isArray(abs)?abs:Object.values(abs||{});
+                      atBatSeqNow+=arr.length;
+                    });});
+                    const entry={pitcherIdx:newPIdx,fromInning:g.inning,fromHalf:g.half,outsAtStart:g.outs,atBatSeq:atBatSeqNow};
+                    return {...g,[defTeam+"Pitchers"]:ps,[defTeam+"PitcherIdx"]:newPIdx,[logKey]:[...(g[logKey]||[]),entry]};
                   });
-                }
+                },50);
               }
               setModal(null);
               showToast(`${_optionalChain([mPlayer, 'optionalAccess', _40 => _40.name])} → ${newName} 交代`);

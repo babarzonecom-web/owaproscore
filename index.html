@@ -366,10 +366,9 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
   
   // postBasesで見つからないランナーのデフォルト先
   // runnerDefault: 明示的に指定があればそれを使う（CS/PO/RO時は"out"）
-  // batterOut:trueでもランナーのデフォルトは"scored"にしない（残塁はアウトではない）
-  // → ランナーはpostBasesに基づいて判定し、見つからない場合は"scored"
-  // （ユーザーが手動でoutに変更した場合のみoutになる）
-  const runnerDefaultTo = (runnerDefault !== undefined) ? runnerDefault : "scored";
+  // 打者アウト（batterOut:true）のとき→残塁(lob)がデフォルト
+  // 打者得点・四球等→得点(scored)がデフォルト
+  const runnerDefaultTo = (runnerDefault !== undefined) ? runnerDefault : (batterOut ? "lob" : "scored");
 
   const buildRunners = () => {
     const list = [];
@@ -427,7 +426,7 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
     setRunners(rs => {
       const newRunners = rs.map((r, i) => {
         if (i !== idx) return r;
-        const cycle = [0, 1, 2, "scored", "out"];
+        const cycle = [0, 1, 2, "scored", "out", "lob"];
         const cur = cycle.indexOf(r.to);
         const next = cycle[(cur + 1) % cycle.length];
         return { ...r, to: next };
@@ -447,13 +446,17 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
   const adjBases = [null, null, null];
   runners.forEach(r => {
     if (typeof r.to === "number") adjBases[r.to] = r.name;
+    else if (r.to === "lob") {
+      // 残塁：元の塁に残す（fromが塁番号の場合）
+      if (typeof r.from === "number") adjBases[r.from] = r.name;
+    }
   });
   const scoredNames = runners.filter(r => r.to === "scored").map(r => r.name);
   const adjRuns = scoredNames.length;
 
   const fromLabel = (from) => from === "batter" ? "打者" : BASE_LABELS[from];
-  const toLabel   = (to)   => typeof to === "number" ? BASE_LABELS[to] : (to === "scored" ? "得点🏠" : "アウト❌");
-  const toColor   = (to)   => typeof to === "number" ? BASE_COLORS[to] : (to === "scored" ? "#f97316" : "#64748b");
+  const toLabel   = (to)   => typeof to === "number" ? BASE_LABELS[to] : (to === "scored" ? "得点🏠" : to === "lob" ? "残塁🏃" : "アウト❌");
+  const toColor   = (to)   => typeof to === "number" ? BASE_COLORS[to] : (to === "scored" ? "#f97316" : to === "lob" ? "#a78bfa" : "#64748b");
 
   return (
     React.createElement('div', { style: S.overlay, onClick: onCancel,}
@@ -497,7 +500,7 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
                 )
               ))
             )
-            , React.createElement('div', { style: {fontSize:10,color:"#334155",marginTop:6,textAlign:"center"},}, "行き先をタップすると 1塁→2塁→3塁→得点→アウト と切り替わります"
+            , React.createElement('div', { style: {fontSize:10,color:"#334155",marginTop:6,textAlign:"center"},}, "タップで切替: 1塁→2塁→3塁→得点→アウト→残塁"
 
             )
           )
@@ -2753,7 +2756,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v281")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v283")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2831,7 +2834,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v281")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v283")
         )
 
         // ===== 新規チーム作成 =====

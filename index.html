@@ -365,9 +365,11 @@ const BASE_COLORS = ["#fbbf24","#22c55e","#f87171","#f97316","#94a3b8"];
 function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel, defTeamLineup, pendingCode, preErrorPos, runnerDefault }) {
   
   // postBasesで見つからないランナーのデフォルト先
-  // batterOutフラグを使って判定
   // runnerDefault: 明示的に指定があればそれを使う（CS/PO/RO時は"out"）
-  const runnerDefaultTo = (runnerDefault !== undefined) ? runnerDefault : (batterOut ? "out" : "scored");
+  // batterOut:trueでもランナーのデフォルトは"scored"にしない（残塁はアウトではない）
+  // → ランナーはpostBasesに基づいて判定し、見つからない場合は"scored"
+  // （ユーザーが手動でoutに変更した場合のみoutになる）
+  const runnerDefaultTo = (runnerDefault !== undefined) ? runnerDefault : "scored";
 
   const buildRunners = () => {
     const list = [];
@@ -412,6 +414,8 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
   };
 
   const [runners, setRunners] = useState(buildRunners);
+  // adjOutsの初期値：outsは打撃コードによるアウト数（走塁アウトは0から開始）
+  // buildRunnersで初期状態のoutランナー数は加算しない（postBases外=残塁or得点）
   const [adjOuts, setAdjOuts] = useState(outs);
   const [adjErrorPos, setAdjErrorPos] = useState(preErrorPos||null);
   const [showErrPicker, setShowErrPicker] = useState(false);
@@ -2749,7 +2753,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v279")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v281")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2827,7 +2831,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v279")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v281")
         )
 
         // ===== 新規チーム作成 =====
@@ -3742,10 +3746,11 @@ function App() {
                           const hr  = auto.autoHr||0;
                           const runs = auto.autoRuns||0;
                           const er  = p.manualOverride ? (p.er!==undefined?p.er:(p.autoEr||0)) : (auto.autoEr||0);
-                          // manualOverrideの場合はauto系フィールドを優先表示
-                          const hDisp  = p.manualOverride && p.autoH!==undefined ? p.autoH : auto.autoH||0;
-                          const bbDisp = p.manualOverride && p.autoBb!==undefined ? p.autoBb : auto.autoBb||0;
-                          const kDisp  = p.manualOverride && p.autoK!==undefined ? p.autoK : auto.autoK||0;
+                          // 被安打・四球・三振は常にauto（computePitcherStats）の値を使う
+                          // p.autoH等はmakePitcherの初期値0が入っているので信用しない
+                          const hDisp  = auto.autoH||0;
+                          const bbDisp = auto.autoBb||0;
+                          const kDisp  = auto.autoK||0;
                           const era = ipNum>0 ? (er*9/ipNum).toFixed(2) : (er>0?"∞":"—");
                           return React.createElement('tr', {key:p.id||i,
                             style:{background:isCur?(color+"22"):i%2===0?"#0a1628":"transparent",
@@ -3838,8 +3843,8 @@ function App() {
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {type:"text", inputMode:"numeric", min:0,
-                                  defaultValue:p.manualOverride&&p.autoHr!==undefined?p.autoHr:hr,
-                                  key:"hr_"+i+"_"+(p.manualOverride&&p.autoHr!==undefined?p.autoHr:hr),
+                                  defaultValue:hr,
+                                  key:"hr_"+i+"_"+hr,
                                   onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoHr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
@@ -3857,15 +3862,15 @@ function App() {
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {type:"text", inputMode:"numeric", min:0,
-                                  defaultValue:p.manualOverride&&p.autoHbp!==undefined?p.autoHbp:hbp,
-                                  key:"hbp_"+i+"_"+(p.manualOverride&&p.autoHbp!==undefined?p.autoHbp:hbp),
+                                  defaultValue:hbp,
+                                  key:"hbp_"+i+"_"+hbp,
                                   onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoHbp:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {type:"text", inputMode:"numeric", min:0,
-                                  defaultValue:p.manualOverride&&p.autoRuns!==undefined?p.autoRuns:runs,
-                                  key:"runs_"+i+"_"+(p.manualOverride&&p.autoRuns!==undefined?p.autoRuns:runs),
+                                  defaultValue:runs,
+                                  key:"runs_"+i+"_"+runs,
                                   onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoRuns:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:"#0d1f35",border:"1px solid #1e3a5f",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )

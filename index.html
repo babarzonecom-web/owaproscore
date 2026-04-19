@@ -2756,7 +2756,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v288")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v290")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2834,7 +2834,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v288")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v290")
         )
 
         // ===== 新規チーム作成 =====
@@ -3929,6 +3929,7 @@ function App() {
                 });
               },
               onRestoreTeam:(g, myTeamSide)=>{
+                setTab("teams");
                 const restoreTeam = (teamName, lineupRaw, isMyTeam) => {
                   if(!teamName||teamName==="ビジターチーム"||teamName==="ホームチーム") return;
                   const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
@@ -4084,15 +4085,6 @@ function App() {
                       style:{...sBt("#475569",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
                     }, "✏️ 編集")
                 )
-                , myTeam.id && React.createElement('div', {style:{marginTop:4,background:"#060f1e",borderRadius:6,padding:"5px 10px",display:"flex",alignItems:"center",gap:8,marginBottom:8}}
-                    , React.createElement('span', {style:{fontSize:10,color:"#475569"}}, "チームID:")
-                    , React.createElement('span', {style:{fontFamily:"monospace",fontSize:11,color:"#7dd3fc",letterSpacing:1}}, myTeam.id)
-                    , React.createElement('button', {
-                        onClick:()=>{ navigator.clipboard&&navigator.clipboard.writeText(myTeam.id).then(()=>showToast("コピーしました")); },
-                        style:{fontSize:9,padding:"2px 8px",borderRadius:4,cursor:"pointer",marginLeft:"auto",
-                          background:"#1e3a5f",border:"1px solid #3b82f6",color:"#7dd3fc"}
-                      }, "📋 コピー")
-                  )
                 , React.createElement('div', {style:{display:"flex",gap:8,flexWrap:"wrap"}}
                   , React.createElement('button', {
                       onClick:()=>{ setModal({step:"team_lineup",side:"away",preselect:myTeam}); setTab("lineup"); },
@@ -6091,6 +6083,7 @@ function PasswordChangeCard({ teamCode, showToast }) {
 }
 
 function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam }) {
+  const [restoreTarget, setRestoreTarget] = React.useState(null);
   const [fbTeamId, setFbTeamId] = useState(teamShareCode||"");
   const [fbLoading, setFbLoading] = useState(false);
   const [fbMsg, setFbMsg] = useState("");
@@ -6130,6 +6123,27 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
 
   return (
     React.createElement('div', null
+
+      , restoreTarget && React.createElement('div', {style:S.overlay, onClick:()=>setRestoreTarget(null)}
+          , React.createElement('div', {style:{...S.mBox,maxWidth:320}, onClick:e=>e.stopPropagation()}
+            , React.createElement('div', {style:{...S.mt,marginBottom:12}}, "👥 チーム復元")
+            , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:16}}, restoreTarget.awayTeam+" vs "+restoreTarget.homeTeam+" のチームをチームタブに復元します")
+            , ["away","home"].map(side=>{
+                const tName = side==="away"?restoreTarget.awayTeam:restoreTarget.homeTeam;
+                const oppName = side==="away"?restoreTarget.homeTeam:restoreTarget.awayTeam;
+                return React.createElement('button', {key:side,
+                  onClick:()=>{ onRestoreTeam(restoreTarget, side); setRestoreTarget(null); },
+                  style:{width:"100%",marginBottom:10,padding:"12px",borderRadius:10,
+                    border:"2px solid #4ade80",background:"#0d2a1a",
+                    color:"#4ade80",fontSize:14,fontWeight:700,cursor:"pointer",textAlign:"left"}
+                }
+                , React.createElement('div',{style:{fontSize:13,fontWeight:700}}, "🏠 自チーム: ", tName)
+                , React.createElement('div',{style:{fontSize:11,color:"#64748b",marginTop:2}}, "対戦相手: "+oppName+" → 対戦相手リストに保存")
+                );
+              })
+            , React.createElement('button', {onClick:()=>setRestoreTarget(null), style:S.cBtn}, "キャンセル")
+          )
+        )
 
       // Firebase読み込みUI
       , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #22c55e", marginBottom:14}}
@@ -6185,13 +6199,8 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
                 , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
                   , React.createElement('button', {onClick:()=>onLoad(g),
                       style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}}, "📂 読込")
-                  , React.createElement('button', {onClick:()=>{
-                      if(!onRestoreTeam) return;
-                      const choice = window.confirm(
-                        g.awayTeam+" vs "+g.homeTeam+"\n\nどちらを自チームとして復元しますか？\nOK → "+g.awayTeam+"（先攻）\nキャンセル → "+g.homeTeam+"（後攻）"
-                      );
-                      onRestoreTeam(g, choice ? "away" : "home");
-                    }, style:{...sBt("#f59e0b"),fontSize:11,padding:"4px 10px"}}, "👥 復元")
+                  , React.createElement('button', {onClick:()=>setRestoreTarget(g),
+                      style:{...sBt("#f59e0b"),fontSize:11,padding:"4px 10px"}}, "👥 チーム復元")
                   , React.createElement('button', {onClick:()=>onExcel(g),
                       style:{...sBt("#16a34a"),fontSize:11,padding:"4px 10px"}}, "📊 Excel")
                   , React.createElement('button', {onClick:()=>onUpload(g),

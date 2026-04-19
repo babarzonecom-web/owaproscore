@@ -204,9 +204,10 @@ function applyResult(code, bases, outs, batterName) {
       newOuts=outs+3; b=[null,null,null]; batterOn=-1; break;
     }
     case "DP": {
-      // 併殺: 2アウト、1塁走者と打者アウト
+      // 併殺: 2アウト。どのランナーがアウトかはケースバイケースなので
+      // postBasesを空にして進塁モーダルで全員手動調整できるようにする
       newOuts=Math.min(outs+2,3);
-      b=[null,n2,n3];
+      b=[null,null,null];
       batterOn=-1; break;
     }
     case "E": {
@@ -2756,7 +2757,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v292")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v293")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2834,7 +2835,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v292")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v293")
         )
 
         // ===== 新規チーム作成 =====
@@ -3799,7 +3800,7 @@ function App() {
                                   const manualOuts = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
                                   const dispInn = Math.floor(manualOuts/3);
                                   const dispFrac = manualOuts%3;
-                                  const dispStr = dispInn + "回" + (dispFrac>0 ? dispFrac+"/3" : "") + " [og:"+(auto._outsGot||0)+" mIp:"+(p.manualIp!==undefined?p.manualIp:"—")+"]";
+                                  const dispStr = dispInn + "回" + (dispFrac>0 ? dispFrac+"/3" : "");
                                   const btnSt = {width:22,height:22,borderRadius:4,border:"1px solid #1e3a5f",
                                     background:"#1e3a5f",color:"#7dd3fc",cursor:"pointer",
                                     fontSize:14,fontWeight:900,padding:0,flexShrink:0};

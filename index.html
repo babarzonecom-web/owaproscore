@@ -2768,7 +2768,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v275")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v276")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2846,7 +2846,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v275")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v276")
         )
 
         // ===== 新規チーム作成 =====
@@ -4556,7 +4556,7 @@ function App() {
             team: modal.team,
             game: game,
             pidx: modal.pidx,
-            teams: teams,
+            teams: [...(teams||[]), ...(opponents||[])],
             onConfirm: (newName,newPos,reason)=>{
               substitutePlayer(modal.team,modal.pidx,newName,newPos,reason);
               // 投手交代も自動処理（substitutePlayer後にmutGameで更新）

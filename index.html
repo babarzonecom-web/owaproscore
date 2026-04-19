@@ -3827,7 +3827,7 @@ function App() {
                                   color:(p.pitchCount||0)>=100?"#f87171":(p.pitchCount||0)>=80?"#fbbf24":"#4ade80"
                                 }}, (game.pitchMode||"result")==="pitch" ? (p.pitchCount||0) : "—")
                               , React.createElement('span', {style:{fontSize:9,color:"#475569",marginLeft:2}},
-                  "[ab:"+((auto._outsGot||0)-(auto._brOutsCount||0))+"/br:"+(auto._brOutsCount||0)+"]")
+                  "[ab:"+((auto._outsGot||0)-(auto._brOutsCount||0))+"/br:"+(auto._brOutsCount||0)+"/mIp:"+(p.manualIp!==undefined?p.manualIp:"—")+"]")
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}
                               , (()=>{

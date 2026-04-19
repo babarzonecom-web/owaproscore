@@ -1536,7 +1536,8 @@ function App() {
         const totalOuts = (newOuts || 0);
         const prevOuts = (g.outs || 0);
         const addedOuts = totalOuts - prevOuts;
-        // 走塁アウト分（打撃結果コードで発生するアウト以外）
+        // 走塁アウト分：addedOutsからコードで発生するアウトを除いた分
+        // （codeIsIpOutがtrueの場合はallAtBatsで既にカウントされるので走塁分のみ追加）
         const runnerOuts = Math.max(0, addedOuts - baseOutsFromCode);
         if(runnerOuts > 0) {
           const defTeam = team==="away"?"home":"away";
@@ -1545,8 +1546,9 @@ function App() {
             brOuts.push({inning:g.inning, half:g.half, outsAtTime:prevOuts+baseOutsFromCode+i, defTeam, pitcherIdx:curPIdx});
           }
         }
-        // IPアウトコードでない追加アウト（走塁アウトは上のrunnerOutsで処理済みなので追加しない）
-        if(!codeIsIpOut && codeOutCount===0 && addedOuts > 0) {
+        // IPアウトコードでなく、かつ走塁アウト以外の追加アウト（runnerOutsで処理済みでないもの）
+        // runnerOuts>0の場合は既に処理済みなのでスキップ
+        if(!codeIsIpOut && codeOutCount===0 && addedOuts > 0 && runnerOuts===0) {
           const defTeam = team==="away"?"home":"away";
           const curPIdx2 = g[defTeam+"PitcherIdx"]||0;
           for(let i=0;i<addedOuts;i++){
@@ -1882,20 +1884,9 @@ function App() {
 
   const changeInning=()=>{
     mutGame(g=>{
-      // アウトが3未満でチェンジする場合、不足分をbaserunnerOutsに補完（投球回計算用）
-      const defTeam = g.half==="top" ? "home" : "away"; // 守備側チーム
-      let brOuts = [...(g.baserunnerOuts||[])];
-      const missing = 3 - (g.outs||0);
-      if(missing > 0 && missing < 3) {
-        // 手動チェンジによる不足アウトを補完
-        const chgDefTeam = g.half==="top" ? "home" : "away";
-        const chgPIdx = g[chgDefTeam+"PitcherIdx"]||0;
-        for(let i=0;i<missing;i++){
-          brOuts.push({inning:g.inning, half:g.half, outsAtTime:(g.outs||0)+i, defTeam, manual:true, pitcherIdx:chgPIdx});
-        }
-      }
-      if(g.half==="top") return{...g,half:"bottom",outs:0,bases:[null,null,null],baserunnerOuts:brOuts};
-      return{...g,inning:Math.min(g.inning+1,15),half:"top",outs:0,bases:[null,null,null],baserunnerOuts:brOuts};
+      // 残塁はアウトではないので投球回に補完しない
+      if(g.half==="top") return{...g,half:"bottom",outs:0,bases:[null,null,null]};
+      return{...g,inning:Math.min(g.inning+1,15),half:"top",outs:0,bases:[null,null,null]};
     });
     showToast("チェンジ！");
   };
@@ -2333,19 +2324,9 @@ function App() {
   const endGame = useCallback((reason, endInning, endNote, pitcherResults)=>{
     mutGame(g=>{
       // 試合終了時: 現在進行中のハーフにアウト不足があれば補完
-      let brOuts = [...(g.baserunnerOuts||[])];
-      const currentOuts = g.outs||0;
-      const missing = 3 - currentOuts;
-      // アウトが0でない（試合中の途中状態）かつ3未満なら補完
-      if(missing > 0 && missing < 3 && currentOuts > 0) {
-        const defTeam = g.half==="top" ? "home" : "away";
-        const endPIdx = g[defTeam+"PitcherIdx"]||0;
-        for(let i=0;i<missing;i++){
-          brOuts.push({inning:g.inning, half:g.half, outsAtTime:currentOuts+i, defTeam, endGame:true, pitcherIdx:endPIdx});
-        }
-      }
+      // 残塁はアウトではないので投球回に補完しない
       return {...g, finished:true, endReason:reason, endInning, endNote:endNote||"",
-        pitcherResults:pitcherResults||{}, baserunnerOuts:brOuts};
+        pitcherResults:pitcherResults||{}};
     });
     
     setStorage(s=>{
@@ -2768,7 +2749,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v276")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v278")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2846,7 +2827,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v276")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v278")
         )
 
         // ===== 新規チーム作成 =====

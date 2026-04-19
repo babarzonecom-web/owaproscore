@@ -362,11 +362,12 @@ function MiniDiamond({ bases, size=56 }) {
 }
 const BASE_LABELS = ["1塁","2塁","3塁","ホームイン🏠","アウト❌"];
 const BASE_COLORS = ["#fbbf24","#22c55e","#f87171","#f97316","#94a3b8"];
-function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel, defTeamLineup, pendingCode, preErrorPos }) {
+function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel, defTeamLineup, pendingCode, preErrorPos, runnerDefault }) {
   
   // postBasesで見つからないランナーのデフォルト先
   // batterOutフラグを使って判定
-  const runnerDefaultTo = batterOut ? "out" : "scored";
+  // runnerDefault: 明示的に指定があればそれを使う（CS/PO/RO時は"out"）
+  const runnerDefaultTo = (runnerDefault !== undefined) ? runnerDefault : (batterOut ? "out" : "scored");
 
   const buildRunners = () => {
     const list = [];
@@ -427,10 +428,13 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
         const next = cycle[(cur + 1) % cycle.length];
         return { ...r, to: next };
       });
-      // ランナーの「out」の数からadjOutsを自動更新
-      const runnerOuts = newRunners.filter(r => r.to === "out").length;
-      const baseOuts = outs; // 打撃結果コードによるアウト数（初期値）
-      setAdjOuts(Math.min(baseOuts + runnerOuts, 3));
+      // ランナーの「out」の数からadjOutsを更新
+      // outsは打撃結果コードによる初期アウト数
+      // 走塁アウトのみ追加（outsに既に打撃アウトが含まれている場合は走塁アウトのみ加算）
+      const initRunnerOuts = runners.filter(r=>r.to==="out").length;
+      const newRunnerOuts = newRunners.filter(r=>r.to==="out").length;
+      const delta = newRunnerOuts - initRunnerOuts;
+      setAdjOuts(prev=>Math.min(Math.max(0,prev+delta), 3));
       return newRunners;
     });
   };
@@ -1551,7 +1555,7 @@ function App() {
         }
       }
       const tmp={...g, [lk]:lineup, ...defLineupUpdate,
-        bases: newBases!==undefined ? newBases : g.bases,
+        bases: changeOccurs ? [null,null,null] : (newBases!==undefined ? newBases : g.bases),
         outs:  newOuts!==undefined  ? (changeOccurs?0:newOuts) : g.outs,
         inning: changeOccurs ? (g.half==="top"?g.inning:Math.min(g.inning+1,15)) : g.inning,
         half:   changeOccurs ? (g.half==="top"?"bottom":"top") : g.half,
@@ -1723,7 +1727,7 @@ function App() {
 
       // ログメッセージ
       const typeLabel = {
-        SB:"盗塁成功", CS:"盗塁刺", PO:"牽制アウト",
+        SB:"盗塁成功", CS:"盗塁刺", PO:"牽制アウト", RO:"走塁死",
         WP:"暴投(WP)進塁", PB:"捕逸(PB)進塁", BK:"ボーク(BK)進塁",
         OBI:"走塁妨害で進塁", ADV:"進塁",
       }[type]||type;
@@ -1734,7 +1738,9 @@ function App() {
       }).join(" / ");
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-        msg:"【"+g[team+"Team"]+"】"+typeLabel+": "+moveDesc+(scoreAdd>0?" ["+scoreAdd+"点]":"")
+        msg:"【"+g[team+"Team"]+"】"+typeLabel+": "+moveDesc+(scoreAdd>0?" ["+scoreAdd+"点]":""),
+        runs: scoreAdd,
+        logType: scoreAdd>0?"score":(["CS","PO","RO"].includes(type)?"out":"normal")
       },...(g.log||[]).slice(0,99)];
 
       const outs = Math.min(g.outs + outsAdded, 3);
@@ -1763,6 +1769,12 @@ function App() {
         log};
     });
     setModal(null);
+    // チェンジになった場合はストライク・ボールカウントをリセット（球数は保持）
+    const outsAfter = Math.min((moves.filter(m=>m.isOut).length), 3);
+    if((moves.filter(m=>m.isOut).length) > 0) {
+      setPitchCount(p=>({b:0,s:0,f:0}));
+      setPitchHistory([]);
+    }
     const toastMsg = {
       SB:"盗塁✅", CS:"盗塁刺❌", PO:"牽制アウト❌", RO:"走塁死❌",
       WP:"WP進塁✅", PB:"PB進塁✅", BK:"ボーク✅",
@@ -2756,7 +2768,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v271")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v274")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2834,7 +2846,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v271")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v274")
         )
 
         // ===== 新規チーム作成 =====
@@ -3437,14 +3449,14 @@ function App() {
                 React.createElement('div', { key: i, style: {display:"flex",gap:10,padding:"6px 8px",
                   borderBottom:"1px solid #0f2040",
                   borderRadius:6,
-                  background: (e.runs&&e.runs>0) ? "rgba(251,191,36,0.12)" : "transparent",
-                  border: (e.runs&&e.runs>0) ? "1px solid rgba(251,191,36,0.5)" : "1px solid transparent",
+                  background: (e.runs>0||e.logType==="score") ? "rgba(251,191,36,0.12)" : e.logType==="sub" ? "rgba(34,197,94,0.08)" : "transparent",
+                  border: (e.runs>0||e.logType==="score") ? "1px solid rgba(251,191,36,0.5)" : e.logType==="sub" ? "1px solid rgba(34,197,94,0.3)" : "1px solid transparent",
                   opacity: i===0?1:0.8},}
-                  , React.createElement('span', { style: {fontSize:11,color:(e.runs&&e.runs>0)?"#fbbf24":"#7db8e8",flexShrink:0},}, e.ts)
+                  , React.createElement('span', { style: {fontSize:11,color:(e.runs>0||e.logType==="score")?"#fbbf24":e.logType==="sub"?"#4ade80":"#7db8e8",flexShrink:0},}, e.ts)
                   , React.createElement('span', { style: {
                       fontSize:13,
-                      fontWeight:(e.runs&&e.runs>0)?700:400,
-                      color:(e.runs&&e.runs>0)?"#fde047":"#e2e8f0"
+                      fontWeight:(e.runs>0||e.logType==="score"||e.logType==="sub")?700:400,
+                      color:(e.runs>0||e.logType==="score")?"#fde047":e.logType==="sub"?"#86efac":"#e2e8f0"
                     },}, e.msg)
                   , (e.runs&&e.runs>0)&&React.createElement('span', {style:{
                       fontSize:12, color:"#fff", fontWeight:900, marginLeft:"auto", flexShrink:0,
@@ -4686,20 +4698,23 @@ function App() {
             else { simBases[destBi] = runner.name; }
           });
           const outsAdded = moves.filter(m=>m.isOut).length;
+          // 走塁アウトのみ加算（打撃結果のアウトはcommitAtBatで処理済み）
           const simOuts = Math.min(game.outs + outsAdded, 3);
 
           // 守備側のlineup（エラー記録用）
           const defSide = modal.team==="away" ? "home" : "away";
           const defLineup = game[defSide+"Lineup"]||[];
 
+          const isOutSbType = ["CS","PO","RO"].includes(modal.sbBuiltType);
           return (
             React.createElement(RunnerAdjustModal, {
               preBases: game.bases,
               postBases: simBases,
-              preScoredNames: simScored,
+              preScoredNames: isOutSbType ? [] : simScored,
               batterName: "",
               batterScored: false,
               batterOut: false,
+              runnerDefault: isOutSbType ? "out" : undefined,
               outs: simOuts,
               defTeamLineup: defLineup,
               pendingCode: "",

@@ -2756,7 +2756,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v286")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v287")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2834,7 +2834,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v286")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v287")
         )
 
         // ===== 新規チーム作成 =====
@@ -3798,12 +3798,12 @@ function App() {
                                   const manualOuts = p.manualIp !== undefined ? p.manualIp : rawIp;
                                   const dispInn = Math.floor(manualOuts/3);
                                   const dispFrac = manualOuts%3;
-                                  const dispStr = dispInn + "回" + (dispFrac>0 ? dispFrac+"/3" : "");
+                                  const dispStr = dispInn + "回" + (dispFrac>0 ? dispFrac+"/3" : "") + " [og:"+(auto._outsGot||0)+" mIp:"+(p.manualIp!==undefined?p.manualIp:"—")+"]";
                                   const btnSt = {width:22,height:22,borderRadius:4,border:"1px solid #1e3a5f",
                                     background:"#1e3a5f",color:"#7dd3fc",cursor:"pointer",
                                     fontSize:14,fontWeight:900,padding:0,flexShrink:0};
                                   return React.createElement('div',{style:{display:"flex",alignItems:"center",gap:3,justifyContent:"center"}}
-                                    , React.createElement('span',{style:{fontSize:8,color:"#f87171",position:"absolute",top:0,right:0}},_dbg)
+
                                     , React.createElement('button',{style:btnSt,
                                         onClick:()=>mutGame(g=>{
                                           const ps=[...g[side+"Pitchers"]];

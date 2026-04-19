@@ -2756,7 +2756,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v290")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v292")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2834,7 +2834,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v290")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v292")
         )
 
         // ===== 新規チーム作成 =====
@@ -3928,28 +3928,49 @@ function App() {
                   return {...s, history:hist.slice(0,50)};
                 });
               },
+              onRestoreOpp:(g, oppName)=>{
+                setTab("teams");
+                const lineupRaw = g.awayTeam===oppName ? g.awayLineup : g.homeLineup;
+                const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
+                const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
+                if(members.length===0){ showToast("メンバーが見つかりません"); return; }
+                const oppObj = {id:Date.now().toString(36), name:oppName, members};
+                setStorage(s=>{
+                  const exists=(s.opponents||[]).some(t=>t.name===oppName);
+                  const next = {...s, opponents: exists
+                    ? (s.opponents||[]).map(t=>t.name===oppName?oppObj:t)
+                    : [...(s.opponents||[]),oppObj]};
+                  showToast("✅ 対戦相手「"+oppName+"」を登録しました");
+                  return next;
+                });
+              },
               onRestoreTeam:(g, myTeamSide)=>{
                 setTab("teams");
-                const restoreTeam = (teamName, lineupRaw, isMyTeam) => {
-                  if(!teamName||teamName==="ビジターチーム"||teamName==="ホームチーム") return;
+                const makeTeamObj = (teamName, lineupRaw) => {
+                  if(!teamName||teamName==="ビジターチーム"||teamName==="ホームチーム") return null;
                   const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
                   const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
-                  if(members.length===0) return;
-                  const teamObj = {id:Date.now().toString(36), name:teamName, members};
-                  setStorage(s=>{
-                    if(isMyTeam){
-                      showToast("✅ 自チーム「"+teamName+"」を復元しました");
-                      return {...s, myTeam:teamObj};
-                    } else {
-                      const exists=(s.opponents||[]).some(t=>t.name===teamName);
-                      if(!exists){ showToast("✅ 「"+teamName+"」を対戦相手に復元"); return {...s,opponents:[...(s.opponents||[]),teamObj]}; }
-                      showToast("✅ 「"+teamName+"」を更新しました");
-                      return {...s,opponents:(s.opponents||[]).map(t=>t.name===teamName?teamObj:t)};
-                    }
-                  });
+                  if(members.length===0) return null;
+                  return {id:Date.now().toString(36), name:teamName, members};
                 };
-                restoreTeam(g.awayTeam, g.awayLineup, myTeamSide==="away");
-                restoreTeam(g.homeTeam, g.homeLineup, myTeamSide==="home");
+                const myObj  = makeTeamObj(g[myTeamSide+"Team"], g[myTeamSide+"Lineup"]);
+                const oppSide = myTeamSide==="away"?"home":"away";
+                const oppObj = makeTeamObj(g[oppSide+"Team"], g[oppSide+"Lineup"]);
+                setStorage(s=>{
+                  let next = {...s};
+                  if(myObj){
+                    next = {...next, myTeam:myObj};
+                    showToast("✅ 自チーム「"+myObj.name+"」を復元");
+                  }
+                  if(oppObj){
+                    const exists=(next.opponents||[]).some(t=>t.name===oppObj.name);
+                    next = {...next, opponents: exists
+                      ? (next.opponents||[]).map(t=>t.name===oppObj.name?oppObj:t)
+                      : [...(next.opponents||[]),oppObj]};
+                    showToast("✅ 対戦相手「"+oppObj.name+"」を保存");
+                  }
+                  return next;
+                });
               },
               onUpload:(g)=>{
                 const code = window.__teamShareCode;
@@ -6082,7 +6103,7 @@ function PasswordChangeCard({ teamCode, showToast }) {
   );
 }
 
-function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam }) {
+function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam, onRestoreOpp }) {
   const [restoreTarget, setRestoreTarget] = React.useState(null);
   const [fbTeamId, setFbTeamId] = useState(teamShareCode||"");
   const [fbLoading, setFbLoading] = useState(false);
@@ -6128,19 +6149,40 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
           , React.createElement('div', {style:{...S.mBox,maxWidth:320}, onClick:e=>e.stopPropagation()}
             , React.createElement('div', {style:{...S.mt,marginBottom:12}}, "👥 チーム復元")
             , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:16}}, restoreTarget.awayTeam+" vs "+restoreTarget.homeTeam+" のチームをチームタブに復元します")
-            , ["away","home"].map(side=>{
-                const tName = side==="away"?restoreTarget.awayTeam:restoreTarget.homeTeam;
-                const oppName = side==="away"?restoreTarget.homeTeam:restoreTarget.awayTeam;
-                return React.createElement('button', {key:side,
-                  onClick:()=>{ onRestoreTeam(restoreTarget, side); setRestoreTarget(null); },
-                  style:{width:"100%",marginBottom:10,padding:"12px",borderRadius:10,
-                    border:"2px solid #4ade80",background:"#0d2a1a",
-                    color:"#4ade80",fontSize:14,fontWeight:700,cursor:"pointer",textAlign:"left"}
-                }
-                , React.createElement('div',{style:{fontSize:13,fontWeight:700}}, "🏠 自チーム: ", tName)
-                , React.createElement('div',{style:{fontSize:11,color:"#64748b",marginTop:2}}, "対戦相手: "+oppName+" → 対戦相手リストに保存")
-                );
-              })
+            , (()=>{
+                const teams2 = [
+                  {name:restoreTarget.awayTeam, role:"my"},
+                  {name:restoreTarget.awayTeam, role:"opp"},
+                  {name:restoreTarget.homeTeam, role:"my"},
+                  {name:restoreTarget.homeTeam, role:"opp"},
+                ];
+                return teams2.map((t,idx)=>{
+                  const isMy = t.role==="my";
+                  const myTeamSide = t.name===restoreTarget.awayTeam ? "away" : "home";
+                  return React.createElement('button', {key:idx,
+                    onClick:()=>{
+                      if(isMy){
+                        onRestoreTeam(restoreTarget, myTeamSide);
+                      } else {
+                        // 対戦相手のみ登録（自チームは変更しない）
+                        onRestoreOpp && onRestoreOpp(restoreTarget, t.name);
+                      }
+                      setRestoreTarget(null);
+                    },
+                    style:{width:"100%",marginBottom:8,padding:"10px 14px",borderRadius:10,
+                      border:"2px solid "+(isMy?"#4ade80":"#f59e0b"),
+                      background:isMy?"#0d2a1a":"#1a1200",
+                      color:"#e2e8f0",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"left",
+                      display:"flex",alignItems:"center",gap:10}
+                  }
+                  , React.createElement('span',{style:{fontSize:16}}, isMy?"🏠":"⚔️")
+                  , React.createElement('div',null
+                    , React.createElement('div',{style:{fontSize:13,fontWeight:700,color:isMy?"#4ade80":"#fbbf24"}}, t.name)
+                    , React.createElement('div',{style:{fontSize:11,color:"#64748b",marginTop:2}}, isMy?"自チームとして登録":"対戦相手として登録")
+                  )
+                  );
+                });
+              })()
             , React.createElement('button', {onClick:()=>setRestoreTarget(null), style:S.cBtn}, "キャンセル")
           )
         )

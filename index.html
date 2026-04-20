@@ -810,8 +810,8 @@ const computePitcherStats = (g) => {
         const seqLog = buildSeqLog();
 
     const findActivePitcher = (abSeq) => {
-      // seqがundefined（旧データ）の場合は先発投手を返す
-      if(abSeq === undefined || abSeq === null) return log[0].pitcherIdx;
+      // seqがundefined（旧データ）の場合は現在の投手インデックスを返す
+      if(abSeq === undefined || abSeq === null) return seqLog[seqLog.length-1]?.pitcherIdx ?? log[0].pitcherIdx;
       // seqLog中でfromSeq <= abSeqを満たす最後（最新）のエントリ
       let bestIdx = seqLog[0] ? seqLog[0].pitcherIdx : 0;
       for(let i=0; i<seqLog.length; i++){
@@ -2769,7 +2769,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v296")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v297")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2847,7 +2847,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v296")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v297")
         )
 
         // ===== 新規チーム作成 =====
@@ -5231,6 +5231,13 @@ function StatsTab({ game, history, teams, myTeam, opponents }) {
     ...allTeamNames.filter(n=>registeredTeams.some(t=>t.name===n)),
     ...allTeamNames.filter(n=>!registeredTeams.some(t=>t.name===n)),
   ];
+
+  // 日付降順にソート（新しい試合が先頭）
+  allGames.sort((a,b)=>{
+    const da = a.date||"";
+    const db = b.date||"";
+    return da<db?1:da>db?-1:0;
+  });
 
   // 選択中チーム・シーズンでフィルタした試合
   const filteredGames = allGames.filter(g=>{

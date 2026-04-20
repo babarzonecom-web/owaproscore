@@ -1571,7 +1571,12 @@ function App() {
           }
         }
       }
+      // runs>0のとき直接スコアを加算（recomputeScoresと併用）
+      const scoreKey2 = team+"Score";
+      const curInnScore = parseInt(g[scoreKey2]?.[inning])||0;
+      const directScore = runs>0 ? {...g[scoreKey2], [inning]: curInnScore + runs} : g[scoreKey2];
       const tmp={...g, [lk]:lineup, ...defLineupUpdate,
+        [scoreKey2]: directScore,
         bases: changeOccurs ? [null,null,null] : (newBases!==undefined ? newBases : g.bases),
         outs:  newOuts!==undefined  ? (changeOccurs?0:newOuts) : g.outs,
         inning: changeOccurs ? (g.half==="top"?g.inning:Math.min(g.inning+1,15)) : g.inning,
@@ -2764,7 +2769,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v295")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v296")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2842,7 +2847,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v295")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v296")
         )
 
         // ===== 新規チーム作成 =====

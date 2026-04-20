@@ -161,8 +161,12 @@ function applyResult(code, bases, outs, batterName) {
       b = [null,BN,n1||null]; batterOn=1; break;
     }
     case "H1": {
-      if(n3){ scoredNames=[n3]; runs=1; }
-      b = [BN, n1||null, n2||null]; batterOn=0; break;
+      // シングル: n3→得点, n2→3塁（どちらも進塁モーダルのデフォルト得点）
+      // 塁上に残るかどうかはモーダルで調整
+      scoredNames = [n3, n2].filter(Boolean);
+      runs = scoredNames.length;
+      // postBasesにはn2を残さない（scoredNamesに入れたのでモーダルでデフォルト得点）
+      b = [BN, n1||null, null]; batterOn=0; break;
     }
     case "BB": case "HBP": case "IBB": {
       if(!n1){
@@ -2757,7 +2761,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v293")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v294")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2835,7 +2839,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v293")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v294")
         )
 
         // ===== 新規チーム作成 =====

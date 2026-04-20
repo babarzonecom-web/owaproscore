@@ -615,19 +615,22 @@ const calcTotal   = (s) => Object.values(s).reduce((a,v)=>a+(parseInt(v)||0),0);
 
 const recomputeScores = (g) => {
   const aScore={...g.awayScore}, hScore={...g.homeScore};
-  const _inns = Array.from({length:g.innings||9},(_,i)=>i+1);
-  _inns.forEach(inn=>{
+  // 全イニング（延長含む）のキーを取得
+  const allInns = new Set([
+    ...Array.from({length:g.innings||9},(_,i)=>i+1),
+    ...Object.keys(g.awayScore||{}).map(Number),
+    ...Object.keys(g.homeScore||{}).map(Number),
+  ]);
+  allInns.forEach(inn=>{
     let ar=0, hr=0, aHas=false, hHas=false;
     g.awayLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ ar+=norm(e).runs||0; aHas=true; }));
     g.homeLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ hr+=norm(e).runs||0; hHas=true; }));
 
-    // 打席がある回だけスコアをセット
-    // ただし盗塁・WP・PB等で直接加算された分を保持するため
-    // 「atBatsのruns合計」が現在のスコアより小さい場合は差分を維持する
+    // atBatsのruns合計を正とし、盗塁等（recordSBで直接加算）の分を上乗せする
+    // recordSBはscoreKeyに直接加算しているので、atBatsで説明できない分がある
     if(aHas){
       const prev = parseInt(g.awayScore[inn])||0;
-      // atBatsで説明できないスコア（盗塁等）を保持
-      const extra = Math.max(0, prev - ar);
+      const extra = Math.max(0, prev - ar); // 盗塁等で直接加算された分
       aScore[inn] = ar + extra;
     }
     if(hHas){
@@ -2761,7 +2764,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v294")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v295")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2839,7 +2842,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v294")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v295")
         )
 
         // ===== 新規チーム作成 =====

@@ -2773,7 +2773,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v304")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v305")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2851,7 +2851,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v304")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v305")
         )
 
         // ===== 新規チーム作成 =====
@@ -3911,9 +3911,10 @@ function App() {
           , React.createElement(HistoryTab, {
               history:history,
               teamShareCode:teamShareCode,
+              showToast:showToast,
               onLoad:loadGame,
               onDelete:delHistory,
-              onExcel:(g)=>exportExcel(g, {stat:statOverrides, pitch:pitchOverrides}),
+              onExcel:(g)=>{ showToast("📊 出力処理を開始します..."); exportExcel(g); },
               onImport:(games)=>{
                 // gamesは配列で一括受け取り
                 const arr = Array.isArray(games)?games:[games];
@@ -6117,7 +6118,7 @@ function PasswordChangeCard({ teamCode, showToast }) {
   );
 }
 
-function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam, onRestoreOpp }) {
+function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam, onRestoreOpp, showToast }) {
   const [restoreTarget, setRestoreTarget] = React.useState(null);
   const [fbTeamId, setFbTeamId] = useState(teamShareCode||"");
   const [fbLoading, setFbLoading] = useState(false);
@@ -6257,7 +6258,7 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
                       style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}}, "📂 読込")
                   , React.createElement('button', {onClick:()=>setRestoreTarget(g),
                       style:{...sBt("#f59e0b"),fontSize:11,padding:"4px 10px"}}, "👥 チーム復元")
-                  , React.createElement('button', {onClick:()=>onExcel(g),
+                  , React.createElement('button', {onClick:()=>{ if(onExcel) onExcel(g); else showToast("❌ Excel機能が利用できません"); },
                       style:{...sBt("#16a34a"),fontSize:11,padding:"4px 10px"}}, "📊 Excel")
                   , React.createElement('button', {onClick:()=>onUpload(g),
                       style:{...sBt("#7c3aed"),fontSize:11,padding:"4px 10px"}}, "☁️ 共有")

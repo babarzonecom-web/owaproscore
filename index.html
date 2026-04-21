@@ -2098,6 +2098,7 @@ function App() {
 
   
   const exportExcel = useCallback((targetGame) => {
+    showToast("📊 出力処理を開始します...");
     const doExport = (XLSX) => { try {
     const g = targetGame || game;
     const aStats = computeStats(g.awayLineup);
@@ -2772,7 +2773,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v302")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v303")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2850,7 +2851,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v302")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v303")
         )
 
         // ===== 新規チーム作成 =====

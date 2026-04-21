@@ -835,45 +835,9 @@ const computePitcherStats = (g) => {
       if(code==="HR") ps.autoHr = (ps.autoHr||0)+1;
       const runsScored = ab.entry.runs||0;
       if(runsScored > 0) {
-        // 得点の帰責: 打者自身の得点は現在の投手に、
-        // 前のランナーの得点はそのランナーが出塁した時の投手に帰責
-        const scoredNames = ab.entry.scoredNames || [];
-        const batterName  = lineup[ab.playerIdx]?.name || "";
-        // 打者自身の得点（HR等）
-        const batterScored = scoredNames.includes(batterName) || ab.entry.scored;
-        if(batterScored) {
-          ps.autoEr++;
-          ps.autoRuns = (ps.autoRuns||0) + 1;
-        }
-        // ランナーの得点: 出塁時の投手を遡って特定
-        scoredNames.filter(n=>n && n!==batterName).forEach(runnerName=>{
-          // allAtBatsを遡って、このランナーが最後に出塁した打席を探す
-          let runnerPitcherIdx = activePIdx; // デフォルト: 現在の投手
-          for(let k=0; k<allAtBats.length; k++){
-            const prev = allAtBats[k];
-            if(prev === ab) break; // 現在の打席より前だけ対象
-            const pName = lineup[prev.playerIdx]?.name;
-            if(pName === runnerName && prev.entry.code) {
-              // この選手が出塁した打席かチェック
-              const pc = prev.entry.code;
-              const isReach = ["H1","H2","H3","HR","BB","HBP","IBB","CI","KW","E","FC"].includes(pc);
-              if(isReach) {
-                // この時点の投手を特定
-                runnerPitcherIdx = findActivePitcher(prev.seq);
-              }
-            }
-          }
-          const rps = stats[runnerPitcherIdx];
-          if(rps) {
-            rps.autoEr++;
-            rps.autoRuns = (rps.autoRuns||0) + 1;
-          }
-        });
-        // scoredNamesがない場合：batterScoredで既に加算していなければ加算
-        if(scoredNames.length === 0 && !batterScored) {
-          ps.autoEr += runsScored;
-          ps.autoRuns = (ps.autoRuns||0) + runsScored;
-        }
+        // 失点帰責: その打席を担当する投手に全失点を帰責（シンプル方式）
+        ps.autoEr = (ps.autoEr||0) + runsScored;
+        ps.autoRuns = (ps.autoRuns||0) + runsScored;
       }
     });
 
@@ -2769,7 +2733,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v297")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v298")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2847,7 +2811,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v297")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v298")
         )
 
         // ===== 新規チーム作成 =====

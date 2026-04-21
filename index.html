@@ -1397,9 +1397,11 @@ function App() {
   };
 
   const mutGame = useCallback((fn)=>{
-    // メンバーは記録操作不可
-    if(window.__teamShareRole === "member") {
-      showToast("👥 メンバーモードでは記録できません。管理者でログインしてください。");
+    // admin以外は記録操作不可（member・未ログイン・閲覧者すべてブロック）
+    if(window.__teamShareRole !== "admin") {
+      if(window.__teamShareRole === "member") {
+        showToast("👥 メンバーモードでは記録できません。管理者でログインしてください。");
+      }
       return;
     }
     setStorage(s=>{
@@ -2280,11 +2282,39 @@ function App() {
     if(window.XLSX) {
       doExport(window.XLSX);
     } else {
-      var s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload = function(){ doExport(window.XLSX); };
-      s.onerror = function(){ showToast('❌ Excel機能の読み込みに失敗しました'); };
-      document.head.appendChild(s);
+      // XLSXなしでもCSVとして出力
+      showToast("📋 CSV出力中...");
+      try {
+        const isIOS2 = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+          (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+        const g2 = targetGame || game;
+        const aStats2 = computeStats(g2.awayLineup);
+        const hStats2 = computeStats(g2.homeLineup);
+        const buildCsv2 = (rows) => rows.map(r=>r.map(c=>String(c||'').replace(/,/g,"、")).join(",")).join("\n");
+        const batRows2 = [["チーム","選手名","打席","安打","打率","本塁打","打点","四球","三振","盗塁","得点"]];
+        [g2.awayTeam, g2.homeTeam].forEach((tn, ti)=>{
+          const stats2 = ti===0 ? aStats2 : hStats2;
+          stats2.forEach(p=>batRows2.push([tn,p.name,p.pa,p.h,p.avg,p.hr,p.rbi,p.bb,p.k,p.sb,p.run]));
+        });
+        const csv2 = [g2.awayTeam+" vs "+g2.homeTeam, buildCsv2(batRows2)].join("\n");
+        if(isIOS2) {
+          const ta2 = document.createElement("textarea");
+          ta2.value = csv2;
+          ta2.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0;";
+          document.body.appendChild(ta2);
+          ta2.focus(); ta2.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta2);
+          showToast("📋 CSVをコピーしました！スプレッドシートに貼り付けてください");
+        } else {
+          const blob = new Blob([csv2], {type:"text/csv;charset=utf-8;"});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = g2.awayTeam+"_vs_"+g2.homeTeam+".csv";
+          a.click(); URL.revokeObjectURL(url);
+          showToast("📊 CSVを出力しました");
+        }
+      } catch(e2) { showToast("❌ 出力に失敗しました: "+e2.message); }
     }
   }, [game]);
 
@@ -2740,7 +2770,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v299")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v300")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2818,7 +2848,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v299")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v300")
         )
 
         // ===== 新規チーム作成 =====
@@ -3577,7 +3607,7 @@ function App() {
                           , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:3},}
                             , React.createElement(MemberPicker, {
                                 name: p.name,
-                                onChange: v=>editPlayer(team,idx,"name",v),
+                                onChange: isReadOnly ? ()=>{} : v=>editPlayer(team,idx,"name",v),
                                 members: (()=>{
                                   const regT = [...(teams||[]),...(opponents||[])].find(t=>t.name===game[team+"Team"]);
                                   const used = new Set(game[team+"Lineup"].map(pl=>pl.name));
@@ -3594,7 +3624,7 @@ function App() {
                         )
                         , React.createElement('td', { style: {...S.td,position:"relative"},}
                           , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:1}}
-                            , React.createElement(PosSelector, { value: p.pos, onChange: v=>editPlayer(team,idx,"pos",v),})
+                            , React.createElement(PosSelector, { value: p.pos, onChange: isReadOnly ? ()=>{} : v=>editPlayer(team,idx,"pos",v),})
                             , posHistory.length>1&&React.createElement('div',{style:{fontSize:8,color:"#64748b",
                                 textAlign:"center",maxWidth:40,overflow:"hidden",textOverflow:"ellipsis",
                                 whiteSpace:"nowrap"}},posLabel)
@@ -3606,7 +3636,7 @@ function App() {
                           , React.createElement('span', { style: {color:"#f87171"},}, p.cs||0)
                         )
                         , React.createElement('td', { style: {...S.td,padding:2,textAlign:"center"},}
-                          , React.createElement('button', { onClick: ()=>setModal({team,pidx:idx,step:"sub"}),
+                          , !isReadOnly && React.createElement('button', { onClick: ()=>setModal({team,pidx:idx,step:"sub"}),
                             style: {fontSize:9,padding:"2px 6px",borderRadius:5,cursor:"pointer",
                               background:"transparent",border:"1px solid #2a4a7a",color:"#64748b"},}, "交代"
                           )

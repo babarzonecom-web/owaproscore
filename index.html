@@ -2236,25 +2236,23 @@ function App() {
         (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 
       if(isIOS) {
-        // iOSはtextarea+execCommandで同期コピー
+        // iOSはBlobダウンロード → ファイルアプリ経由でスプレッドシートに開ける
         try {
-          const ta = document.createElement("textarea");
-          ta.value = csvParts;
-          ta.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0;";
-          document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          const ok = document.execCommand("copy");
-          document.body.removeChild(ta);
-          if(ok) {
-            showToast("📋 CSVをコピーしました！スプレッドシートに貼り付けてください");
-          } else {
-            throw new Error("copy failed");
-          }
+          const blob = new Blob(["\uFEFF"+csvParts], {type:"text/csv;charset=utf-8;"});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = fname.replace(/\.xlsx$/,".csv");
+          a.style.display = "none";
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+          showToast("📥 CSVをダウンロードしました！ファイルアプリから開けます");
         } catch(e) {
+          // fallback: clipboard
           navigator.clipboard && navigator.clipboard.writeText(csvParts)
             .then(()=>showToast("📋 CSVをコピーしました！"))
-            .catch(()=>showToast("⚠️ コピー失敗。画面を長押しして貼り付けを試してください"));
+            .catch(()=>showToast("⚠️ 出力に失敗しました: "+e.message));
         }
       } else {
         // PC・Android：Excelファイルとしてダウンロード
@@ -2770,7 +2768,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v300")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v301")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2848,7 +2846,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v300")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v301")
         )
 
         // ===== 新規チーム作成 =====

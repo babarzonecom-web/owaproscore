@@ -2323,17 +2323,28 @@ function App() {
         });
         const csv2 = [g2.awayTeam+" vs "+g2.homeTeam, buildCsv2(batRows2)].join("\n");
         if(isIOS2) {
-          const blob2 = new Blob(["\uFEFF"+csv2], {type:"text/csv;charset=utf-8;"});
-          const url2 = URL.createObjectURL(blob2);
-          const a2 = document.createElement("a");
-          a2.href = url2;
-          a2.download = (g2.awayTeam||"away")+"_vs_"+(g2.homeTeam||"home")+".csv";
-          a2.style.display = "none";
-          document.body.appendChild(a2);
-          a2.click();
-          setTimeout(()=>{ document.body.removeChild(a2); URL.revokeObjectURL(url2); }, 1000);
-          showToast("📥 CSVをダウンロードしました！ファイルアプリから開けます");
-
+          // iOS: オーバーレイでCSVテキストを表示してコピー
+          const ov = document.createElement('div');
+          ov.style.cssText = 'position:fixed;inset:0;background:#0008;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;';
+          const bx = document.createElement('div');
+          bx.style.cssText = 'background:#1e293b;border-radius:12px;padding:16px;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;gap:10px;';
+          bx.innerHTML = '<div style="color:#f0a500;font-weight:700;font-size:14px">📊 CSV出力 — コピーしてスプレッドシートに貼り付けてください</div>';
+          const ta2 = document.createElement('textarea');
+          ta2.value = csv2; ta2.readOnly = false;
+          ta2.style.cssText = 'flex:1;min-height:180px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px;font-size:11px;font-family:monospace;resize:none;';
+          const br2 = document.createElement('div'); br2.style.cssText = 'display:flex;gap:8px;';
+          const cb2 = document.createElement('button');
+          cb2.textContent = '📋 全選択してコピー';
+          cb2.style.cssText = 'flex:1;background:#f0a500;color:#000;border:none;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;';
+          cb2.onclick = () => { ta2.select(); ta2.setSelectionRange(0,99999); document.execCommand('copy'); cb2.textContent='✅ コピーしました！'; setTimeout(()=>{cb2.textContent='📋 全選択してコピー';},2000); };
+          const cl2 = document.createElement('button');
+          cl2.textContent = '✕ 閉じる';
+          cl2.style.cssText = 'background:transparent;color:#64748b;border:1px solid #334155;border-radius:8px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;';
+          cl2.onclick = () => document.body.removeChild(ov);
+          br2.appendChild(cb2); br2.appendChild(cl2);
+          bx.appendChild(ta2); bx.appendChild(br2);
+          ov.appendChild(bx); document.body.appendChild(ov);
+          setTimeout(()=>{ ta2.focus(); ta2.select(); ta2.setSelectionRange(0,99999); }, 100);
         } else {
           const blob = new Blob([csv2], {type:"text/csv;charset=utf-8;"});
           const url = URL.createObjectURL(blob);
@@ -2798,7 +2809,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v307")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v308")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2876,7 +2887,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v307")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v308")
         )
 
         // ===== 新規チーム作成 =====

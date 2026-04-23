@@ -2775,7 +2775,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v312")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v313")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2853,7 +2853,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v312")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v313")
         )
 
         // ===== 新規チーム作成 =====
@@ -3906,7 +3906,7 @@ function App() {
         ))
 
         , tab==="stats"&&(React.createElement(React.Fragment, null
-          , React.createElement(StatsTab, {game:game, history:history, teams:teams, myTeam:myTeam, opponents:opponents, onExcel:(g)=>exportExcel(g)})
+          , React.createElement(StatsTab, {game:game, history:history, teams:teams, myTeam:myTeam, opponents:opponents, tournaments:tournaments, onExcel:(g)=>exportExcel(g)})
         ))
 
         , tab==="history"&&(React.createElement(React.Fragment, null
@@ -5205,7 +5205,7 @@ function App() {
   );
 }
 // ===== 成績タブ =====
-function StatsTab({ game, history, teams, myTeam, opponents, onExcel }) {
+function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExcel }) {
   const [statsView, setStatsView] = useState("batting");
   const [selectedSeason, setSelectedSeason] = useState(new Date().getFullYear());
   const [selectedTournament, setSelectedTournament] = useState(null);

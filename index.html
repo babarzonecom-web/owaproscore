@@ -888,10 +888,11 @@ const computePitcherStats = (g) => {
   return result;
 };
 
-const newGame = (innings=7, pitchMode="result", season=null) => ({
+const newGame = (innings=7, pitchMode="result", season=null, tournament=null) => ({
   id:Date.now(),
   date:new Date().toISOString().split("T")[0],
   season: season || new Date().getFullYear(),
+  tournament: tournament || null,
   innings: innings,
   pitchMode: pitchMode,
   venue:"", awayTeam:"ビジターチーム", homeTeam:"ホームチーム", started:false,
@@ -1151,6 +1152,7 @@ function App() {
   const [newInnings, setNewInnings] = useState(7);
   const [newPitchMode, setNewPitchMode] = useState("result");
   const [newSeason, setNewSeason] = useState(()=>new Date().getFullYear());
+  const [newTournament, setNewTournament] = useState(null);
   const [tournament, setTournament] = useState(null); // 現在参加中の大会データ
   const [tournamentCode, setTournamentCode] = useState(""); // 入力中のコード
   const [tournamentMsg, setTournamentMsg] = useState("");
@@ -2773,7 +2775,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v311")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v312")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2851,7 +2853,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v311")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v312")
         )
 
         // ===== 新規チーム作成 =====
@@ -4090,6 +4092,45 @@ function App() {
           )
 
           // ===== 自チーム・対戦相手 =====
+          , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #f0a500"}}
+            , React.createElement('div', {style:{...S.ct, marginBottom:10}}, "🏆 大会登録")
+            , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10}}
+              , React.createElement('input', {
+                  id:"new-tour-input",
+                  placeholder:"大会名を入力（例：春季大会2026）",
+                  style:{...S.inp, flex:1}
+                })
+              , React.createElement('button', {
+                  onClick:()=>{
+                    const v=document.getElementById('new-tour-input').value.trim();
+                    if(!v){showToast('大会名を入力してください');return;}
+                    const t={id:Date.now().toString(36),name:v};
+                    setStorage(s=>({...s,tournaments:[...(s.tournaments||[]),t]}));
+                    document.getElementById('new-tour-input').value='';
+                    showToast('✅ 大会「'+v+'」を登録しました');
+                  },
+                  style:{...sBt("#f0a500"),fontSize:12,padding:"6px 14px",whiteSpace:"nowrap"}
+                }, "＋ 追加")
+            )
+            , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6}},
+              (tournaments||[]).length===0
+                ? React.createElement('div',{style:{fontSize:12,color:"#475569"}},'大会が登録されていません')
+                : (tournaments||[]).map(t=>
+                    React.createElement('div',{key:t.id,style:{display:"flex",alignItems:"center",gap:6,
+                      background:"#1a2234",border:"1px solid #2a3a55",borderRadius:8,padding:"4px 10px"}}
+                      , React.createElement('span',{style:{fontSize:12,color:"#e2e8f0",fontWeight:700}},t.name)
+                      , React.createElement('button',{
+                          onClick:()=>{
+                            if(!confirm('「'+t.name+'」を削除しますか？'))return;
+                            setStorage(s=>({...s,tournaments:(s.tournaments||[]).filter(x=>x.id!==t.id)}));
+                          },
+                          style:{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:12,padding:"0 2px"}
+                        },'×')
+                    )
+                  )
+              )
+          )
+
           , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #fbbf24"}}
             , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:12}}
               , React.createElement('div', {style:S.ct}, "🏟 自チーム")
@@ -4299,7 +4340,7 @@ function App() {
           const selHome = modal._selHome || null;
 
           const startGame = (save) => {
-            const g = newGame(newInnings, newPitchMode, newSeason);
+            const g = newGame(newInnings, newPitchMode, newSeason, newTournament);
             g.started = true;
 
             // チーム選択があれば名前とlineupを直接セット
@@ -4368,6 +4409,26 @@ function App() {
                   "選択したチームのメンバーがオーダーに自動セットされます（9名）")
               )
 
+              , React.createElement('div', {style:{fontSize:13,color:"#f0a500",marginBottom:8,fontWeight:700}}, "🏆 大会")
+              , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}},
+                  React.createElement('button', {
+                    onClick:()=>setNewTournament(null),
+                    style:{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",
+                      background:newTournament===null?"#92400e":"#0d1f35",
+                      border:`2px solid ${newTournament===null?"#f0a500":"#1e3a5f"}`,
+                      color:newTournament===null?"#fcd34d":"#64748b"}
+                  }, "指定なし"),
+                  ...(tournaments||[]).map(t=>
+                    React.createElement('button', {key:t.id,
+                      onClick:()=>setNewTournament(t.name),
+                      style:{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",
+                        background:newTournament===t.name?"#92400e":"#0d1f35",
+                        border:`2px solid ${newTournament===t.name?"#f0a500":"#1e3a5f"}`,
+                        color:newTournament===t.name?"#fcd34d":"#64748b"}
+                    }, t.name)
+                  )
+                )
+              , (tournaments||[]).length===0 && React.createElement('div',{style:{fontSize:11,color:"#475569",marginBottom:8}},"チームタブで大会を登録できます")
               , React.createElement('div', {style:{fontSize:13,color:"#7dd3fc",marginBottom:8,fontWeight:700}}, "シーズン")
               , React.createElement('div', {style:{display:"flex",gap:8,justifyContent:"center",marginBottom:16}}
                 , [new Date().getFullYear()-1, new Date().getFullYear(), new Date().getFullYear()+1].map(y=>
@@ -5147,6 +5208,7 @@ function App() {
 function StatsTab({ game, history, teams, myTeam, opponents, onExcel }) {
   const [statsView, setStatsView] = useState("batting");
   const [selectedSeason, setSelectedSeason] = useState(new Date().getFullYear());
+  const [selectedTournament, setSelectedTournament] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(
     ()=> myTeam && myTeam.name ? myTeam.name : null
   );
@@ -5226,12 +5288,13 @@ function StatsTab({ game, history, teams, myTeam, opponents, onExcel }) {
     return da<db?1:da>db?-1:0;
   });
 
-  // 選択中チーム・シーズンでフィルタした試合
+  // 選択中チーム・シーズン・大会でフィルタした試合
   const filteredGames = allGames.filter(g=>{
     const gYear = g.season || (g.date ? new Date(g.date).getFullYear() : new Date().getFullYear());
     const seasonMatch = !selectedSeason || gYear===selectedSeason;
     const teamMatch = !selectedTeam || g.awayTeam===selectedTeam || g.homeTeam===selectedTeam;
-    return seasonMatch && teamMatch;
+    const tourMatch = !selectedTournament || g.tournament===selectedTournament;
+    return seasonMatch && teamMatch && tourMatch;
   });
 
   // 守備成績集計（失策・ポジション別）
@@ -5806,6 +5869,29 @@ function StatsTab({ game, history, teams, myTeam, opponents, onExcel }) {
                   border:`1.5px solid ${selectedSeason===y?"#3b82f6":"#1e3a5f"}`,
                   color:selectedSeason===y?"#fff":"#64748b"}
               }, y===0?"全期間":y+"年")
+          )
+        )
+      )
+
+      // 大会フィルター
+      , (tournaments||[]).length > 0 && React.createElement('div', {style:{marginBottom:12}}
+        , React.createElement('div', {style:{fontSize:11,color:"#f0a500",marginBottom:6,fontWeight:700}}, "🏆 大会")
+        , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
+          , React.createElement('button', {key:"all",
+              onClick:()=>setSelectedTournament(null),
+              style:{padding:"5px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
+                background:selectedTournament===null?"#92400e":"#0d1f35",
+                border:`1.5px solid ${selectedTournament===null?"#f0a500":"#1e3a5f"}`,
+                color:selectedTournament===null?"#fcd34d":"#64748b"}
+            }, "全大会")
+          , (tournaments||[]).map(t=>
+              React.createElement('button', {key:t.id,
+                onClick:()=>setSelectedTournament(t.name),
+                style:{padding:"5px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
+                  background:selectedTournament===t.name?"#92400e":"#0d1f35",
+                  border:`1.5px solid ${selectedTournament===t.name?"#f0a500":"#1e3a5f"}`,
+                  color:selectedTournament===t.name?"#fcd34d":"#64748b"}
+              }, t.name)
           )
         )
       )

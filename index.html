@@ -2237,29 +2237,49 @@ function App() {
         (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 
       if(isIOS) {
-        // iOS: data:URIで新しいタブに開く → 共有→ファイルに保存
-        try {
-          const csvB64 = btoa(unescape(encodeURIComponent("\uFEFF"+csvParts)));
-          const dataUri = "data:text/csv;charset=utf-8;base64," + csvB64;
-          const win = window.open(dataUri, "_blank");
-          if(win) {
-            showToast("📄 新しいタブに開きました。共有ボタン→ファイルに保存");
-          } else {
-            // ポップアップブロック時はBlobで試みる
-            const blob = new Blob(["\uFEFF"+csvParts], {type:"text/csv;charset=utf-8;"});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url; a.download = fname.replace(/\.xlsx$/,".csv");
-            a.style.display = "none";
-            document.body.appendChild(a); a.click();
-            setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
-            showToast("📥 CSVをダウンロードしました！");
+        // iOS PWA: オーバーレイでCSVテキストを表示→全選択してコピー
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:#0008;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;';
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#1e293b;border-radius:12px;padding:16px;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;gap:10px;';
+        const title = document.createElement('div');
+        title.style.cssText = 'color:#f0a500;font-weight:700;font-size:14px;';
+        title.textContent = '📊 CSV出力 — 全選択してコピーしてください';
+        const ta = document.createElement('textarea');
+        ta.value = csvParts;
+        ta.style.cssText = 'flex:1;min-height:200px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px;font-size:11px;font-family:monospace;resize:none;';
+        ta.readOnly = false;
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:8px;';
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = '📋 全選択してコピー';
+        copyBtn.style.cssText = 'flex:1;background:#f0a500;color:#000;border:none;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;';
+        copyBtn.onclick = () => {
+          ta.select();
+          ta.setSelectionRange(0, 99999);
+          try {
+            document.execCommand('copy');
+            copyBtn.textContent = '✅ コピーしました！';
+            setTimeout(()=>{ copyBtn.textContent = '📋 全選択してコピー'; }, 2000);
+          } catch(e) {
+            navigator.clipboard && navigator.clipboard.writeText(csvParts).then(()=>{
+              copyBtn.textContent = '✅ コピーしました！';
+              setTimeout(()=>{ copyBtn.textContent = '📋 全選択してコピー'; }, 2000);
+            });
           }
-        } catch(e) {
-          navigator.clipboard && navigator.clipboard.writeText(csvParts)
-            .then(()=>showToast("📋 CSVをコピーしました！"))
-            .catch(()=>showToast("⚠️ 出力に失敗しました: "+e.message));
-        }
+        };
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✕ 閉じる';
+        closeBtn.style.cssText = 'background:transparent;color:#64748b;border:1px solid #334155;border-radius:8px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;';
+        closeBtn.onclick = () => document.body.removeChild(overlay);
+        btnRow.appendChild(copyBtn);
+        btnRow.appendChild(closeBtn);
+        box.appendChild(title);
+        box.appendChild(ta);
+        box.appendChild(btnRow);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        setTimeout(()=>{ ta.focus(); ta.select(); ta.setSelectionRange(0,99999); }, 100);
       } else {
         // PC・Android：Excelファイルとしてダウンロード
         try {
@@ -2778,7 +2798,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v306")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v307")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2856,7 +2876,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v306")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v307")
         )
 
         // ===== 新規チーム作成 =====

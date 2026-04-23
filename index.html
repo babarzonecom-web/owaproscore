@@ -2238,16 +2238,16 @@ function App() {
 
       if(isIOS) {
         // iOS: タブ区切りTSVをコピー → Googleスプレッドシートに貼り付けで列に分かれる
-        const toTsv = (rows) => rows.map(r=>r.map(c=>String(c===null||c===undefined?'':c).replace(/\t/g,' ')).join('\t')).join('\n');
-        const tsvText = [
+        const toTsv = (rows) => rows.map(r=>Array.isArray(r)?r.map(c=>String(c===null||c===undefined?'':c).replace(/\t/g,' ')).join('\t'):'').join('\n');
+        const tsvText = toTsv([
           [g.awayTeam+' vs '+g.homeTeam+' ('+g.date+')'],
           [],
           ['【打撃成績】'],
-          ...batRows.map(r=>r),
+          ...batRows,
           [],
           ['【投手成績】'],
-          ...pitRows.map(r=>r),
-        ].map(r=>Array.isArray(r)?r.map(c=>String(c===null||c===undefined?'':c).replace(/\t/g,' ')).join('\t'):r).join('\n');
+          ...pitRows,
+        ]);
 
         const ov = document.createElement('div');
         ov.style.cssText = 'position:fixed;inset:0;background:#000a;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
@@ -2311,81 +2311,12 @@ function App() {
     if(window.XLSX) {
       doExport(window.XLSX);
     } else {
-      // XLSXなしでもCSVとして出力
-      showToast("📋 CSV出力中...");
-      try {
-        const isIOS2 = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
-          (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
-        const g2 = targetGame || game;
-        const aStats2 = computeStats(g2.awayLineup);
-        const hStats2 = computeStats(g2.homeLineup);
-        const buildCsv2 = (rows) => rows.map(r=>r.map(c=>String(c||'').replace(/,/g,"、")).join(",")).join("\n");
-        const batRows2 = [["チーム","選手名","打席","安打","打率","本塁打","打点","四球","三振","盗塁","得点"]];
-        [g2.awayTeam, g2.homeTeam].forEach((tn, ti)=>{
-          const stats2 = ti===0 ? aStats2 : hStats2;
-          stats2.forEach(p=>batRows2.push([tn,p.name,p.pa,p.h,p.avg,p.hr,p.rbi,p.bb,p.k,p.sb,p.run]));
-        });
-        const csv2 = [g2.awayTeam+" vs "+g2.homeTeam, buildCsv2(batRows2)].join("\n");
-        if(isIOS2) {
-          // iOS: タブ区切りでクリップボードにコピー → スプレッドシートにそのまま貼り付け可能
-          const toTsv = (rows) => rows.map(r=>r.map(c=>String(c===null||c===undefined?'':c).replace(/\t/g,' ')).join('\t')).join('\n');
-          const batHeader2 = ['チーム','選手名','打席','打数','安打','二塁打','三塁打','本塁打','打点','四球','死球','三振','得点','打率','長打率','出塁率','OPS'];
-          const batRows2tsv = [batHeader2];
-          [g2.awayTeam, g2.homeTeam].forEach((tn2, ti2)=>{
-            const st2 = ti2===0 ? aStats2 : hStats2;
-            st2.forEach(p=>batRows2tsv.push([tn2,p.name,p.pa,p.ab,p.h,p.h2||0,p.h3||0,p.hr,p.rbi,p.bb,p.hbp||0,p.k,p.run,p.avg,p.slg||'---',p.obp||'---',p.ops||'---']));
-            batRows2tsv.push(['合計','',st2.reduce((s,p)=>s+(p.pa||0),0),st2.reduce((s,p)=>s+(p.ab||0),0),st2.reduce((s,p)=>s+(p.h||0),0),'','',st2.reduce((s,p)=>s+(p.hr||0),0),st2.reduce((s,p)=>s+(p.rbi||0),0),st2.reduce((s,p)=>s+(p.bb||0),0),'',st2.reduce((s,p)=>s+(p.k||0),0),st2.reduce((s,p)=>s+(p.run||0),0),'','','','']);
-            batRows2tsv.push([]);
-          });
-          const tsvText = toTsv(batRows2tsv);
-          const showOverlay = (textToCopy) => {
-            const ov = document.createElement('div');
-            ov.style.cssText = 'position:fixed;inset:0;background:#000a;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
-            const bx = document.createElement('div');
-            bx.style.cssText = 'background:#1e293b;border-radius:14px;padding:20px;width:100%;max-width:500px;display:flex;flex-direction:column;gap:14px;';
-            const ttl = document.createElement('div');
-            ttl.style.cssText = 'color:#f0a500;font-weight:700;font-size:15px;';
-            ttl.textContent = '📊 Googleスプレッドシート用';
-            const desc = document.createElement('div');
-            desc.style.cssText = 'color:#94a3b8;font-size:12px;line-height:1.6;';
-            desc.textContent = '①下のボタンでコピー　②Googleスプレッドシートを開く　③A1セルをタップして貼り付け　→ 自動で列に分かれます';
-            const cb = document.createElement('button');
-            cb.style.cssText = 'background:#f0a500;color:#000;border:none;border-radius:10px;padding:16px;font-weight:900;font-size:18px;cursor:pointer;width:100%;';
-            cb.textContent = '📋 コピーする';
-            cb.onclick = () => {
-              navigator.clipboard.writeText(textToCopy).then(()=>{
-                cb.textContent = '✅ コピーしました！スプレッドシートに貼り付けてください';
-                cb.style.background = '#3fb950';
-              }).catch(()=>{
-                // fallbackでtextarea
-                const ta = document.createElement('textarea');
-                ta.value = textToCopy;
-                ta.style.cssText = 'position:fixed;top:-9999px;';
-                document.body.appendChild(ta);
-                ta.focus(); ta.select(); ta.setSelectionRange(0,99999);
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                cb.textContent = '✅ コピーしました！スプレッドシートに貼り付けてください';
-                cb.style.background = '#3fb950';
-              });
-            };
-            const cl = document.createElement('button');
-            cl.style.cssText = 'background:transparent;color:#64748b;border:1px solid #334155;border-radius:10px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;';
-            cl.textContent = '✕ 閉じる';
-            cl.onclick = () => document.body.removeChild(ov);
-            bx.appendChild(ttl); bx.appendChild(desc); bx.appendChild(cb); bx.appendChild(cl);
-            ov.appendChild(bx); document.body.appendChild(ov);
-          };
-          showOverlay(tsvText);
-        } else {
-          const blob = new Blob([csv2], {type:"text/csv;charset=utf-8;"});
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url; a.download = g2.awayTeam+"_vs_"+g2.homeTeam+".csv";
-          a.click(); URL.revokeObjectURL(url);
-          showToast("📊 CSVを出力しました");
-        }
-      } catch(e2) { showToast("❌ 出力に失敗しました: "+e2.message); }
+      // XLSXなし：ダミーXLSXオブジェクトでiOS TSV出力を呼び出す
+      const dummyXLSX = {
+        utils:{ book_new:()=>({}), aoa_to_sheet:()=>({}), book_append_sheet:()=>{} },
+        write:()=>{ throw new Error('no xlsx'); }
+      };
+      doExport(dummyXLSX);
     }
   }, [game]);
 
@@ -2841,7 +2772,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v309")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v310")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2919,7 +2850,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v309")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v310")
         )
 
         // ===== 新規チーム作成 =====

@@ -2237,20 +2237,25 @@ function App() {
         (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 
       if(isIOS) {
-        // iOSはBlobダウンロード → ファイルアプリ経由でスプレッドシートに開ける
+        // iOS: data:URIで新しいタブに開く → 共有→ファイルに保存
         try {
-          const blob = new Blob(["\uFEFF"+csvParts], {type:"text/csv;charset=utf-8;"});
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = fname.replace(/\.xlsx$/,".csv");
-          a.style.display = "none";
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
-          showToast("📥 CSVをダウンロードしました！ファイルアプリから開けます");
+          const csvB64 = btoa(unescape(encodeURIComponent("\uFEFF"+csvParts)));
+          const dataUri = "data:text/csv;charset=utf-8;base64," + csvB64;
+          const win = window.open(dataUri, "_blank");
+          if(win) {
+            showToast("📄 新しいタブに開きました。共有ボタン→ファイルに保存");
+          } else {
+            // ポップアップブロック時はBlobで試みる
+            const blob = new Blob(["\uFEFF"+csvParts], {type:"text/csv;charset=utf-8;"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = fname.replace(/\.xlsx$/,".csv");
+            a.style.display = "none";
+            document.body.appendChild(a); a.click();
+            setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+            showToast("📥 CSVをダウンロードしました！");
+          }
         } catch(e) {
-          // fallback: clipboard
           navigator.clipboard && navigator.clipboard.writeText(csvParts)
             .then(()=>showToast("📋 CSVをコピーしました！"))
             .catch(()=>showToast("⚠️ 出力に失敗しました: "+e.message));
@@ -2773,7 +2778,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v305")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v306")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2851,7 +2856,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v305")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v306")
         )
 
         // ===== 新規チーム作成 =====

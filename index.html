@@ -1204,6 +1204,7 @@ function App() {
   const teams      = storage.teams||[];
   const myTeam     = storage.myTeam||null;
   const opponents  = storage.opponents||[];
+  const tournaments = storage.tournaments||[];
 
     useEffect(()=>lsSave(storage),[storage]);
   window.__setStorage = setStorage;
@@ -2775,7 +2776,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v313")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v314")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2853,7 +2854,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v313")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v314")
         )
 
         // ===== 新規チーム作成 =====

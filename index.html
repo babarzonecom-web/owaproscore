@@ -2237,49 +2237,53 @@ function App() {
         (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 
       if(isIOS) {
-        // iOS PWA: オーバーレイでCSVテキストを表示→全選択してコピー
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;background:#0008;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;';
-        const box = document.createElement('div');
-        box.style.cssText = 'background:#1e293b;border-radius:12px;padding:16px;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;gap:10px;';
-        const title = document.createElement('div');
-        title.style.cssText = 'color:#f0a500;font-weight:700;font-size:14px;';
-        title.textContent = '📊 CSV出力 — 全選択してコピーしてください';
-        const ta = document.createElement('textarea');
-        ta.value = csvParts;
-        ta.style.cssText = 'flex:1;min-height:200px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px;font-size:11px;font-family:monospace;resize:none;';
-        ta.readOnly = false;
-        const btnRow = document.createElement('div');
-        btnRow.style.cssText = 'display:flex;gap:8px;';
-        const copyBtn = document.createElement('button');
-        copyBtn.textContent = '📋 全選択してコピー';
-        copyBtn.style.cssText = 'flex:1;background:#f0a500;color:#000;border:none;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;';
-        copyBtn.onclick = () => {
-          ta.select();
-          ta.setSelectionRange(0, 99999);
-          try {
+        // iOS: タブ区切りTSVをコピー → Googleスプレッドシートに貼り付けで列に分かれる
+        const toTsv = (rows) => rows.map(r=>r.map(c=>String(c===null||c===undefined?'':c).replace(/\t/g,' ')).join('\t')).join('\n');
+        const tsvText = [
+          [g.awayTeam+' vs '+g.homeTeam+' ('+g.date+')'],
+          [],
+          ['【打撃成績】'],
+          ...batRows.map(r=>r),
+          [],
+          ['【投手成績】'],
+          ...pitRows.map(r=>r),
+        ].map(r=>Array.isArray(r)?r.map(c=>String(c===null||c===undefined?'':c).replace(/\t/g,' ')).join('\t'):r).join('\n');
+
+        const ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;inset:0;background:#000a;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        const bx = document.createElement('div');
+        bx.style.cssText = 'background:#1e293b;border-radius:14px;padding:20px;width:100%;max-width:500px;display:flex;flex-direction:column;gap:14px;';
+        const ttl = document.createElement('div');
+        ttl.style.cssText = 'color:#f0a500;font-weight:700;font-size:15px;';
+        ttl.textContent = '📊 Googleスプレッドシート用';
+        const desc = document.createElement('div');
+        desc.style.cssText = 'color:#94a3b8;font-size:12px;line-height:1.6;';
+        desc.textContent = '①下のボタンでコピー　②Googleスプレッドシートを開く　③A1セルをタップして貼り付け　→ 自動で列に分かれます';
+        const cb = document.createElement('button');
+        cb.style.cssText = 'background:#f0a500;color:#000;border:none;border-radius:10px;padding:18px;font-weight:900;font-size:18px;cursor:pointer;width:100%;';
+        cb.textContent = '📋 コピーする';
+        cb.onclick = () => {
+          navigator.clipboard.writeText(tsvText).then(()=>{
+            cb.textContent = '✅ コピーしました！スプレッドシートに貼り付けてください';
+            cb.style.background = '#3fb950';
+          }).catch(()=>{
+            const ta = document.createElement('textarea');
+            ta.value = tsvText;
+            ta.style.cssText = 'position:fixed;top:-9999px;';
+            document.body.appendChild(ta);
+            ta.focus(); ta.select(); ta.setSelectionRange(0,99999);
             document.execCommand('copy');
-            copyBtn.textContent = '✅ コピーしました！';
-            setTimeout(()=>{ copyBtn.textContent = '📋 全選択してコピー'; }, 2000);
-          } catch(e) {
-            navigator.clipboard && navigator.clipboard.writeText(csvParts).then(()=>{
-              copyBtn.textContent = '✅ コピーしました！';
-              setTimeout(()=>{ copyBtn.textContent = '📋 全選択してコピー'; }, 2000);
-            });
-          }
+            document.body.removeChild(ta);
+            cb.textContent = '✅ コピーしました！スプレッドシートに貼り付けてください';
+            cb.style.background = '#3fb950';
+          });
         };
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = '✕ 閉じる';
-        closeBtn.style.cssText = 'background:transparent;color:#64748b;border:1px solid #334155;border-radius:8px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;';
-        closeBtn.onclick = () => document.body.removeChild(overlay);
-        btnRow.appendChild(copyBtn);
-        btnRow.appendChild(closeBtn);
-        box.appendChild(title);
-        box.appendChild(ta);
-        box.appendChild(btnRow);
-        overlay.appendChild(box);
-        document.body.appendChild(overlay);
-        setTimeout(()=>{ ta.focus(); ta.select(); ta.setSelectionRange(0,99999); }, 100);
+        const cl = document.createElement('button');
+        cl.style.cssText = 'background:transparent;color:#64748b;border:1px solid #334155;border-radius:10px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;';
+        cl.textContent = '✕ 閉じる';
+        cl.onclick = () => document.body.removeChild(ov);
+        bx.appendChild(ttl); bx.appendChild(desc); bx.appendChild(cb); bx.appendChild(cl);
+        ov.appendChild(bx); document.body.appendChild(ov);
       } else {
         // PC・Android：Excelファイルとしてダウンロード
         try {
@@ -2323,28 +2327,56 @@ function App() {
         });
         const csv2 = [g2.awayTeam+" vs "+g2.homeTeam, buildCsv2(batRows2)].join("\n");
         if(isIOS2) {
-          // iOS: オーバーレイでCSVテキストを表示してコピー
-          const ov = document.createElement('div');
-          ov.style.cssText = 'position:fixed;inset:0;background:#0008;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;';
-          const bx = document.createElement('div');
-          bx.style.cssText = 'background:#1e293b;border-radius:12px;padding:16px;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;gap:10px;';
-          bx.innerHTML = '<div style="color:#f0a500;font-weight:700;font-size:14px">📊 CSV出力 — コピーしてスプレッドシートに貼り付けてください</div>';
-          const ta2 = document.createElement('textarea');
-          ta2.value = csv2; ta2.readOnly = false;
-          ta2.style.cssText = 'flex:1;min-height:180px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px;font-size:11px;font-family:monospace;resize:none;';
-          const br2 = document.createElement('div'); br2.style.cssText = 'display:flex;gap:8px;';
-          const cb2 = document.createElement('button');
-          cb2.textContent = '📋 全選択してコピー';
-          cb2.style.cssText = 'flex:1;background:#f0a500;color:#000;border:none;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;';
-          cb2.onclick = () => { ta2.select(); ta2.setSelectionRange(0,99999); document.execCommand('copy'); cb2.textContent='✅ コピーしました！'; setTimeout(()=>{cb2.textContent='📋 全選択してコピー';},2000); };
-          const cl2 = document.createElement('button');
-          cl2.textContent = '✕ 閉じる';
-          cl2.style.cssText = 'background:transparent;color:#64748b;border:1px solid #334155;border-radius:8px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;';
-          cl2.onclick = () => document.body.removeChild(ov);
-          br2.appendChild(cb2); br2.appendChild(cl2);
-          bx.appendChild(ta2); bx.appendChild(br2);
-          ov.appendChild(bx); document.body.appendChild(ov);
-          setTimeout(()=>{ ta2.focus(); ta2.select(); ta2.setSelectionRange(0,99999); }, 100);
+          // iOS: タブ区切りでクリップボードにコピー → スプレッドシートにそのまま貼り付け可能
+          const toTsv = (rows) => rows.map(r=>r.map(c=>String(c===null||c===undefined?'':c).replace(/\t/g,' ')).join('\t')).join('\n');
+          const batHeader2 = ['チーム','選手名','打席','打数','安打','二塁打','三塁打','本塁打','打点','四球','死球','三振','得点','打率','長打率','出塁率','OPS'];
+          const batRows2tsv = [batHeader2];
+          [g2.awayTeam, g2.homeTeam].forEach((tn2, ti2)=>{
+            const st2 = ti2===0 ? aStats2 : hStats2;
+            st2.forEach(p=>batRows2tsv.push([tn2,p.name,p.pa,p.ab,p.h,p.h2||0,p.h3||0,p.hr,p.rbi,p.bb,p.hbp||0,p.k,p.run,p.avg,p.slg||'---',p.obp||'---',p.ops||'---']));
+            batRows2tsv.push(['合計','',st2.reduce((s,p)=>s+(p.pa||0),0),st2.reduce((s,p)=>s+(p.ab||0),0),st2.reduce((s,p)=>s+(p.h||0),0),'','',st2.reduce((s,p)=>s+(p.hr||0),0),st2.reduce((s,p)=>s+(p.rbi||0),0),st2.reduce((s,p)=>s+(p.bb||0),0),'',st2.reduce((s,p)=>s+(p.k||0),0),st2.reduce((s,p)=>s+(p.run||0),0),'','','','']);
+            batRows2tsv.push([]);
+          });
+          const tsvText = toTsv(batRows2tsv);
+          const showOverlay = (textToCopy) => {
+            const ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;inset:0;background:#000a;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+            const bx = document.createElement('div');
+            bx.style.cssText = 'background:#1e293b;border-radius:14px;padding:20px;width:100%;max-width:500px;display:flex;flex-direction:column;gap:14px;';
+            const ttl = document.createElement('div');
+            ttl.style.cssText = 'color:#f0a500;font-weight:700;font-size:15px;';
+            ttl.textContent = '📊 Googleスプレッドシート用';
+            const desc = document.createElement('div');
+            desc.style.cssText = 'color:#94a3b8;font-size:12px;line-height:1.6;';
+            desc.textContent = '①下のボタンでコピー　②Googleスプレッドシートを開く　③A1セルをタップして貼り付け　→ 自動で列に分かれます';
+            const cb = document.createElement('button');
+            cb.style.cssText = 'background:#f0a500;color:#000;border:none;border-radius:10px;padding:16px;font-weight:900;font-size:18px;cursor:pointer;width:100%;';
+            cb.textContent = '📋 コピーする';
+            cb.onclick = () => {
+              navigator.clipboard.writeText(textToCopy).then(()=>{
+                cb.textContent = '✅ コピーしました！スプレッドシートに貼り付けてください';
+                cb.style.background = '#3fb950';
+              }).catch(()=>{
+                // fallbackでtextarea
+                const ta = document.createElement('textarea');
+                ta.value = textToCopy;
+                ta.style.cssText = 'position:fixed;top:-9999px;';
+                document.body.appendChild(ta);
+                ta.focus(); ta.select(); ta.setSelectionRange(0,99999);
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                cb.textContent = '✅ コピーしました！スプレッドシートに貼り付けてください';
+                cb.style.background = '#3fb950';
+              });
+            };
+            const cl = document.createElement('button');
+            cl.style.cssText = 'background:transparent;color:#64748b;border:1px solid #334155;border-radius:10px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;';
+            cl.textContent = '✕ 閉じる';
+            cl.onclick = () => document.body.removeChild(ov);
+            bx.appendChild(ttl); bx.appendChild(desc); bx.appendChild(cb); bx.appendChild(cl);
+            ov.appendChild(bx); document.body.appendChild(ov);
+          };
+          showOverlay(tsvText);
         } else {
           const blob = new Blob([csv2], {type:"text/csv;charset=utf-8;"});
           const url = URL.createObjectURL(blob);
@@ -2809,7 +2841,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v308")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v309")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2887,7 +2919,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v308")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v309")
         )
 
         // ===== 新規チーム作成 =====

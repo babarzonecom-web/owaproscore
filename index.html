@@ -2776,7 +2776,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v314")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v315")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2854,7 +2854,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v314")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v315")
         )
 
         // ===== 新規チーム作成 =====
@@ -5436,7 +5436,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       const avgInnings = m.outs>0 ? m.outsXinnings/m.outs : 9;
       const era = ipNum>0?(m.er*avgInnings/ipNum).toFixed(2):(m.er>0?"∞":"—");
       const whip= ipNum>0?((m.bb+m.h)/ipNum).toFixed(2):"—";
-      return {...m, ipDisp, ipNum, era, whip, games:m.games.size};
+      return {...m, ipDisp, ipNum, era, whip, games:m.games.size, runs:m.runs};
     }).sort((a,b)=>b.ipNum-a.ipNum);
   };
 
@@ -5602,7 +5602,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
         , React.createElement('table', {style:{...S.table,minWidth:480}}
           , React.createElement('thead', null
             , React.createElement('tr', null
-              , ["投手","試","投球回","球数","St%","被安打","自責点","防御率","WHIP","四球","奪三振","死球","被本塁"].map(h=>
+              , ["投手","試","投球回","被安打","失点","自責点","防御率","WHIP","四球","奪三振","死球","被本塁"].map(h=>
                   React.createElement('th', {key:h,style:thS}, h))
             )
           )
@@ -5630,6 +5630,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                 const displayFields = [
                   {k:"ipDisp", v:p.ipDisp, s:tdS, editable:true},
                   {k:"h", v:p.h, s:tdS, editable:true},
+                  {k:"runs", v:p.runs, s:{...tdS,color:"#fb923c"}, editable:true},
                   {k:"er", v:p.er, s:{...tdS,color:"#f87171"}, editable:true},
                   {k:"era", v:recalcEra, s:{...tdS,color:parseFloat(recalcEra)<3?"#4ade80":parseFloat(recalcEra)<5?"#fbbf24":"#f87171",fontWeight:900}, editable:false},
                   {k:"whip", v:recalcWhip, s:tdS, editable:false},
@@ -5646,13 +5647,6 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                       },"解除")
                   )
                   , React.createElement('td', {style:tdS}, p.games)
-                  , React.createElement('td', {style:tdS}, p.pitchCount||0)
-                  , React.createElement('td', {style:tdS}, (()=>{
-                      const total=p.pitchCount||0; const strikes=p.strikeCount||0;
-                      if(total===0) return "—";
-                      const rate=Math.round(strikes/total*100);
-                      return rate+"%";
-                    })())
                   , displayFields.map(f=>{
                       const {k,v,s,editable}=f;
                       if(!editable) {
@@ -5678,11 +5672,6 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                     })
                   , React.createElement('td', {style:tdS}, p.hbp)
                   , React.createElement('td', {style:{...tdS,color:p.hr>0?"#f87171":"#475569"}}, p.hr)
-                  , React.createElement('td', {style:{...tdS,color:(p.win||0)>0?"#4ade80":"#475569",fontWeight:(p.win||0)>0?700:400}}, p.win||0)
-                  , React.createElement('td', {style:{...tdS,color:(p.lose||0)>0?"#f87171":"#475569"}}, p.lose||0)
-                  , React.createElement('td', {style:{...tdS,color:(p.save||0)>0?"#fbbf24":"#475569",fontWeight:(p.save||0)>0?700:400}}, p.save||0)
-                  , React.createElement('td', {style:{...tdS,color:(p.hold||0)>0?"#60a5fa":"#475569"}}, p.hold||0)
-                  , React.createElement('td', {style:{...tdS,color:(p.bs||0)>0?"#fb923c":"#475569"}}, p.bs||0)
                 );
               })
           )
@@ -5692,6 +5681,68 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   );
 
   // 直近5試合の成績
+  // 直近5試合の投手成績
+  const Recent5Pitching = () => {
+    const pitcherMap = {};
+    recent5.forEach((g,gi)=>{
+      const sides = selectedTeam
+        ? (g.awayTeam===selectedTeam?["away"]:g.homeTeam===selectedTeam?["home"]:[])
+        : ["away","home"];
+      const pStats = computePitcherStats(g);
+      sides.forEach(side=>{
+        (g[side+"Pitchers"]||[]).forEach((p,i)=>{
+          if(!p.name) return;
+          const a = (pStats[side]||[])[i]||{};
+          const autoIpOuts = Math.floor((a.autoIp||0)/10)*3 + ((a.autoIp||0)%10);
+          const outsGot = p.manualIp!==undefined ? p.manualIp : autoIpOuts;
+          if(!pitcherMap[p.name]) pitcherMap[p.name]={name:p.name, games:Array(recent5.length).fill(null)};
+          const er  = p.er!==undefined&&p.manualOverride ? p.er : (a.autoEr||0);
+          const h   = p.manualOverride&&p.autoH!==undefined ? p.autoH : (a.autoH||0);
+          const bb  = p.manualOverride&&p.autoBb!==undefined ? p.autoBb : (a.autoBb||0);
+          const k   = p.manualOverride&&p.autoK!==undefined ? p.autoK : (a.autoK||0);
+          const runs= p.manualOverride&&p.autoRuns!==undefined ? p.autoRuns : (a.autoRuns||0);
+          const ipWhole=Math.floor(outsGot/3), ipFrac=outsGot%3;
+          const ipDisp=ipWhole+"回"+(ipFrac>0?ipFrac+"/3":"");
+          const ipNum=ipWhole+ipFrac/3;
+          pitcherMap[p.name].games[gi]={outsGot,ipDisp,ipNum,h,er,bb,k,runs};
+        });
+      });
+    });
+    const pList=Object.values(pitcherMap).filter(p=>p.games.some(g=>g&&g.outsGot>0));
+    if(!pList.length) return React.createElement('div',{style:{color:"#475569",textAlign:"center",padding:12}},"データなし");
+
+    return React.createElement('div', null
+      , React.createElement('div',{style:{...S.ct,marginBottom:10}},"⚾ 直近5試合の投手成績")
+      , React.createElement('div',{style:{overflowX:"auto"}}
+        , React.createElement('table',{style:{...S.table,minWidth:400}}
+          , React.createElement('thead',null
+            , React.createElement('tr',null
+              , React.createElement('th',{style:thS},"投手")
+              , recent5.map((g,gi)=>React.createElement('th',{key:gi,style:{...thS,color:"#94a3b8",fontSize:9}},
+                  (g.date||"").slice(5)+" "+(g.awayTeam||"")+"vs"+(g.homeTeam||"")))
+              , React.createElement('th',{style:{...thS,color:"#fbbf24"}},"通算防御率")
+            )
+          )
+          , React.createElement('tbody',null
+            , pList.map((p,ri)=>React.createElement('tr',{key:p.name,style:{background:ri%2===0?"#0a1628":"transparent"}}
+                , React.createElement('td',{style:{...tdS,fontWeight:700,minWidth:70}},p.name)
+                , p.games.map((g,gi)=>React.createElement('td',{key:gi,style:tdS},
+                    g ? React.createElement('div',null
+                        , React.createElement('div',{style:{fontSize:11,color:"#94a3b8"}},g.ipDisp)
+                        , React.createElement('div',{style:{fontSize:10,color:"#7d8590"}},g.h+"安 "+g.er+"自")
+                      ) : React.createElement('span',{style:{color:"#1e3a5f"}},"—")
+                  ))
+                , React.createElement('td',{style:{...tdS,fontWeight:700,color:"#fbbf24"}},(()=>{
+                    const tots=p.games.reduce((s,g)=>g?{ip:s.ip+g.ipNum,er:s.er+g.er}:{...s},{ip:0,er:0});
+                    return tots.ip>0?(tots.er*9/tots.ip).toFixed(2):"—";
+                  })())
+              ))
+          )
+        )
+      )
+    );
+  };
+
   const Recent5 = () => {
     // 選手ごとに5試合分の成績と通算を集計
     const players = {};
@@ -6050,6 +6101,9 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           , React.createElement('div', {style:S.card}
             , React.createElement('div', {style:{...S.ct,marginBottom:12}}, "📅 直近5試合の打率推移")
             , React.createElement(Recent5, null)
+          )
+          , React.createElement('div', {style:{...S.card,marginTop:12}}
+            , React.createElement(Recent5Pitching, null)
           )
         )
     )

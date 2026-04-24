@@ -1190,6 +1190,7 @@ function App() {
   const [newPitchMode, setNewPitchMode] = useState("result");
   const [newSeason, setNewSeason] = useState(()=>new Date().getFullYear());
   const [newTournament, setNewTournament] = useState(null);
+  const [pitEditMode, setPitEditMode] = useState(false);
   const [tournament, setTournament] = useState(null); // 現在参加中の大会データ
   const [tournamentCode, setTournamentCode] = useState(""); // 入力中のコード
   const [tournamentMsg, setTournamentMsg] = useState("");
@@ -2815,7 +2816,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v321")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v322")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2893,7 +2894,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v321")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v322")
         )
 
         // ===== 新規チーム作成 =====

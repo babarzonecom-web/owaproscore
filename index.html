@@ -2816,7 +2816,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v328")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v329")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2894,7 +2894,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v328")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v329")
         )
 
         // ===== 新規チーム作成 =====
@@ -3850,7 +3850,16 @@ function App() {
                                           mutGame(g=>{
                                             const ps=[...g[side+"Pitchers"]];
                                             ps.splice(i,1);
-                                            return {...g,[side+"Pitchers"]:ps};
+                                            // pitcherLogのインデックスも修正（削除した投手より後のインデックスを-1）
+                                            const logKey=side+"PitcherLog";
+                                            const newLog=(g[logKey]||[])
+                                              .filter(l=>l.pitcherIdx!==i) // 削除した投手のログを除去
+                                              .map(l=>({...l, pitcherIdx:l.pitcherIdx>i?l.pitcherIdx-1:l.pitcherIdx}));
+                                            // PitcherIdxも修正
+                                            const idxKey=side+"PitcherIdx";
+                                            const curIdx=g[idxKey]||0;
+                                            const newIdx=curIdx>i?curIdx-1:curIdx===i?Math.max(0,i-1):curIdx;
+                                            return {...g,[side+"Pitchers"]:ps,[logKey]:newLog,[idxKey]:newIdx};
                                           });
                                         },
                                         style:{fontSize:10,padding:"3px 6px",borderRadius:5,cursor:"pointer",

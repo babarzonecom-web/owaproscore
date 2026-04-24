@@ -2816,7 +2816,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v322")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v323")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2894,7 +2894,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v322")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v323")
         )
 
         // ===== 新規チーム作成 =====
@@ -3725,7 +3725,7 @@ function App() {
                 )
               )
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginTop:10,flexWrap:"wrap"},}
-                , React.createElement('button', { onClick: ()=>addPitcher(team),
+                , React.createElement('button', { onClick: ()=>addPitcher(side),
                   style: {background:"transparent",border:"1px dashed #2a4a7a",
                     borderRadius:7,color:"#7db8e8",padding:"5px 14px",cursor:"pointer",fontSize:12},}, "＋ 投手を追加"
                 )

@@ -2816,7 +2816,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v329")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v330")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2894,7 +2894,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v329")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v330")
         )
 
         // ===== 新規チーム作成 =====
@@ -3798,14 +3798,14 @@ function App() {
                           // デバッグ表示
                           const _dbg = "[og:"+(auto._outsGot||0)+" mIp:"+(p.manualIp!==undefined?p.manualIp:"—")+"]";
                           const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
-                          const er   = p.manualOverride ? (p.er!==undefined?p.er:(auto.autoEr||0)) : (auto.autoEr||0);
-                          // 表示値：manualOverrideかつ手動入力値がある場合はそちらを優先
-                          const hDisp   = (p.manualOverride && p.autoH!==undefined)    ? p.autoH    : (auto.autoH||0);
-                          const bbDisp  = (p.manualOverride && p.autoBb!==undefined)   ? p.autoBb   : (auto.autoBb||0);
-                          const kDisp   = (p.manualOverride && p.autoK!==undefined)    ? p.autoK    : (auto.autoK||0);
-                          const hbpDisp = (p.manualOverride && p.autoHbp!==undefined)  ? p.autoHbp  : (auto.autoHbp||0);
-                          const hrDisp  = (p.manualOverride && p.autoHr!==undefined)   ? p.autoHr   : (auto.autoHr||0);
-                          const runsDisp= (p.manualOverride && p.autoRuns!==undefined) ? p.autoRuns : (auto.autoRuns||0);
+                          const hasManual = !!p.manualOverride;
+                          const er      = hasManual && p.er!==undefined      ? p.er       : (auto.autoEr||0);
+                          const hDisp   = hasManual && p.autoH!==undefined   ? p.autoH    : (auto.autoH||0);
+                          const bbDisp  = hasManual && p.autoBb!==undefined  ? p.autoBb   : (auto.autoBb||0);
+                          const kDisp   = hasManual && p.autoK!==undefined   ? p.autoK    : (auto.autoK||0);
+                          const hbpDisp = hasManual && p.autoHbp!==undefined ? p.autoHbp  : (auto.autoHbp||0);
+                          const hrDisp  = hasManual && p.autoHr!==undefined  ? p.autoHr   : (auto.autoHr||0);
+                          const runsDisp= hasManual && p.autoRuns!==undefined? p.autoRuns : (auto.autoRuns||0);
                           const h=hDisp; const bb=bbDisp; const k=kDisp; const hbp=hbpDisp; const hr=hrDisp; const runs=runsDisp;
                           const era = ipNum>0 ? (er*9/ipNum).toFixed(2) : (er>0?"∞":"—");
                           return React.createElement('tr', {key:p.id||i,
@@ -3884,7 +3884,7 @@ function App() {
                                         onClick:()=>mutGame(g=>{
                                           const ps=[...g[side+"Pitchers"]];
                                           const cur=ps[i].manualIp!==undefined?ps[i].manualIp:autoIpOuts;
-                                          ps[i]={...ps[i],manualIp:Math.max(0,cur-1),manualOverride:true};
+                                          ps[i]={...ps[i],manualIp:Math.max(0,cur-1)};
                                           return{...g,[side+"Pitchers"]:ps};
                                         })
                                       },"−")
@@ -3893,7 +3893,7 @@ function App() {
                                         onClick:()=>mutGame(g=>{
                                           const ps=[...g[side+"Pitchers"]];
                                           const cur=ps[i].manualIp!==undefined?ps[i].manualIp:autoIpOuts;
-                                          ps[i]={...ps[i],manualIp:Math.min(90,cur+1),manualOverride:true};
+                                          ps[i]={...ps[i],manualIp:Math.min(90,cur+1)};
                                           return{...g,[side+"Pitchers"]:ps};
                                         })
                                       },"+")

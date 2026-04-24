@@ -2816,7 +2816,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v325")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v326")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2894,7 +2894,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v325")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v326")
         )
 
         // ===== 新規チーム作成 =====
@@ -3782,7 +3782,9 @@ function App() {
                           const auto = (pitcherStats[side]||[])[i]||{};
                           const isDefault = /^投手\d+$/.test(p.name||'');
                           const hasRecord = (auto._outsGot||0)>0||(auto.autoH||0)>0||(auto.autoBb||0)>0||(auto.autoK||0)>0;
-                          return !isDefault || hasRecord || (!game.finished && i===curPIdx);
+                          // 試合終了後は全投手表示（追加した投手も見えるように）
+                          if(game.finished) return true;
+                          return !isDefault || hasRecord || i===curPIdx;
                         }).map((p,_i) => {
                           const i = pitchers.indexOf(p); // 元のインデックスを保持
                           const isCur = !game.finished && i===curPIdx;

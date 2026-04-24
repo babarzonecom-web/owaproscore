@@ -2816,7 +2816,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v323")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v325")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2894,7 +2894,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v323")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v325")
         )
 
         // ===== 新規チーム作成 =====
@@ -3724,21 +3724,6 @@ function App() {
                   )
                 )
               )
-              , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginTop:10,flexWrap:"wrap"},}
-                , React.createElement('button', { onClick: ()=>addPitcher(side),
-                  style: {background:"transparent",border:"1px dashed #2a4a7a",
-                    borderRadius:7,color:"#7db8e8",padding:"5px 14px",cursor:"pointer",fontSize:12},}, "＋ 投手を追加"
-                )
-                , React.createElement('span', { style: {fontSize:11,color:"#475569"},},
-                    pitEditMode?"数値を直接入力できます":"赤丸 = 得点数 ／ タップで遡って修正")
-                , React.createElement('button', {
-                    onClick:()=>setPitEditMode(v=>!v),
-                    style:{padding:"5px 14px",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,
-                      background:pitEditMode?"#4c1d9522":"transparent",
-                      border:"1px solid "+(pitEditMode?"#a78bfa":"#2a4a7a"),
-                      color:pitEditMode?"#a78bfa":"#7db8e8"}
-                  }, pitEditMode?"✏️ 修正中（完了）":"✏️ 手動修正")
-              )
             )
           ))
         )
@@ -3811,18 +3796,15 @@ function App() {
                           // デバッグ表示
                           const _dbg = "[og:"+(auto._outsGot||0)+" mIp:"+(p.manualIp!==undefined?p.manualIp:"—")+"]";
                           const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
-                          const h   = auto.autoH||0;
-                          const bb  = auto.autoBb||0;
-                          const k   = auto.autoK||0;
-                          const hbp = auto.autoHbp||0;
-                          const hr  = auto.autoHr||0;
-                          const runs = auto.autoRuns||0;
-                          const er  = p.manualOverride ? (p.er!==undefined?p.er:(p.autoEr||0)) : (auto.autoEr||0);
-                          // 被安打・四球・三振は常にauto（computePitcherStats）の値を使う
-                          // p.autoH等はmakePitcherの初期値0が入っているので信用しない
-                          const hDisp  = auto.autoH||0;
-                          const bbDisp = auto.autoBb||0;
-                          const kDisp  = auto.autoK||0;
+                          const er   = p.manualOverride ? (p.er!==undefined?p.er:(auto.autoEr||0)) : (auto.autoEr||0);
+                          // 表示値：manualOverrideかつ手動入力値がある場合はそちらを優先
+                          const hDisp   = (p.manualOverride && p.autoH!==undefined)    ? p.autoH    : (auto.autoH||0);
+                          const bbDisp  = (p.manualOverride && p.autoBb!==undefined)   ? p.autoBb   : (auto.autoBb||0);
+                          const kDisp   = (p.manualOverride && p.autoK!==undefined)    ? p.autoK    : (auto.autoK||0);
+                          const hbpDisp = (p.manualOverride && p.autoHbp!==undefined)  ? p.autoHbp  : (auto.autoHbp||0);
+                          const hrDisp  = (p.manualOverride && p.autoHr!==undefined)   ? p.autoHr   : (auto.autoHr||0);
+                          const runsDisp= (p.manualOverride && p.autoRuns!==undefined) ? p.autoRuns : (auto.autoRuns||0);
+                          const h=hDisp; const bb=bbDisp; const k=kDisp; const hbp=hbpDisp; const hr=hrDisp; const runs=runsDisp;
                           const era = ipNum>0 ? (er*9/ipNum).toFixed(2) : (er>0?"∞":"—");
                           return React.createElement('tr', {key:p.id||i,
                             style:{background:isCur?(color+"22"):i%2===0?"#0a1628":"transparent",
@@ -3915,8 +3897,8 @@ function App() {
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {readOnly:!pitEditMode, type:"text", inputMode:"numeric", min:0,
-                                  defaultValue:hr,
-                                  key:"hr_"+i+"_"+hr,
+                                  defaultValue:hrDisp,
+                                  key:"hr_"+i+"_"+hrDisp,
                                   onBlur:e=>{ if(!pitEditMode) return; const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoHr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:pitEditMode?"#1a2a40":"transparent",border:pitEditMode?"1px solid #a78bfa":"none",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
@@ -3934,15 +3916,15 @@ function App() {
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {readOnly:!pitEditMode, type:"text", inputMode:"numeric", min:0,
-                                  defaultValue:hbp,
-                                  key:"hbp_"+i+"_"+hbp,
+                                  defaultValue:hbpDisp,
+                                  key:"hbp_"+i+"_"+hbpDisp,
                                   onBlur:e=>{ if(!pitEditMode) return; const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoHbp:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:pitEditMode?"#1a2a40":"transparent",border:pitEditMode?"1px solid #a78bfa":"none",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , React.createElement('input', {readOnly:!pitEditMode, type:"text", inputMode:"numeric", min:0,
-                                  defaultValue:runs,
-                                  key:"runs_"+i+"_"+runs,
+                                  defaultValue:runsDisp,
+                                  key:"runs_"+i+"_"+runsDisp,
                                   onBlur:e=>{ if(!pitEditMode) return; const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoRuns:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
                                   style:{width:34,textAlign:"center",background:pitEditMode?"#1a2a40":"transparent",border:pitEditMode?"1px solid #a78bfa":"none",
                                     borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
@@ -3961,8 +3943,41 @@ function App() {
                     )
                   )
                 )
-                , React.createElement('div', {style:{fontSize:11,color:"#475569",marginTop:6}},
-                    "※ 投手名をタップで編集。▼で候補から選択。「登板」ボタンで投手交代。")
+                , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginTop:10,flexWrap:"wrap"}}
+                    , React.createElement('button', {
+                        onClick:()=>addPitcher(side),
+                        style:{background:"transparent",border:"1px dashed #2a4a7a",
+                          borderRadius:7,color:"#7db8e8",padding:"5px 14px",cursor:"pointer",fontSize:12}
+                      }, "＋ 投手を追加")
+                    , React.createElement('button', {
+                        onClick:()=>{
+                          if(pitEditMode){
+                            if(window.confirm("この内容で手動修正を確定しますか？\nキャンセルすると自動計算値に戻ります。")){
+                              setPitEditMode(false);
+                            } else {
+                              // キャンセル：manualOverrideをリセットして自動計算値に戻す
+                              mutGame(g=>({...g,
+                                [side+"Pitchers"]:g[side+"Pitchers"].map(p=>({
+                                  ...p,
+                                  manualOverride:false,
+                                  er:undefined, autoH:undefined, autoBb:undefined,
+                                  autoK:undefined, autoHbp:undefined, autoHr:undefined, autoRuns:undefined
+                                }))
+                              }));
+                              setPitEditMode(false);
+                            }
+                          } else {
+                            setPitEditMode(true);
+                          }
+                        },
+                        style:{padding:"5px 14px",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,
+                          background:pitEditMode?"#4c1d9522":"transparent",
+                          border:"1px solid "+(pitEditMode?"#a78bfa":"#2a4a7a"),
+                          color:pitEditMode?"#a78bfa":"#7db8e8"}
+                      }, pitEditMode?"✏️ 修正中（完了）":"✏️ 手動修正")
+                    , React.createElement('span', {style:{fontSize:11,color:"#475569"}},
+                        pitEditMode?"数値を直接入力できます":"※ 投手名タップで編集。「登板」ボタンで投手交代。")
+                  )
               );
             })
 

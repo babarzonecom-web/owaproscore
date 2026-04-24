@@ -2814,7 +2814,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v317")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v319")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2892,7 +2892,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v317")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v319")
         )
 
         // ===== 新規チーム作成 =====
@@ -3770,8 +3770,8 @@ function App() {
                         , React.createElement('th', {style:{...S.th, textAlign:"left", minWidth:110}}, "投手名")
                         , React.createElement('th', {style:S.th}, "登板")
                         , React.createElement('th', {style:S.th}, "投球回")
-                        , React.createElement('th', {style:S.th}, "球数")
-                        , React.createElement('th', {style:S.th}, "St%")
+                        , (game.pitchMode||"result")==="pitch" && React.createElement('th', {style:S.th}, "球数")
+                        , (game.pitchMode||"result")==="pitch" && React.createElement('th', {style:S.th}, "St%")
                         , React.createElement('th', {style:S.th}, "被安打")
                         , React.createElement('th', {style:S.th}, "被本")
                         , React.createElement('th', {style:S.th}, "三振")
@@ -5685,6 +5685,19 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                       },"解除")
                   )
                   , React.createElement('td', {style:tdS}, p.games)
+                  , (game.pitchMode||"result")==="pitch" && React.createElement('td', {style:tdS},
+                      React.createElement('span', {style:{
+                        fontSize:14,fontWeight:700,
+                        color:(p.pitchCount||0)>=100?"#f87171":(p.pitchCount||0)>=80?"#fbbf24":"#4ade80"
+                      }}, p.pitchCount||0)
+                    )
+                  , (game.pitchMode||"result")==="pitch" && React.createElement('td', {style:tdS}, (()=>{
+                      const total=p.pitchCount||0, strikes=p.strikeCount||0;
+                      if(total===0) return "—";
+                      const rate=Math.round(strikes/total*100);
+                      const color=rate>=65?"#4ade80":rate>=55?"#fbbf24":"#f87171";
+                      return React.createElement('span',{style:{fontSize:13,fontWeight:700,color}},rate+"%");
+                    })())
                   , displayFields.map(f=>{
                       const {k,v,s,editable}=f;
                       if(!editable) {

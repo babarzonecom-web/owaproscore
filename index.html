@@ -879,6 +879,31 @@ const computePitcherStats = (g) => {
       if(ps) { ps._outsGot++; ps._brOutsCount++; }
     });
 
+    // 試合終了時のアウト補正
+    // 最終投手にfinalOutsまでのアウトを補完（試合終了ボタンで記録漏れを防ぐ）
+    if(g.finished && g.finalOuts !== undefined && g.finalHalf !== undefined) {
+      // 最終ハーフの総アウト数を計算（allAtBatsから）
+      const finalHalfOuts = allAtBats.filter(ab =>
+        ab.inning === g.finalInning && ab.half === g.finalHalf && OUT_CODES_FOR_IP.has(ab.entry.code) && !ab.hasError
+      ).length + allAtBats.filter(ab =>
+        ab.inning === g.finalInning && ab.half === g.finalHalf && ab.entry.code === "DP" && !ab.hasError
+      ).length + allAtBats.filter(ab =>
+        ab.inning === g.finalInning && ab.half === g.finalHalf && ab.entry.code === "TP" && !ab.hasError
+      ).length * 2;
+      const brOutsInFinalHalf = (g.baserunnerOuts||[]).filter(bo =>
+        bo.defTeam === defTeam && bo.inning === g.finalInning && bo.half === g.finalHalf
+      ).length;
+      const totalFinalOuts = finalHalfOuts + brOutsInFinalHalf;
+      const expectedOuts = g.finalOuts;
+      if(totalFinalOuts < expectedOuts) {
+        // 差分を最終投手に補完
+        const lastPitcher = stats.length > 0 ? stats[stats.length - 1] : null;
+        if(lastPitcher) {
+          const diff = expectedOuts - totalFinalOuts;
+          lastPitcher._outsGot += diff;
+        }
+      }
+    }
     stats.forEach(ps=>{
       ps.autoIp = Math.floor(ps._outsGot/3)*10 + (ps._outsGot%3); 
     });
@@ -2350,10 +2375,11 @@ function App() {
 
   const endGame = useCallback((reason, endInning, endNote, pitcherResults)=>{
     mutGame(g=>{
-      // 試合終了時: 現在進行中のハーフにアウト不足があれば補完
-      // 残塁はアウトではないので投球回に補完しない
+      // 試合終了時: 現在のアウトカウントを最終アウト数として記録
+      // computePitcherStatsで使用してズレを補正する
       return {...g, finished:true, endReason:reason, endInning, endNote:endNote||"",
-        pitcherResults:pitcherResults||{}};
+        pitcherResults:pitcherResults||{},
+        finalOuts: g.outs, finalInning: g.inning, finalHalf: g.half};
     });
     
     setStorage(s=>{
@@ -2776,7 +2802,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v315")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v316")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2854,7 +2880,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v315")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v316")
         )
 
         // ===== 新規チーム作成 =====

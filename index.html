@@ -2816,7 +2816,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v332")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v333")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2894,7 +2894,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v332")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v333")
         )
 
         // ===== 新規チーム作成 =====
@@ -5504,7 +5504,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
         const autoArr = (pStats[side]||[]);
         pitchers.forEach((p,i)=>{
           if(!p.name) return;
-          if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set(),outsXinnings:0};
+          if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set(),outsXinnings:0,win:0,lose:0,save:0,hold:0,bs:0};
           const m = map[p.name];
           m.games.add(g.id);
           const a = autoArr[i]||{};
@@ -5522,6 +5522,13 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           m.hbp  += p.manualOverride&&p.autoHbp!==undefined ? p.autoHbp : (a.autoHbp||0);
           m.hr   += p.manualOverride&&p.autoHr!==undefined ? p.autoHr : (a.autoHr||0);
           m.runs += p.manualOverride&&p.autoRuns!==undefined ? p.autoRuns : (a.autoRuns||0);
+          // 勝敗・セーブ・ホールド
+          const pr = (g.pitcherResults||{})[p.name]||{};
+          if(pr.win)  m.win++;
+          if(pr.lose) m.lose++;
+          if(pr.save) m.save++;
+          if(pr.hold) m.hold++;
+          if(pr.bs)   m.bs++;
           // 防御率計算用：投球アウト数×試合のイニング数を累積
           m.outsXinnings += outsGot * (g.innings||9);
         });
@@ -5536,7 +5543,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       const avgInnings = m.outs>0 ? m.outsXinnings/m.outs : 9;
       const era = ipNum>0?(m.er*avgInnings/ipNum).toFixed(2):(m.er>0?"∞":"—");
       const whip= ipNum>0?((m.bb+m.h)/ipNum).toFixed(2):"—";
-      return {...m, ipDisp, ipNum, era, whip, games:m.games.size, runs:m.runs};
+      return {...m, ipDisp, ipNum, era, whip, games:m.games.size, runs:m.runs,
+        win:m.win, lose:m.lose, save:m.save, hold:m.hold, bs:m.bs};
     }).sort((a,b)=>b.ipNum-a.ipNum);
   };
 
@@ -6884,7 +6892,13 @@ function EndGameModal({ game, onConfirm, onCancel }) {
   // 投手成績チェック
   const allPitchers = [...(game.awayPitchers||[]), ...(game.homePitchers||[])].filter(p=>p&&p.name);
   const initPR = {};
-  allPitchers.forEach(p=>{ initPR[p.name]={win:false,lose:false,save:false,hold:false,bs:false}; });
+  allPitchers.forEach(p=>{
+    const existing = (game.pitcherResults||{})[p.name]||{};
+    initPR[p.name]={
+      win:existing.win||false, lose:existing.lose||false,
+      save:existing.save||false, hold:existing.hold||false, bs:existing.bs||false
+    };
+  });
   const [pitcherResults, setPitcherResults] = useState(initPR);
   const togglePR = (name, key) => {
     setPitcherResults(pr=>{

@@ -2149,7 +2149,8 @@ function App() {
       const newLog = [...(g[logKey]||[]), entry];
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-        msg:`【${g[defTeam+"Team"]}】投手交代: ${_optionalChain([g, 'access', _21 => _21[defTeam+"Pitchers"], 'access', _22 => _22[newPitcherIdx], 'optionalAccess', _23 => _23.name])||"新投手"} 登板（${g.inning}回${g.half==="top"?"表":"裏"}）`
+        msg:`【${g[defTeam+"Team"]}】投手交代: ${_optionalChain([g, 'access', _21 => _21[defTeam+"Pitchers"], 'access', _22 => _22[newPitcherIdx], 'optionalAccess', _23 => _23.name])||"新投手"} 登板（${g.inning}回${g.half==="top"?"表":"裏"}）`,
+        logType:"sub", runs:0
       },...(g.log||[]).slice(0,99)];
       return {...g,[defTeam+"PitcherIdx"]:newPitcherIdx,[logKey]:newLog,log};
     });
@@ -2834,7 +2835,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v339")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v340")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2912,7 +2913,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v339")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v340")
         )
 
         // ===== 新規チーム作成 =====
@@ -3906,6 +3907,45 @@ function App() {
                                           background:"#f8514922",border:"1px solid #f85149",
                                           color:"#f85149",fontWeight:700}
                                       }, "×")
+                                    , pitEditMode && i>0 && React.createElement('button', {
+                                        onClick:()=>mutGame(g=>{
+                                          const ps=[...g[side+"Pitchers"]];
+                                          [ps[i-1],ps[i]]=[ps[i],ps[i-1]];
+                                          // pitcherLogのインデックスも入れ替え
+                                          const lk=side+"PitcherLog";
+                                          const nl=(g[lk]||[]).map(l=>{
+                                            if(l.pitcherIdx===i) return {...l,pitcherIdx:i-1};
+                                            if(l.pitcherIdx===i-1) return {...l,pitcherIdx:i};
+                                            return l;
+                                          });
+                                          const ik=side+"PitcherIdx";
+                                          const ci=g[ik]||0;
+                                          const ni=ci===i?i-1:ci===i-1?i:ci;
+                                          return {...g,[side+"Pitchers"]:ps,[lk]:nl,[ik]:ni};
+                                        }),
+                                        style:{fontSize:10,padding:"3px 6px",borderRadius:5,cursor:"pointer",
+                                          background:"#1a2a4022",border:"1px solid #3b82f6",
+                                          color:"#3b82f6",fontWeight:700}
+                                      }, "↑")
+                                    , pitEditMode && i<pitchers.length-1 && React.createElement('button', {
+                                        onClick:()=>mutGame(g=>{
+                                          const ps=[...g[side+"Pitchers"]];
+                                          [ps[i+1],ps[i]]=[ps[i],ps[i+1]];
+                                          const lk=side+"PitcherLog";
+                                          const nl=(g[lk]||[]).map(l=>{
+                                            if(l.pitcherIdx===i) return {...l,pitcherIdx:i+1};
+                                            if(l.pitcherIdx===i+1) return {...l,pitcherIdx:i};
+                                            return l;
+                                          });
+                                          const ik=side+"PitcherIdx";
+                                          const ci=g[ik]||0;
+                                          const ni=ci===i?i+1:ci===i+1?i:ci;
+                                          return {...g,[side+"Pitchers"]:ps,[lk]:nl,[ik]:ni};
+                                        }),
+                                        style:{fontSize:10,padding:"3px 6px",borderRadius:5,cursor:"pointer",
+                                          background:"#1a2a4022",border:"1px solid #3b82f6",
+                                          color:"#3b82f6",fontWeight:700}
+                                      }, "↓")
                                     , pitEditMode && React.createElement('div', {style:{display:"flex",gap:3,marginTop:4,flexWrap:"wrap"}},
                                         [
                                           {key:"win",  label:"勝", color:"#4ade80"},

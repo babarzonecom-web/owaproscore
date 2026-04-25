@@ -1616,9 +1616,12 @@ function App() {
         });
         if(moved.length) runnerNote = ' (' + moved.join(', ') + ')';
       }
+      const isOutCode = ["K","KL","GO","FO","LO","FF","DP","TP","SAC","SF","OI"].includes(code);
+      const logType = (runs||0)>0?"score":isOutCode?"out":"normal";
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-        msg:`【${g[team+"Team"]}】${lineup[pidx].name} → ${_optionalChain([rOf, 'call', _7 => _7(code), 'optionalAccess', _8 => _8.label])||code}${zl?`(${zl.label})`:""}${(runs||0)>0?` [${runs}点]`:""}${runnerNote}（${inning}回）`
+        msg:`【${g[team+"Team"]}】${lineup[pidx].name} → ${_optionalChain([rOf, 'call', _7 => _7(code), 'optionalAccess', _8 => _8.label])||code}${zl?`(${zl.label})`:""}${(runs||0)>0?` [${runs}点]`:""}${runnerNote}（${inning}回）`,
+        runs:runs||0, logType
       },...(g.log||[]).slice(0,99)];
       return {...tmp,...scores,log,[batterKey]:nextPidx};
     });
@@ -2091,7 +2094,8 @@ function App() {
         ts,
         msg: isPosChange
           ? `【${g[team+"Team"]}】ポジション変更: ${outPlayer.name} ${outPlayer.pos||"-"}→${newPos} (${g.inning}回${g.half==="top"?"表":"裏"})`
-          : `【${g[team+"Team"]}】交代: ${outPlayer.name}(${outPlayer.pos||"-"}) → ${newName}(${newPos||"-"})${reason?` [${reason}]`:""} (${g.inning}回${g.half==="top"?"表":"裏"})`
+          : `【${g[team+"Team"]}】交代: ${outPlayer.name}(${outPlayer.pos||"-"}) → ${newName}(${newPos||"-"})${reason?` [${reason}]`:""} (${g.inning}回${g.half==="top"?"表":"裏"}）`,
+        logType:"sub", runs:0
       },...(g.log||[]).slice(0,99)];
 
       const defEntry = {
@@ -2830,7 +2834,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v338")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v339")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2908,7 +2912,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v338")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v339")
         )
 
         // ===== 新規チーム作成 =====
@@ -3827,6 +3831,36 @@ function App() {
                               outline:isCur?`1px solid ${color}33`:"none"}}
                             // 投手名セル：編集可能input + 候補ドロップダウン
                             , React.createElement('td', {style:{...S.td, minWidth:110}}
+                              , pitEditMode && i > 0 && (()=>{
+                                  const logKey = side+"PitcherLog";
+                                  const logEntry = (game[logKey]||[]).find(l=>l.pitcherIdx===i);
+                                  const inn = logEntry?logEntry.fromInning:game.inning;
+                                  const half = logEntry?logEntry.fromHalf:game.half;
+                                  const outs2 = logEntry?logEntry.outsAtStart:0;
+                                  const halfLabel = half==="top"?"表":"裏";
+                                  const btnS = {fontSize:9,width:16,height:16,borderRadius:3,border:"1px solid #a78bfa",
+                                    background:"#4c1d9522",color:"#a78bfa",cursor:"pointer",padding:0,fontWeight:700,lineHeight:"16px"};
+                                  const upd = (ni,nh,no) => mutGame(g=>{
+                                    const lk=side+"PitcherLog";
+                                    const existing=(g[lk]||[]).find(l=>l.pitcherIdx===i);
+                                    const newLog=existing
+                                      ?(g[lk]||[]).map(l=>l.pitcherIdx===i?{...l,fromInning:ni,fromHalf:nh,outsAtStart:no}:l)
+                                      :[...(g[lk]||[]),{pitcherIdx:i,fromInning:ni,fromHalf:nh,outsAtStart:no,atBatSeq:-1}];
+                                    return {...g,[lk]:newLog};
+                                  });
+                                  return React.createElement('div',{style:{display:"flex",gap:2,alignItems:"center",flexWrap:"wrap",marginBottom:3}}
+                                    , React.createElement('span',{style:{fontSize:8,color:"#a78bfa",fontWeight:700}},"登板:")
+                                    , React.createElement('button',{style:btnS,onClick:()=>upd(Math.max(1,inn-1),half,outs2)},"△")
+                                    , React.createElement('span',{style:{fontSize:9,color:"#e2e8f0",minWidth:16,textAlign:"center"}},inn+"回")
+                                    , React.createElement('button',{style:btnS,onClick:()=>upd(Math.min(15,inn+1),half,outs2)},"▽")
+                                    , React.createElement('button',{style:{...btnS,marginLeft:2},onClick:()=>upd(inn,half==="top"?"bottom":"top",outs2)},halfLabel)
+                                    , React.createElement('span',{style:{fontSize:8,color:"#475569",margin:"0 2px"}},"|" )
+                                    , React.createElement('button',{style:btnS,onClick:()=>upd(inn,half,Math.max(0,outs2-1))},"△")
+                                    , React.createElement('span',{style:{fontSize:9,color:"#e2e8f0",minWidth:14,textAlign:"center"}},outs2)
+                                    , React.createElement('button',{style:btnS,onClick:()=>upd(inn,half,Math.min(2,outs2+1))},"▽")
+                                    , React.createElement('span',{style:{fontSize:8,color:"#475569"}},"out")
+                                  );
+                                })()
                               , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:3}}
                                 , isCur&&React.createElement('span',{style:{color,fontSize:10,fontWeight:900,flexShrink:0}},"▶")
                                 , React.createElement('input', {

@@ -942,7 +942,9 @@ const newGame = (innings=7, pitchMode="result", season=null, tournament=null) =>
   awayBatterIdx:0, homeBatterIdx:0, 
   awayPitcherIdx:0, homePitcherIdx:0, 
   
-  awayPitcherLog:[], homePitcherLog:[],
+  // 先発投手のログエントリを初期値として追加（idx:0が先発）
+  awayPitcherLog:[{pitcherIdx:0, fromInning:1, fromHalf:"bottom", outsAtStart:0, atBatSeq:0}],
+  homePitcherLog:[{pitcherIdx:0, fromInning:1, fromHalf:"top",    outsAtStart:0, atBatSeq:0}],
   baserunnerOuts: [], // 走塁アウト記録 [{inning,half,outsAtTime,defTeam}]
 });
 
@@ -2004,8 +2006,20 @@ function App() {
     
     const existIdx = pitchers.findIndex(p=>p.name===pitcher.name);
     if(existIdx >= 0){
-      
-      return {...g, [side+"PitcherIdx"]: existIdx};
+      // 既存投手への切り替え：pitcherLogにエントリを追加
+      const logKey = side+"PitcherLog";
+      const offLKey = side==="away" ? "homeLineup" : "awayLineup";
+      const offL = g[offLKey]||[];
+      let abSeq = 0;
+      offL.forEach(p=>{ Object.values(p.atBats||{}).forEach(abs=>{ abSeq += Array.isArray(abs)?abs.length:Object.values(abs||{}).length; }); });
+      const newLog = [...(g[logKey]||[]), {
+        pitcherIdx: existIdx,
+        fromInning: g.inning,
+        fromHalf: g.half,
+        outsAtStart: g.outs,
+        atBatSeq: abSeq,
+      }];
+      return {...g, [side+"PitcherIdx"]: existIdx, [logKey]: newLog};
     }
     
     const newPitcher = {...makePitcher(pitchers.length+1), name: pitcher.name};
@@ -2816,7 +2830,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v337")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v338")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2894,7 +2908,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v337")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v338")
         )
 
         // ===== 新規チーム作成 =====

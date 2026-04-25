@@ -2835,7 +2835,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v343")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v344")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2913,7 +2913,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v343")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v344")
         )
 
         // ===== 新規チーム作成 =====
@@ -3886,8 +3886,8 @@ function App() {
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , isCur
                                 ? React.createElement('span', {style:{fontSize:10,color,fontWeight:700}},"登板中")
-                                : pitEditMode && React.createElement('div', {style:{display:"flex",gap:3,flexWrap:"wrap",alignItems:"center"}}
-                                    , React.createElement('button', {
+                                : pitEditMode && React.createElement('div', {style:{display:"flex",gap:3,justifyContent:"center"}}
+                                    , pitEditMode && React.createElement('button', {
                                         onClick:()=>{
                                           if(!window.confirm(p.name+" を削除しますか？")) return;
                                           mutGame(g=>{
@@ -3903,13 +3903,15 @@ function App() {
                                             return {...g,[side+"Pitchers"]:ps,[logKey]:newLog,[idxKey]:newIdx};
                                           });
                                         },
-                                        style:{fontSize:10,padding:"2px 5px",borderRadius:4,cursor:"pointer",
-                                          background:"#f8514922",border:"1px solid #f85149",color:"#f85149",fontWeight:700}
+                                        style:{fontSize:10,padding:"3px 6px",borderRadius:5,cursor:"pointer",
+                                          background:"#f8514922",border:"1px solid #f85149",
+                                          color:"#f85149",fontWeight:700}
                                       }, "×")
-                                    , i>0 && React.createElement('button', {
+                                    , pitEditMode && i>0 && React.createElement('button', {
                                         onClick:()=>mutGame(g=>{
                                           const ps=[...g[side+"Pitchers"]];
                                           [ps[i-1],ps[i]]=[ps[i],ps[i-1]];
+                                          // pitcherLogのインデックスも入れ替え
                                           const lk=side+"PitcherLog";
                                           const nl=(g[lk]||[]).map(l=>{
                                             if(l.pitcherIdx===i) return {...l,pitcherIdx:i-1};
@@ -3921,10 +3923,11 @@ function App() {
                                           const ni=ci===i?i-1:ci===i-1?i:ci;
                                           return {...g,[side+"Pitchers"]:ps,[lk]:nl,[ik]:ni};
                                         }),
-                                        style:{fontSize:10,padding:"2px 5px",borderRadius:4,cursor:"pointer",
-                                          background:"#1a2a4022",border:"1px solid #3b82f6",color:"#3b82f6",fontWeight:700}
+                                        style:{fontSize:10,padding:"3px 6px",borderRadius:5,cursor:"pointer",
+                                          background:"#1a2a4022",border:"1px solid #3b82f6",
+                                          color:"#3b82f6",fontWeight:700}
                                       }, "↑")
-                                    , i<pitchers.length-1 && React.createElement('button', {
+                                    , pitEditMode && i<pitchers.length-1 && React.createElement('button', {
                                         onClick:()=>mutGame(g=>{
                                           const ps=[...g[side+"Pitchers"]];
                                           [ps[i+1],ps[i]]=[ps[i],ps[i+1]];
@@ -3939,10 +3942,11 @@ function App() {
                                           const ni=ci===i?i+1:ci===i+1?i:ci;
                                           return {...g,[side+"Pitchers"]:ps,[lk]:nl,[ik]:ni};
                                         }),
-                                        style:{fontSize:10,padding:"2px 5px",borderRadius:4,cursor:"pointer",
-                                          background:"#1a2a4022",border:"1px solid #3b82f6",color:"#3b82f6",fontWeight:700}
+                                        style:{fontSize:10,padding:"3px 6px",borderRadius:5,cursor:"pointer",
+                                          background:"#1a2a4022",border:"1px solid #3b82f6",
+                                          color:"#3b82f6",fontWeight:700}
                                       }, "↓")
-                                    , React.createElement('div', {style:{display:"flex",gap:3,flexWrap:"wrap"}},
+                                    , pitEditMode && React.createElement('div', {style:{display:"flex",gap:3,marginTop:4,flexWrap:"wrap"}},
                                         [
                                           {key:"win",  label:"勝", color:"#4ade80"},
                                           {key:"lose", label:"敗", color:"#f87171"},
@@ -6145,8 +6149,15 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             filteredGames.length+"試合分の成績"+(selectedTeam?" ("+selectedTeam+")":"")+(selectedSeason?" "+selectedSeason+"年":""))
       )
 
-      // 種別タブ切替
-      , React.createElement('div', {style:{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}
+      // チーム未選択メッセージ
+      , !selectedTeam && React.createElement('div', {style:{textAlign:"center",padding:"30px 20px"}}
+          , React.createElement('div',{style:{fontSize:36,marginBottom:10}},"📋")
+          , React.createElement('div',{style:{fontSize:15,color:"#7db8e8",fontWeight:700,marginBottom:6}},"チームを選択してください")
+          , React.createElement('div',{style:{fontSize:12,color:"#475569"}},"上のチームボタンから表示するチームを選択してください")
+        )
+
+  // 種別タブ切替
+      , selectedTeam && React.createElement('div', {style:{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}
         , [["batting","⚾ 打撃"],["pitching","🎯 投手"],["defense","🧤 守備"],["team","🏆 チーム通算"],["recent","📅 直近5試合"]].map(([id,label])=>
             React.createElement('button', {key:id, onClick:()=>setStatsView(id),
               style:{padding:"7px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
@@ -6157,7 +6168,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       )
 
       // 打撃成績
-      , statsView==="batting" && React.createElement('div', null
+      , selectedTeam && statsView==="batting" && React.createElement('div', null
           , React.createElement('div',{style:{display:"flex",justifyContent:"flex-end",marginBottom:8}}
             , React.createElement('button',{
                 onClick:()=>setEditMode(v=>!v),
@@ -6176,7 +6187,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
         )
 
       // 投手成績
-      , statsView==="pitching" && React.createElement('div', null
+      , selectedTeam && statsView==="pitching" && React.createElement('div', null
           , React.createElement('div',{style:{display:"flex",justifyContent:"flex-end",marginBottom:8}}
               , React.createElement('button',{
                   onClick:()=>setEditPitchMode(v=>!v),
@@ -6191,7 +6202,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
         )
 
       // 守備成績
-      , statsView==="defense" && React.createElement('div', null
+      , selectedTeam && statsView==="defense" && React.createElement('div', null
           , React.createElement('div', {style:{...S.card}}
             , React.createElement('div', {style:{...S.ct,marginBottom:10}}, "🧤 守備成績（失策）")
             , defStats.filter(p=>p.e>0||p.games>0).length===0
@@ -6232,7 +6243,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
         )
 
       // チーム通算
-      , statsView==="team" && React.createElement('div', null
+      , selectedTeam && statsView==="team" && React.createElement('div', null
           , React.createElement('div', {style:{...S.card}}
             , React.createElement('div', {style:{...S.ct,marginBottom:12}}, "🏆 チーム通算成績")
             , React.createElement('div', {style:{fontSize:12,color:"#7db8e8",marginBottom:10}}, "集計試合数: ", allGames.length, "試合")
@@ -6273,7 +6284,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
         )
 
       // 直近5試合
-      , statsView==="recent" && React.createElement('div', null
+      , selectedTeam && statsView==="recent" && React.createElement('div', null
           , React.createElement('div', {style:S.card}
             , React.createElement('div', {style:{...S.ct,marginBottom:12}}, "📅 直近5試合の打率推移")
             , React.createElement(Recent5, null)

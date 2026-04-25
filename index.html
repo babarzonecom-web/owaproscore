@@ -2816,7 +2816,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v330")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v332")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2894,7 +2894,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v330")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v332")
         )
 
         // ===== 新規チーム作成 =====
@@ -3870,16 +3870,15 @@ function App() {
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , (()=>{
-                                  // rawIpは10進数形式(例:10=1回)→アウト数に変換してから表示
                                   const manualOuts = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
                                   const dispInn = Math.floor(manualOuts/3);
                                   const dispFrac = manualOuts%3;
                                   const dispStr = dispInn + "回" + (dispFrac>0 ? dispFrac+"/3" : "");
-                                  const btnSt = {width:22,height:22,borderRadius:4,border:"1px solid #1e3a5f",
-                                    background:"#1e3a5f",color:"#7dd3fc",cursor:"pointer",
+                                  if(!pitEditMode) return React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}},dispStr);
+                                  const btnSt = {width:22,height:22,borderRadius:4,border:"1px solid #a78bfa",
+                                    background:"#4c1d9522",color:"#a78bfa",cursor:"pointer",
                                     fontSize:14,fontWeight:900,padding:0,flexShrink:0};
                                   return React.createElement('div',{style:{display:"flex",alignItems:"center",gap:3,justifyContent:"center"}}
-
                                     , React.createElement('button',{style:btnSt,
                                         onClick:()=>mutGame(g=>{
                                           const ps=[...g[side+"Pitchers"]];
@@ -5703,7 +5702,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
         , React.createElement('table', {style:{...S.table,minWidth:480}}
           , React.createElement('thead', null
             , React.createElement('tr', null
-              , ["投手","試","投球回","被安打","失点","自責点","防御率","WHIP","四球","奪三振","死球","被本塁"].map(h=>
+              , ["投手","試","投球回","被安打","失点","自責点","防御率","WHIP","四球","奪三振","死球","被本塁","勝","敗","S","H","BS"].map(h=>
                   React.createElement('th', {key:h,style:thS}, h))
             )
           )
@@ -5786,6 +5785,11 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                     })
                   , React.createElement('td', {style:tdS}, p.hbp)
                   , React.createElement('td', {style:{...tdS,color:p.hr>0?"#f87171":"#475569"}}, p.hr)
+                  , React.createElement('td',{style:{...tdS,color:(p.win||0)>0?"#4ade80":"#475569",fontWeight:(p.win||0)>0?700:400}},p.win||0)
+                  , React.createElement('td',{style:{...tdS,color:(p.lose||0)>0?"#f87171":"#475569"}},p.lose||0)
+                  , React.createElement('td',{style:{...tdS,color:(p.save||0)>0?"#fbbf24":"#475569",fontWeight:(p.save||0)>0?700:400}},p.save||0)
+                  , React.createElement('td',{style:{...tdS,color:(p.hold||0)>0?"#60a5fa":"#475569"}},p.hold||0)
+                  , React.createElement('td',{style:{...tdS,color:(p.bs||0)>0?"#fb923c":"#475569"}},p.bs||0)
                 );
               })
           )

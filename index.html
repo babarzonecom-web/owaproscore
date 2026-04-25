@@ -2835,7 +2835,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v342")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v343")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2913,7 +2913,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v342")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v343")
         )
 
         // ===== 新規チーム作成 =====
@@ -3886,8 +3886,8 @@ function App() {
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , isCur
                                 ? React.createElement('span', {style:{fontSize:10,color,fontWeight:700}},"登板中")
-                                : pitEditMode && React.createElement('div', {style:{display:"flex",gap:3,justifyContent:"center"}}
-                                    , pitEditMode && React.createElement('button', {
+                                : pitEditMode && React.createElement('div', {style:{display:"flex",gap:3,flexWrap:"wrap",alignItems:"center"}}
+                                    , React.createElement('button', {
                                         onClick:()=>{
                                           if(!window.confirm(p.name+" を削除しますか？")) return;
                                           mutGame(g=>{
@@ -3903,15 +3903,13 @@ function App() {
                                             return {...g,[side+"Pitchers"]:ps,[logKey]:newLog,[idxKey]:newIdx};
                                           });
                                         },
-                                        style:{fontSize:10,padding:"3px 6px",borderRadius:5,cursor:"pointer",
-                                          background:"#f8514922",border:"1px solid #f85149",
-                                          color:"#f85149",fontWeight:700}
+                                        style:{fontSize:10,padding:"2px 5px",borderRadius:4,cursor:"pointer",
+                                          background:"#f8514922",border:"1px solid #f85149",color:"#f85149",fontWeight:700}
                                       }, "×")
-                                    , pitEditMode && i>0 && React.createElement('button', {
+                                    , i>0 && React.createElement('button', {
                                         onClick:()=>mutGame(g=>{
                                           const ps=[...g[side+"Pitchers"]];
                                           [ps[i-1],ps[i]]=[ps[i],ps[i-1]];
-                                          // pitcherLogのインデックスも入れ替え
                                           const lk=side+"PitcherLog";
                                           const nl=(g[lk]||[]).map(l=>{
                                             if(l.pitcherIdx===i) return {...l,pitcherIdx:i-1};
@@ -3923,11 +3921,10 @@ function App() {
                                           const ni=ci===i?i-1:ci===i-1?i:ci;
                                           return {...g,[side+"Pitchers"]:ps,[lk]:nl,[ik]:ni};
                                         }),
-                                        style:{fontSize:10,padding:"3px 6px",borderRadius:5,cursor:"pointer",
-                                          background:"#1a2a4022",border:"1px solid #3b82f6",
-                                          color:"#3b82f6",fontWeight:700}
+                                        style:{fontSize:10,padding:"2px 5px",borderRadius:4,cursor:"pointer",
+                                          background:"#1a2a4022",border:"1px solid #3b82f6",color:"#3b82f6",fontWeight:700}
                                       }, "↑")
-                                    , pitEditMode && i<pitchers.length-1 && React.createElement('button', {
+                                    , i<pitchers.length-1 && React.createElement('button', {
                                         onClick:()=>mutGame(g=>{
                                           const ps=[...g[side+"Pitchers"]];
                                           [ps[i+1],ps[i]]=[ps[i],ps[i+1]];
@@ -3942,11 +3939,10 @@ function App() {
                                           const ni=ci===i?i+1:ci===i+1?i:ci;
                                           return {...g,[side+"Pitchers"]:ps,[lk]:nl,[ik]:ni};
                                         }),
-                                        style:{fontSize:10,padding:"3px 6px",borderRadius:5,cursor:"pointer",
-                                          background:"#1a2a4022",border:"1px solid #3b82f6",
-                                          color:"#3b82f6",fontWeight:700}
+                                        style:{fontSize:10,padding:"2px 5px",borderRadius:4,cursor:"pointer",
+                                          background:"#1a2a4022",border:"1px solid #3b82f6",color:"#3b82f6",fontWeight:700}
                                       }, "↓")
-                                    , pitEditMode && React.createElement('div', {style:{display:"flex",gap:3,marginTop:4,flexWrap:"wrap"}},
+                                    , React.createElement('div', {style:{display:"flex",gap:3,flexWrap:"wrap"}},
                                         [
                                           {key:"win",  label:"勝", color:"#4ade80"},
                                           {key:"lose", label:"敗", color:"#f87171"},

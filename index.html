@@ -776,14 +776,15 @@ const computePitcherStats = (g) => {
 
     
     
-    // 先発投手（idx:0）のエントリを補完する
-    // defTeam="home" → 守備は表（top）を抑える
-    // defTeam="away" → 守備は裏（bottom）を抑える
+    // 先発投手エントリを補完する
     const starterHalf = defTeam==="home" ? "top" : "bottom";
-    const starterEntry = {pitcherIdx:0, fromInning:1, fromHalf:starterHalf, outsAtStart:0};
     const rawLog = pitcherLog.length>0 ? pitcherLog : [];
-    // 先発エントリが既にあるか確認（halfも考慮）
+    // 先発エントリが既にあるか確認
     const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf===starterHalf && l.outsAtStart===0);
+    // 先発インデックス：pitcherLogの中で最も古い（fromInningが最小）エントリのidx、なければ0
+    const sortedLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1));
+    const starterIdx = sortedLog.length>0 ? sortedLog[0].pitcherIdx : 0;
+    const starterEntry = {pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0};
     const log = hasStarter ? rawLog : [starterEntry, ...rawLog];
 
     // 打席の通し番号(seq)ベースで担当投手を特定するヘルパー
@@ -2815,7 +2816,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v336")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v337")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2893,7 +2894,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v336")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v337")
         )
 
         // ===== 新規チーム作成 =====

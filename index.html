@@ -2835,7 +2835,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v346")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v347")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2913,7 +2913,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v346")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v347")
         )
 
         // ===== 新規チーム作成 =====
@@ -3832,36 +3832,6 @@ function App() {
                               outline:isCur?`1px solid ${color}33`:"none"}}
                             // 投手名セル：編集可能input + 候補ドロップダウン
                             , React.createElement('td', {style:{...S.td, minWidth:110}}
-                              , pitEditMode && i > 0 && (()=>{
-                                  const logKey = side+"PitcherLog";
-                                  const logEntry = (game[logKey]||[]).find(l=>l.pitcherIdx===i);
-                                  const inn = logEntry?logEntry.fromInning:game.inning;
-                                  const half = logEntry?logEntry.fromHalf:game.half;
-                                  const outs2 = logEntry?logEntry.outsAtStart:0;
-                                  const halfLabel = half==="top"?"表":"裏";
-                                  const btnS = {fontSize:9,width:16,height:16,borderRadius:3,border:"1px solid #a78bfa",
-                                    background:"#4c1d9522",color:"#a78bfa",cursor:"pointer",padding:0,fontWeight:700,lineHeight:"16px"};
-                                  const upd = (ni,nh,no) => mutGame(g=>{
-                                    const lk=side+"PitcherLog";
-                                    const existing=(g[lk]||[]).find(l=>l.pitcherIdx===i);
-                                    const newLog=existing
-                                      ?(g[lk]||[]).map(l=>l.pitcherIdx===i?{...l,fromInning:ni,fromHalf:nh,outsAtStart:no}:l)
-                                      :[...(g[lk]||[]),{pitcherIdx:i,fromInning:ni,fromHalf:nh,outsAtStart:no,atBatSeq:-1}];
-                                    return {...g,[lk]:newLog};
-                                  });
-                                  return React.createElement('div',{style:{display:"flex",gap:2,alignItems:"center",flexWrap:"wrap",marginBottom:3}}
-                                    , React.createElement('span',{style:{fontSize:8,color:"#a78bfa",fontWeight:700}},"登板:")
-                                    , React.createElement('button',{style:btnS,onClick:()=>upd(Math.max(1,inn-1),half,outs2)},"△")
-                                    , React.createElement('span',{style:{fontSize:9,color:"#e2e8f0",minWidth:16,textAlign:"center"}},inn+"回")
-                                    , React.createElement('button',{style:btnS,onClick:()=>upd(Math.min(15,inn+1),half,outs2)},"▽")
-                                    , React.createElement('button',{style:{...btnS,marginLeft:2},onClick:()=>upd(inn,half==="top"?"bottom":"top",outs2)},halfLabel)
-                                    , React.createElement('span',{style:{fontSize:8,color:"#475569",margin:"0 2px"}},"|" )
-                                    , React.createElement('button',{style:btnS,onClick:()=>upd(inn,half,Math.max(0,outs2-1))},"△")
-                                    , React.createElement('span',{style:{fontSize:9,color:"#e2e8f0",minWidth:14,textAlign:"center"}},outs2)
-                                    , React.createElement('button',{style:btnS,onClick:()=>upd(inn,half,Math.min(2,outs2+1))},"▽")
-                                    , React.createElement('span',{style:{fontSize:8,color:"#475569"}},"out")
-                                  );
-                                })()
                               , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:3}}
                                 , isCur&&React.createElement('span',{style:{color,fontSize:10,fontWeight:900,flexShrink:0}},"▶")
                                 , React.createElement('input', {
@@ -3886,8 +3856,8 @@ function App() {
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
                               , isCur
                                 ? React.createElement('span', {style:{fontSize:10,color,fontWeight:700}},"登板中")
-                                : pitEditMode && React.createElement('div', {style:{display:"flex",gap:3,justifyContent:"center"}}
-                                    , pitEditMode && React.createElement('button', {
+                                : pitEditMode && React.createElement('div', {style:{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}
+                                    , React.createElement('button', {
                                         onClick:()=>{
                                           if(!window.confirm(p.name+" を削除しますか？")) return;
                                           mutGame(g=>{
@@ -3907,7 +3877,7 @@ function App() {
                                           background:"#f8514922",border:"1px solid #f85149",
                                           color:"#f85149",fontWeight:700}
                                       }, "×")
-                                    , pitEditMode && i>0 && React.createElement('button', {
+                                    , i>0 && React.createElement('button', {
                                         onClick:()=>mutGame(g=>{
                                           const ps=[...g[side+"Pitchers"]];
                                           [ps[i-1],ps[i]]=[ps[i],ps[i-1]];
@@ -3927,7 +3897,7 @@ function App() {
                                           background:"#1a2a4022",border:"1px solid #3b82f6",
                                           color:"#3b82f6",fontWeight:700}
                                       }, "↑")
-                                    , pitEditMode && i<pitchers.length-1 && React.createElement('button', {
+                                    , i<pitchers.length-1 && React.createElement('button', {
                                         onClick:()=>mutGame(g=>{
                                           const ps=[...g[side+"Pitchers"]];
                                           [ps[i+1],ps[i]]=[ps[i],ps[i+1]];

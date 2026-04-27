@@ -2844,7 +2844,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v358")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v359")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2922,7 +2922,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v358")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v359")
         )
 
         // ===== 新規チーム作成 =====
@@ -4796,10 +4796,9 @@ function App() {
           const pcLineup = game[pcTeam+"Lineup"]||[];
           const pcPitchers = (game[pcTeam+"Pitchers"]||[]);
           const curPIdx = game[pcTeam+"PitcherIdx"]||0;
-          const regT = [...(teams||[]),...(opponents||[])].find(t=>t.name===game[pcTeam+"Team"]);
+          const regT = [...(myTeam?[myTeam]:[]), ...(teams||[]),...(opponents||[])].find(t=>t.name===game[pcTeam+"Team"]);
           const allMembers = ((regT&&regT.members)||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean);
-          // 全メンバーを候補に（既存投手リストにいるかどうかは問わない）
-          const newPitcherCandidates = allMembers.length > 0 ? allMembers : [];
+          const newPitcherCandidates = allMembers;
           return (
             React.createElement('div', {style:S.overlay, onClick:()=>setModal(null)}
               , React.createElement('div', {style:{...S.mBox,maxWidth:340,maxHeight:"85vh",overflowY:"auto"}, onClick:e=>e.stopPropagation()}
@@ -7255,15 +7254,17 @@ function NewPitcherInput({ candidates, onRegister }) {
   const [query, setQuery] = React.useState("");
   const filtered = candidates.filter(m=>!query||m.includes(query));
   return React.createElement('div', {style:{marginTop:6}}
-    , candidates.length>0&&React.createElement('div',{style:{marginBottom:8}}
+    , React.createElement('div',{style:{marginBottom:8}}
       , React.createElement('div',{style:{fontSize:11,color:"#4ade80",fontWeight:700,marginBottom:5}},"登録メンバーから選ぶ")
-      , React.createElement('div',{style:{display:"flex",flexWrap:"wrap",gap:4}}
-        , filtered.map(name=>React.createElement('button',{key:name,
-            onClick:()=>onRegister(name),
-            style:{padding:"6px 12px",borderRadius:6,border:"1px solid #22c55e",
-              background:"#0d2a1a",color:"#4ade80",fontSize:12,cursor:"pointer",fontWeight:700}
-          },name))
-      )
+      , candidates.length===0
+        ? React.createElement('div',{style:{fontSize:11,color:"#475569"}},"チームタブでメンバーを登録してください")
+        : React.createElement('div',{style:{display:"flex",flexWrap:"wrap",gap:4}}
+            , filtered.map(name=>React.createElement('button',{key:name,
+                onClick:()=>onRegister(name),
+                style:{padding:"6px 12px",borderRadius:6,border:"1px solid #22c55e",
+                  background:"#0d2a1a",color:"#4ade80",fontSize:12,cursor:"pointer",fontWeight:700}
+              },name))
+          )
     )
     , React.createElement('div',{style:{fontSize:11,color:"#64748b",fontWeight:700,marginBottom:5,marginTop:8}},"直接入力")
     , React.createElement('div',{style:{display:"flex",gap:6}}

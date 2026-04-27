@@ -2844,7 +2844,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v356")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v358")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2922,7 +2922,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v356")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v358")
         )
 
         // ===== 新規チーム作成 =====
@@ -3847,21 +3847,13 @@ function App() {
                             , React.createElement('td', {style:{...S.td, minWidth:110}}
                               , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:3}}
                                 , isCur&&React.createElement('span',{style:{color,fontSize:10,fontWeight:900,flexShrink:0}},"▶")
-                                , React.createElement('input', {
-                                    value: p.name,
-                                    onChange: e=>editPitcher(side,i,"name",e.target.value),
-                                    style:{background:"transparent",border:"none",
-                                      color:isCur?color:"#e2e8f0",
-                                      fontWeight:isCur?700:400,
-                                      fontSize:12,outline:"none",
-                                      width:isCur?60:72,minWidth:40}
-                                  })
-                                // 候補ドロップダウン
-                                , React.createElement(PitcherPicker, {
-                                    members: memberCandidates,
-                                    teams: [],
-                                    currentTeamName: teamName,
-                                    onSelect: n=>editPitcher(side,i,"name",n)
+                                , React.createElement(MemberPicker, {
+                                    name: p.name,
+                                    onChange: n=>editPitcher(side,i,"name",n),
+                                    members: (regTeam&&regTeam.members||[])
+                                      .map(m=>typeof m==="string"?m:(m.name||""))
+                                      .filter(Boolean),
+                                    placeholder: "投手名"
                                   })
                               )
                             )
@@ -4442,10 +4434,9 @@ function App() {
               })(),
               currentLineup: lineup,
               preselect: preselect,
-              onApply: (t, assignments, slotCount)=>{
+              onApply: (t, assignments, slotCount, selPitcher)=>{
                 mutGame(g=>{
                   const lk=side+"Lineup";
-                  // 割り当てられた選手だけをラインナップに（空スロットは除外）
                   const assignedCount = Object.keys(assignments).filter(k=>assignments[k]&&(typeof assignments[k]==="object"?assignments[k].name:assignments[k])).length;
                   const finalCount = assignedCount > 0 ? slotCount : 9;
                   const newLineup = Array.from({length: finalCount}, (_,i)=>{
@@ -4456,13 +4447,29 @@ function App() {
                     if(!name) return null;
                     return {...makePlayer(i+1), name, pos};
                   }).filter(Boolean);
-                  // 割り当てゼロの場合は9人分の空枠
                   const lineup = newLineup.length > 0 ? newLineup
                     : Array.from({length:9},(_,i)=>makePlayer(i+1));
-                  const updated = {...g, [lk]:lineup, [side+"Team"]:t.name};
-                  return syncPitcherFromLineup(updated, side);
+                  let updated = {...g, [lk]:lineup, [side+"Team"]:t.name};
+                  updated = syncPitcherFromLineup(updated, side);
+                  // 先発投手が選択されていれば投手タブに反映
+                  if(selPitcher) {
+                    const pitKey = side+"Pitchers";
+                    const logKey = side+"PitcherLog";
+                    const ps = [...(updated[pitKey]||[])];
+                    let pitIdx = ps.findIndex(p=>p.name===selPitcher);
+                    if(pitIdx<0) {
+                      ps.push({id:ps.length+1,name:selPitcher,ip:0,h:0,er:0,bb:0,k:0,
+                        pitchCount:0,strikeCount:0,ballCount:0,
+                        autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0,manualOverride:false});
+                      pitIdx = ps.length-1;
+                    }
+                    const starterHalf = side==="away" ? "bottom" : "top";
+                    const starterLog = [{pitcherIdx:pitIdx,fromInning:1,fromHalf:starterHalf,outsAtStart:0,atBatSeq:0}];
+                    updated = {...updated, [pitKey]:ps, [side+"PitcherIdx"]:pitIdx, [logKey]:starterLog};
+                  }
+                  return updated;
                 });
-                showToast(`${t.name} ${Object.keys(assignments).length}名のスタメンをセットしました`);
+                showToast(`${t.name} スタメンをセットしました${selPitcher?" / 先発: "+selPitcher:""}`);
                 setModal(null);
               },
               onCancel: ()=>setModal(null),}
@@ -6781,6 +6788,7 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
   const [assignments, setAssignments] = useState({});
   const [activeSlot, setActiveSlot] = useState(null);
   const [slotCount, setSlotCount] = useState(9);
+  const [selPitcher, setSelPitcher] = useState("");
   const POS_LIST = ["投手","捕手","一塁手","二塁手","三塁手","遊撃手","左翼手","中堅手","右翼手","指名打者"];
 
   const members = (selTeam && selTeam.members) || [];
@@ -6820,7 +6828,7 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
   const lineupSlots = Array.from({length:slotCount},(_,i)=>i);
 
   const assignedCount2 = Object.keys(assignments).filter(k=>assignments[k]&&(typeof assignments[k]==="object"?assignments[k].name:assignments[k])).length;
-  const handleApply = () => { if(!selTeam) return; onApply(selTeam, assignments, slotCount); };
+  const handleApply = () => { if(!selTeam) return; onApply(selTeam, assignments, slotCount, selPitcher); };
 
   return (
     React.createElement('div', {style:S.overlay, onClick:onCancel}
@@ -6956,6 +6964,25 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
               )
               , React.createElement('div',{style:{fontSize:11,color:"#64748b",marginBottom:10,textAlign:"center"}},
                   "① 打順番号をタップ　② 右の選手名をタップで割り当て")
+          )
+
+        , selTeam && React.createElement('div', {style:{background:"#0a1628",borderRadius:8,padding:"10px 12px",marginBottom:10}}
+            , React.createElement('div',{style:{fontSize:12,color:"#fbbf24",fontWeight:700,marginBottom:8}},"⚾ 先発投手を選択（投手タブに反映）")
+            , React.createElement('div',{style:{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}
+              , members.map((m,mi)=>{
+                  const name = typeof m==="string"?m:(m.name||"");
+                  if(!name) return null;
+                  return React.createElement('button',{key:mi,
+                    onClick:()=>setSelPitcher(prev=>prev===name?"":name),
+                    style:{padding:"5px 10px",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",
+                      background:selPitcher===name?"#92400e":"#0d1f35",
+                      border:"1.5px solid "+(selPitcher===name?"#fbbf24":"#1e3a5f"),
+                      color:selPitcher===name?"#fcd34d":"#94a3b8"}
+                  }, name);
+                })
+              )
+            , React.createElement('div',{style:{fontSize:10,color:"#475569"}},
+                selPitcher ? "先発: "+selPitcher : "選択なし（スキップ可）")
           )
 
         , React.createElement('button',{onClick:handleApply,

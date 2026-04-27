@@ -2844,7 +2844,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v359")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v361")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2922,7 +2922,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v359")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v361")
         )
 
         // ===== 新規チーム作成 =====
@@ -4796,9 +4796,13 @@ function App() {
           const pcLineup = game[pcTeam+"Lineup"]||[];
           const pcPitchers = (game[pcTeam+"Pitchers"]||[]);
           const curPIdx = game[pcTeam+"PitcherIdx"]||0;
-          const regT = [...(myTeam?[myTeam]:[]), ...(teams||[]),...(opponents||[])].find(t=>t.name===game[pcTeam+"Team"]);
-          const allMembers = ((regT&&regT.members)||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean);
-          const newPitcherCandidates = allMembers;
+          const allRegisteredTeams = [...(myTeam?[myTeam]:[]), ...(teams||[]),...(opponents||[])];
+          const regT = allRegisteredTeams.find(t=>t.name===game[pcTeam+"Team"]);
+          // マッチしない場合は全登録チームの全メンバーをフォールバック
+          const allMembers = regT
+            ? ((regT.members)||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean)
+            : allRegisteredTeams.flatMap(t=>(t.members||[]).map(m=>typeof m==="string"?m:(m.name||""))).filter(Boolean);
+          const newPitcherCandidates = [...new Set(allMembers)];
           return (
             React.createElement('div', {style:S.overlay, onClick:()=>setModal(null)}
               , React.createElement('div', {style:{...S.mBox,maxWidth:340,maxHeight:"85vh",overflowY:"auto"}, onClick:e=>e.stopPropagation()}

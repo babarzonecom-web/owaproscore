@@ -2835,7 +2835,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v347")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v348")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2913,7 +2913,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v347")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v348")
         )
 
         // ===== 新規チーム作成 =====
@@ -4323,6 +4323,38 @@ function App() {
                     }, "👥 ホームに選ぶ")
                 )
               ) : React.createElement('div', {style:{color:"#475569",fontSize:12}}, "まだ自チームが登録されていません")
+          )
+
+          , teamShareCode && React.createElement('div', {style:{...S.card, marginBottom:4, borderLeft:"4px solid #3b82f6"}}
+            , React.createElement('div', {style:{...S.ct, marginBottom:8}}, "☁️ チームデータをFirebaseに同期")
+            , React.createElement('div', {style:{fontSize:11, color:"#94a3b8", marginBottom:8}},
+                "メンバー情報を保存・読み込みできます")
+            , React.createElement('div', {style:{display:"flex", gap:8}}
+              , React.createElement('button', {
+                  onClick:()=>{
+                    const data={teams:storage.teams||[],myTeam:storage.myTeam||null,opponents:storage.opponents||[],savedAt:new Date().toISOString()};
+                    fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+teamShareCode+".json",
+                      {method:"PUT",body:JSON.stringify(data)})
+                      .then(()=>showToast("✅ 保存しました"))
+                      .catch(e=>showToast("❌ 保存失敗: "+e.message));
+                  },
+                  style:{...sBt("#3b82f6"),fontSize:12,padding:"6px 14px"}
+                }, "☁️ 保存")
+              , React.createElement('button', {
+                  onClick:()=>{
+                    if(!window.confirm("Firebaseからチームデータを読み込みます。現在のデータは上書きされます。")) return;
+                    fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+teamShareCode+".json",{cache:"no-store"})
+                      .then(r=>r.json())
+                      .then(data=>{
+                        if(!data||typeof data!=="object"){showToast("データなし");return;}
+                        setStorage(s=>({...s,teams:data.teams||s.teams,myTeam:data.myTeam!==undefined?data.myTeam:s.myTeam,opponents:data.opponents||s.opponents}));
+                        showToast("✅ 読み込みました");
+                      })
+                      .catch(e=>showToast("❌ 読み込み失敗: "+e.message));
+                  },
+                  style:{...sBt("#0369a1"),fontSize:12,padding:"6px 14px"}
+                }, "📥 読み込み")
+            )
           )
 
           , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #7dd3fc"}}

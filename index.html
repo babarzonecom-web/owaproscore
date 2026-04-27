@@ -2838,7 +2838,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v352")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v354")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2916,7 +2916,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v352")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v354")
         )
 
         // ===== 新規チーム作成 =====
@@ -4425,19 +4425,28 @@ function App() {
               side: side,
               sideLabel: sideLabel,
               sideColor: sideColor,
-              teams: [...(myTeam&&myTeam.name?[myTeam]:[]), ...teams, ...opponents],
+              teams: (()=>{
+                // 試合でセットされているチーム名に対応する登録チームだけを返す
+                const teamName = side==="away" ? game.awayTeam : game.homeTeam;
+                const allRegistered = [...(myTeam&&myTeam.name?[myTeam]:[]), ...teams, ...opponents];
+                const matched = allRegistered.filter(t=>t.name===teamName);
+                return matched.length>0 ? matched : allRegistered;
+              })(),
               currentLineup: lineup,
               preselect: preselect,
               onApply: (t, assignments, slotCount)=>{
                 mutGame(g=>{
                   const lk=side+"Lineup";
                   // 割り当てられた選手だけをラインナップに（空スロットは除外）
-                  const assignedCount = Object.keys(assignments).length;
+                  const assignedCount = Object.keys(assignments).filter(k=>assignments[k]&&(typeof assignments[k]==="object"?assignments[k].name:assignments[k])).length;
                   const finalCount = assignedCount > 0 ? slotCount : 9;
                   const newLineup = Array.from({length: finalCount}, (_,i)=>{
-                    const name = assignments[i];
+                    const a = assignments[i];
+                    if(!a) return null;
+                    const name = typeof a==="object" ? a.name : a;
+                    const pos  = typeof a==="object" ? (a.pos||""): "";
                     if(!name) return null;
-                    return {...makePlayer(i+1), name};
+                    return {...makePlayer(i+1), name, pos};
                   }).filter(Boolean);
                   // 割り当てゼロの場合は9人分の空枠
                   const lineup = newLineup.length > 0 ? newLineup
@@ -4859,7 +4868,12 @@ function App() {
             team: modal.team,
             game: game,
             pidx: modal.pidx,
-            teams: [...(teams||[]), ...(opponents||[])],
+            teams: (()=>{
+                const teamName = game[(modal.team||"away")+"Team"];
+                const all = [...(myTeam&&myTeam.name?[myTeam]:[]), ...(teams||[]), ...(opponents||[])];
+                const matched = all.filter(t=>t.name===teamName);
+                return matched.length>0 ? matched : all;
+              })(),
             onConfirm: (newName,newPos,reason)=>{
               substitutePlayer(modal.team,modal.pidx,newName,newPos,reason);
               // 投手交代はsubstitutePlayer内のsyncPitcherFromLineupで自動処理
@@ -6759,16 +6773,31 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
   const [assignments, setAssignments] = useState({});
   const [activeSlot, setActiveSlot] = useState(null);
   const [slotCount, setSlotCount] = useState(9);
+  const POS_LIST = ["投手","捕手","一塁手","二塁手","三塁手","遊撃手","左翼手","中堅手","右翼手","指名打者"];
 
   const members = (selTeam && selTeam.members) || [];
-  const usedNames = new Set(Object.values(assignments));
+  const usedNames = new Set(Object.values(assignments).map(a=>typeof a==="object"?a.name:a).filter(Boolean));
 
   const assign = (slotIdx, name) => {
     setAssignments(a=>{
       const next = {...a};
-      Object.keys(next).forEach(k=>{ if(next[k]===name) delete next[k]; });
-      next[slotIdx] = name;
+      // 同じ選手が他のスロットにいたら削除
+      Object.keys(next).forEach(k=>{
+        const v=next[k]; if((typeof v==="object"?v.name:v)===name) delete next[k];
+      });
+      // 登録メンバーのposがあれば初期値にセット
+      const m = members.find(mm=>(typeof mm==="string"?mm:(mm.name||""))===name);
+      const defaultPos = m&&typeof m==="object"&&m.pos ? m.pos : "";
+      next[slotIdx] = {name, pos:defaultPos};
       return next;
+    });
+    // ポジションがない場合はそのまま選択状態を維持（ポジション選択を促す）
+  };
+  const setPos = (slotIdx, pos) => {
+    setAssignments(a=>{
+      const cur=a[slotIdx];
+      if(!cur) return a;
+      return {...a, [slotIdx]:{...(typeof cur==="object"?cur:{name:cur}), pos}};
     });
     setActiveSlot(null);
   };
@@ -6782,6 +6811,7 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
   const assignedCount = Object.keys(assignments).length;
   const lineupSlots = Array.from({length:slotCount},(_,i)=>i);
 
+  const assignedCount2 = Object.keys(assignments).filter(k=>assignments[k]&&(typeof assignments[k]==="object"?assignments[k].name:assignments[k])).length;
   const handleApply = () => { if(!selTeam) return; onApply(selTeam, assignments, slotCount); };
 
   return (
@@ -6855,12 +6885,23 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
                               minWidth:18,textAlign:"center",fontWeight:700}},i+1)
                           , assigned
                             ? React.createElement(React.Fragment,null
-                                , React.createElement('span',{style:{flex:1,fontSize:13,
-                                    fontWeight:700,color:"#4ade80"}},assigned)
+                                , React.createElement('div',{style:{flex:1}}
+                                    , React.createElement('div',{style:{fontSize:13,fontWeight:700,color:"#4ade80"}},
+                                        typeof assigned==="object"?assigned.name:assigned)
+                                    , React.createElement('select',{
+                                        value:typeof assigned==="object"?assigned.pos:"",
+                                        onClick:e=>e.stopPropagation(),
+                                        onChange:e=>{e.stopPropagation();setPos(i,e.target.value);},
+                                        style:{fontSize:10,background:"#0a1628",border:"1px solid #2a4a7a",
+                                          borderRadius:4,color:"#94a3b8",padding:"1px 4px",marginTop:2,width:"100%"}}
+                                      , React.createElement('option',{value:""},"ポジション")
+                                      , POS_LIST.map(pos=>React.createElement('option',{key:pos,value:pos},pos))
+                                    )
+                                  )
                                 , React.createElement('button',{
                                     onClick:e=>{e.stopPropagation();clearSlot(i);},
                                     style:{background:"none",border:"none",color:"#475569",
-                                      fontSize:13,cursor:"pointer",padding:"0 2px"}},"✕")
+                                      fontSize:13,cursor:"pointer",padding:"0 2px",flexShrink:0}},"✕")
                               )
                             : React.createElement('span',{style:{flex:1,fontSize:12,
                                 color:isActive?"#93c5fd":"#334155"}},

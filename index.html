@@ -2838,7 +2838,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v351")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v352")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2916,7 +2916,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v351")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v352")
         )
 
         // ===== 新規チーム作成 =====
@@ -3579,7 +3579,7 @@ function App() {
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"},}
                 , React.createElement('div', { style: {...S.ct,borderLeft:`4px solid ${color}`,paddingLeft:10,marginBottom:0},}, label)
                 , React.createElement('div', { style: {marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"},}
-                  , teams.length>0&&(
+                  , (teams.length>0||opponents.length>0||(myTeam&&myTeam.name))&&(
                     React.createElement('button', { onClick: ()=>setModal({step:"team_lineup",side:team}),
                       style: {...sBt("#1d4ed8"),fontSize:11,padding:"4px 12px",display:"flex",alignItems:"center",gap:4},}, "👥 チームから選ぶ"
 
@@ -4425,7 +4425,7 @@ function App() {
               side: side,
               sideLabel: sideLabel,
               sideColor: sideColor,
-              teams: teams,
+              teams: [...(myTeam&&myTeam.name?[myTeam]:[]), ...teams, ...opponents],
               currentLineup: lineup,
               preselect: preselect,
               onApply: (t, assignments, slotCount)=>{

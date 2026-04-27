@@ -2835,7 +2835,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v348")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v349")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2913,7 +2913,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v348")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v349")
         )
 
         // ===== 新規チーム作成 =====
@@ -6984,7 +6984,35 @@ function TeamEditorModal({ team, teamType, onSave, onCancel }) {
             style: {marginTop:8,background:"transparent",border:"1px dashed #2a4a7a",
               borderRadius:7,color:"#7db8e8",padding:"5px 14px",cursor:"pointer",
               fontSize:12,width:"100%"},}, "＋ メンバーを追加"
-
+          )
+          , React.createElement('div', {style:{marginTop:12,padding:"10px",background:"#0a1628",borderRadius:8,border:"1px dashed #1e3a5f"}}
+            , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}}, "📋 一括登録（改行区切りで貼り付け）")
+            , React.createElement('textarea', {
+                placeholder:"中山裕介\n中田英寿\n本田圭佑\n\n（1行1人で貼り付け）",
+                rows:4,
+                id:"bulk-member-input",
+                style:{width:"100%",background:"#0d1f35",border:"1px solid #1e3a5f",
+                  borderRadius:6,color:"#e2e8f0",padding:"8px",fontSize:13,
+                  fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}
+              })
+            , React.createElement('button', {
+                onClick:()=>{
+                  const ta = document.getElementById("bulk-member-input");
+                  if(!ta) return;
+                  const names = ta.value.split("\n")
+                    .map(n=>n.trim())
+                    .filter(Boolean);
+                  if(names.length===0) return;
+                  setMembers(ms=>{
+                    const existing = ms.filter(m=>m.trim());
+                    const merged = [...existing, ...names];
+                    return merged;
+                  });
+                  ta.value = "";
+                },
+                style:{marginTop:6,background:"#f0a500",border:"none",borderRadius:6,
+                  color:"#000",padding:"7px 14px",cursor:"pointer",fontSize:12,fontWeight:700,width:"100%"}
+              }, "一括追加")
           )
         )
 

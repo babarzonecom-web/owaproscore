@@ -2058,8 +2058,9 @@ function App() {
         if(i!==outIdx) return p;
 
         if(isPosChange) {
-          // ポジション変更のみ → _subOut不要、posだけ更新
-          return {...p, pos: newPos};
+          // ポジション変更のみ → posLogに履歴を記録
+          const prevPosLog = p._posLog || [];
+          return {...p, pos: newPos, _posLog: [...prevPosLog, {pos: outPlayer.pos||"", inning: g.inning, half: g.half}]};
         }
 
         // 選手交代 → 元選手を_subOuts配列に追記（チェーン対応）
@@ -2106,6 +2107,8 @@ function App() {
       };
       const defenseLog = [...(g.defenseLog||[]), defEntry];
       const updated = {...g,[lk]:lineup,log,defenseLog};
+      // 試合終了後はsyncPitcherFromLineupを呼ばない（余計な投手が追加されるため）
+      if(updated.finished) return updated;
       return syncPitcherFromLineup(updated, team);
     });
   },[mutGame]);
@@ -2835,7 +2838,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v350")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v351")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2913,7 +2916,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v350")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v351")
         )
 
         // ===== 新規チーム作成 =====
@@ -3607,8 +3610,10 @@ function App() {
                       const legacySubOut = p._subOut && !p._subOuts ? [p._subOut] : [];
                       const subOuts = [...legacySubOut, ...(p._subOuts||[])];
 
-                      // ポジション推移を文字列に
-                      const posHistory = [...subOuts.map(s=>s.pos||"—"), p.pos||""].filter((_,i,a)=>i===0||a[i]!==a[i-1]);
+                      // ポジション推移を文字列に（_posLogも含める）
+                      const posLogHistory = (p._posLog||[]).map(l=>l.pos).filter(Boolean);
+                      const allPosHistory = [...subOuts.map(s=>s.pos||"—"), ...posLogHistory, p.pos||""].filter((_,i,a)=>i===0||a[i]!==a[i-1]);
+                      const posHistory = allPosHistory;
                       const posLabel = posHistory.length > 1 ? posHistory.join("→") : (p.pos||"");
 
                       // 退いた選手の行
@@ -4188,7 +4193,7 @@ function App() {
                     , React.createElement('button', {
                         onClick: disconnectTeam,
                         style:{...sBt("#dc2626",true),fontSize:11,padding:"3px 12px"}
-                      }, "切断する")
+                      }, "ログアウト")
                   )
                 )
                 // パスワード変更（管理者のみ）
@@ -4575,25 +4580,12 @@ function App() {
             const g = newGame(newInnings, newPitchMode, newSeason, newTournament);
             g.started = true;
 
-            // チーム選択があれば名前とlineupを直接セット
-            const buildLineup = (team) => {
-              const members = team.members||[];
-              const lineup = members.slice(0,9).map((m,i)=>({
-                ...makePlayer(i+1),
-                name: typeof m==="string" ? m : (m.name||`選手${i+1}`),
-                pos: typeof m==="object" && m.pos ? m.pos : "",
-              }));
-              while(lineup.length < DEFAULT_PLAYERS) lineup.push(makePlayer(lineup.length+1));
-              return lineup;
-            };
-
+            // チーム名だけセット（lineupはオーダータブで手動設定）
             if(selAway) {
               g.awayTeam = selAway.name;
-              g.awayLineup = buildLineup(selAway);
             }
             if(selHome) {
               g.homeTeam = selHome.name;
-              g.homeLineup = buildLineup(selHome);
             }
 
             if(save) saveGame();
@@ -6270,7 +6262,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       , selectedTeam && statsView==="team" && React.createElement('div', null
           , React.createElement('div', {style:{...S.card}}
             , React.createElement('div', {style:{...S.ct,marginBottom:12}}, "🏆 チーム通算成績")
-            , React.createElement('div', {style:{fontSize:12,color:"#7db8e8",marginBottom:10}}, "集計試合数: ", allGames.length, "試合")
+            , React.createElement('div', {style:{fontSize:12,color:"#7db8e8",marginBottom:10}}, "集計試合数: ", filteredGames.length, "試合")
             , React.createElement('table', {style:{...S.table,marginBottom:16}}
               , React.createElement('thead', null
                 , React.createElement('tr', null
@@ -6279,31 +6271,34 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                 )
               )
               , React.createElement('tbody', null
-                , [
-                    {side:"away", name:primaryTeam, color:"#4ade80", players:awayBat},
-                    {side:"home", name:game.homeTeam, color:"#7dd3fc", players:homeBat},
-                  ].map(({name,color,players,side})=>{
-                    const runs = allGames.reduce((s,g)=>s+Object.values(g[side+"Score"]||{}).reduce((a,v)=>a+(parseInt(v)||0),0),0);
+                , (()=>{
+                    // selectedTeamが先攻・後攻どちらかを集計
+                    const teamName = selectedTeam;
+                    const totalRuns = filteredGames.reduce((s,g)=>{
+                      const side = g.awayTeam===teamName?"away":"home";
+                      return s+Object.values(g[side+"Score"]||{}).reduce((a,v)=>a+(parseInt(v)||0),0);
+                    },0);
+                    const players = awayBat; // aggregatePlayerStatsで既にselectedTeamでフィルタ済み
                     const ab=players.reduce((s,p)=>s+p.ab,0);
                     const h=players.reduce((s,p)=>s+p.h,0);
                     const hr=players.reduce((s,p)=>s+p.hr,0);
                     const sb=players.reduce((s,p)=>s+p.sb,0);
                     const e=players.reduce((s,p)=>s+p.e,0);
                     const avg=ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---";
-                    return React.createElement('tr',{key:name,style:{background:"#0d1f35"}}
-                      , React.createElement('td',{style:{...tdN,color}},name)
-                      , React.createElement('td',{style:tdS},allGames.length)
-                      , React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},runs)
+                    return [React.createElement('tr',{key:teamName,style:{background:"#0d1f35"}}
+                      , React.createElement('td',{style:{...tdN,color:"#4ade80"}},teamName)
+                      , React.createElement('td',{style:tdS},filteredGames.length)
+                      , React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},totalRuns)
                       , React.createElement('td',{style:{...tdS,color:"#4ade80"}},h)
                       , React.createElement('td',{style:{...tdS,fontWeight:700}},avg)
                       , React.createElement('td',{style:{...tdS,color:"#f87171"}},hr)
                       , React.createElement('td',{style:tdS},sb)
                       , React.createElement('td',{style:{...tdS,color:"#f87171"}},e)
-                    );
-                  })
+                    )];
+                  })()
               )
             )
-            , React.createElement('div', {style:{fontSize:11,color:"#475569"}}, "※ 現在の試合＋保存済み試合の合計")
+            , React.createElement('div', {style:{fontSize:11,color:"#475569"}}, "※ フィルター中の試合の合計")
           )
         )
 

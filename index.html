@@ -2844,7 +2844,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v355")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v356")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2922,7 +2922,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v355")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v356")
         )
 
         // ===== 新規チーム作成 =====
@@ -7400,7 +7400,7 @@ function PosSelector({ value, onChange }) {
           borderRadius:5,color:"#7dd3fc",fontSize:11,fontWeight:700,
           padding:"4px 6px",cursor:"pointer",minWidth:32,textAlign:"center",
           touchAction:"manipulation"},}
-        , value||""
+        , (typeof abbrPos==="function" ? abbrPos(value||"") : (value||""))
       )
       , open&&(React.createElement(React.Fragment, null
         , React.createElement('div', { style: {position:"fixed",inset:0,zIndex:9998}, onClick: ()=>setOpen(false),})

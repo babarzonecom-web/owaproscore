@@ -601,6 +601,12 @@ const eShort = (e) => { const n=norm(e); return (_optionalChain([rOf, 'call', _2
 const eRuns  = (list) => list.reduce((s,e)=>s+(norm(e).runs||0),0);
 const toList = (ab,inn) => { if(!ab||ab[inn]==null) return []; return Array.isArray(ab[inn])?ab[inn]:[ab[inn]]; };
 
+const POS_ABBR = {
+  "投手":"投","捕手":"捕","一塁手":"一","二塁手":"二","三塁手":"三",
+  "遊撃手":"遊","左翼手":"左","中堅手":"中","右翼手":"右","指名打者":"指",
+  "内野手":"内","外野手":"外"
+};
+const abbrPos = (pos) => POS_ABBR[pos] || pos;
 const makePlayer  = (i) => ({ id:i, name:`選手${i}`, pos:"", atBats:{}, rbi:0, sb:0, cs:0 });
 const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:0,
   pitchCount:0, strikeCount:0, ballCount:0,
@@ -2838,7 +2844,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v354")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v355")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -2916,7 +2922,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v354")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v355")
         )
 
         // ===== 新規チーム作成 =====
@@ -3614,7 +3620,9 @@ function App() {
                       const posLogHistory = (p._posLog||[]).map(l=>l.pos).filter(Boolean);
                       const allPosHistory = [...subOuts.map(s=>s.pos||"—"), ...posLogHistory, p.pos||""].filter((_,i,a)=>i===0||a[i]!==a[i-1]);
                       const posHistory = allPosHistory;
-                      const posLabel = posHistory.length > 1 ? posHistory.join("→") : (p.pos||"");
+                      const posLabel = posHistory.length > 1
+                        ? posHistory.map(abbrPos).join("→")
+                        : abbrPos(p.pos||"");
 
                       // 退いた選手の行
                       const subRows = subOuts.map((so, si)=>{
@@ -6886,8 +6894,14 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
                           , assigned
                             ? React.createElement(React.Fragment,null
                                 , React.createElement('div',{style:{flex:1}}
-                                    , React.createElement('div',{style:{fontSize:13,fontWeight:700,color:"#4ade80"}},
-                                        typeof assigned==="object"?assigned.name:assigned)
+                                    , React.createElement('div',{style:{display:"flex",alignItems:"center",gap:4}}
+                                        , React.createElement('span',{style:{fontSize:13,fontWeight:700,color:"#4ade80"}},
+                                            typeof assigned==="object"?assigned.name:assigned)
+                                        , (typeof assigned==="object"&&assigned.pos) && React.createElement('span',{
+                                            style:{fontSize:11,color:"#7db8e8",fontWeight:700,
+                                              background:"#0d2a4a",borderRadius:4,padding:"1px 5px"}},
+                                            abbrPos(assigned.pos))
+                                      )
                                     , React.createElement('select',{
                                         value:typeof assigned==="object"?assigned.pos:"",
                                         onClick:e=>e.stopPropagation(),

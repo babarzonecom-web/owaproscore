@@ -783,7 +783,8 @@ const computePitcherStats = (g) => {
     
     
     // 先発投手エントリを補完する
-    const starterHalf = defTeam==="home" ? "top" : "bottom";
+    // away投手は表(top)を守る、home投手は裏(bottom)を守る
+    const starterHalf = defTeam==="away" ? "top" : "bottom";
     const rawLog = pitcherLog.length>0 ? pitcherLog : [];
     // 先発エントリが既にあるか確認
     const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf===starterHalf && l.outsAtStart===0);
@@ -1776,8 +1777,9 @@ const newGame = (innings=7, pitchMode="result", season=null, tournament=null) =>
   awayPitcherIdx:0, homePitcherIdx:0, 
   
   // 先発投手のログエントリを初期値として追加（idx:0が先発）
-  awayPitcherLog:[{pitcherIdx:0, fromInning:1, fromHalf:"bottom", outsAtStart:0, atBatSeq:0}],
-  homePitcherLog:[{pitcherIdx:0, fromInning:1, fromHalf:"top",    outsAtStart:0, atBatSeq:0}],
+  // away投手は表(top)を守る、home投手は裏(bottom)を守る
+  awayPitcherLog:[{pitcherIdx:0, fromInning:1, fromHalf:"top",    outsAtStart:0, atBatSeq:0}],
+  homePitcherLog:[{pitcherIdx:0, fromInning:1, fromHalf:"bottom", outsAtStart:0, atBatSeq:0}],
   baserunnerOuts: [], // 走塁アウト記録 [{inning,half,outsAtTime,defTeam}]
 });
 
@@ -2960,6 +2962,13 @@ function App() {
       // その場合は次のイニング（4回裏→5回表、4回表→4回裏…はhome）
       // away: 今が裏(bottom)なら次は(inning+1)の表、今が表なら今のイニングの表
       // home: 今が表(top)なら今のイニングの裏、今が裏なら今のイニングの裏
+      // fromInning/fromHalfの計算
+      // away投手（表に投げる）:
+      //   今が表(sameHalf=true) → 今のイニングの表から
+      //   今が裏(sameHalf=false) → 次のイニングの表から（inning+1）
+      // home投手（裏に投げる）:
+      //   今が裏(sameHalf=true) → 今のイニングの裏から
+      //   今が表(sameHalf=false) → 今のイニングの裏から（inningそのまま）
       const fromInning = sameHalf ? g.inning
         : (defTeam==="away" ? g.inning + 1 : g.inning);
       const fromHalf = pitchHalf;
@@ -3671,7 +3680,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v365")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v366")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3749,7 +3758,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v365")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v366")
         )
 
         // ===== 新規チーム作成 =====

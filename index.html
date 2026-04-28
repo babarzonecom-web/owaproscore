@@ -2841,21 +2841,23 @@ function App() {
     const currentPitcher = pitchers[currentPIdx];
     
     if(_optionalChain([currentPitcher, 'optionalAccess', _20 => _20.name]) === pitcher.name) return g;
+
+    // away投手は表(top)を守る、home投手は裏(bottom)を守る
+    const pitchHalf = side==="away" ? "top" : "bottom";
+    // 現在のハーフが投手の守備ハーフと一致するか
+    const sameHalf = g.half === pitchHalf;
+    const fromHalf = pitchHalf;
+    const fromInning = sameHalf ? g.inning
+      : (side==="away" ? g.inning + 1 : g.inning);
+    const outsAtStart = sameHalf ? g.outs : 0;
     
     const existIdx = pitchers.findIndex(p=>p.name===pitcher.name);
     if(existIdx >= 0){
-      // 既存投手への切り替え：pitcherLogにエントリを追加
       const logKey = side+"PitcherLog";
-      const offLKey = side==="away" ? "homeLineup" : "awayLineup";
-      const offL = g[offLKey]||[];
-      let abSeq = 0;
-      offL.forEach(p=>{ Object.values(p.atBats||{}).forEach(abs=>{ abSeq += Array.isArray(abs)?abs.length:Object.values(abs||{}).length; }); });
       const newLog = [...(g[logKey]||[]), {
         pitcherIdx: existIdx,
-        fromInning: g.inning,
-        fromHalf: g.half,
-        outsAtStart: g.outs,
-        atBatSeq: abSeq,
+        fromInning, fromHalf, outsAtStart,
+        atBatSeq: sameHalf ? -2 : -1,
       }];
       return {...g, [side+"PitcherIdx"]: existIdx, [logKey]: newLog};
     }
@@ -2864,16 +2866,10 @@ function App() {
     const newPitchers = [...pitchers, newPitcher];
     const newPIdx = newPitchers.length-1;
     const logKey = side+"PitcherLog";
-    const offLKey2 = side==="away" ? "homeLineup" : "awayLineup";
-    const offL2 = g[offLKey2]||[];
-    let abSeq2 = 0;
-    offL2.forEach(p=>{ Object.values(p.atBats||{}).forEach(abs=>{ abSeq2 += Array.isArray(abs)?abs.length:Object.values(abs||{}).length; }); });
     const newPitcherLog = [...(g[logKey]||[]), {
       pitcherIdx: newPIdx,
-      fromInning: g.inning,
-      fromHalf: g.half,
-      outsAtStart: g.outs,
-      atBatSeq: abSeq2,
+      fromInning, fromHalf, outsAtStart,
+      atBatSeq: sameHalf ? -2 : -1,
     }];
     return {...g,
       [side+"Pitchers"]: newPitchers,
@@ -3680,7 +3676,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v367")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v368")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3758,7 +3754,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v367")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v368")
         )
 
         // ===== 新規チーム作成 =====

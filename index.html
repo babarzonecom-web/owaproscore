@@ -797,26 +797,28 @@ const computePitcherStats = (g) => {
     // 各交代エントリにfromSeq（何番目の打席から担当か）を紐づけて判定
     // fromSeq以上のseqを持つ打席が新投手の担当
     const buildSeqLog = () => {
-      // 常にinning/half/outsAtStartから正確にfromSeqを決定する
       return log.map((l, li) => {
-        if(li === 0) return {...l, fromSeq: 0}; // 先発は常に0番目から
+        if(li === 0) return {...l, fromSeq: 0};
 
         const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
         const outs = l.outsAtStart||0;
 
-        // fromInning/fromHalf/outsAtStartに一致する打席を探す
-        // 「そのイニング・ハーフ・アウト数時点での最初の打席」
-        let fromSeq = allAtBats.length; // デフォルトは末尾
+        // 「fromInning/fromHalf時点でoutsAtStart個のアウトが完了した後の最初の打席」
+        // outsAtAb は「その打席が始まった時点のアウト数」
+        // outsAtStart=2なら「2アウトが既に記録された後の打席」= outsAtAb>=2の最初
+        let fromSeq = allAtBats.length;
         for(let ai=0; ai<allAtBats.length; ai++){
           const ab = allAtBats[ai];
           const abTime = ab.inning*2+(ab.half==="top"?0:1);
+          if(abTime < logTime) continue;
           if(abTime > logTime){
-            // 次のイニング以降の最初の打席
             fromSeq = ab.seq;
             break;
           }
-          if(abTime === logTime && (ab.outsAtAb||0) >= outs){
-            // 同じイニング・ハーフでアウト数が一致する最初の打席
+          // 同じイニング・ハーフ
+          // outsAtAb: その打席が始まった時点のアウト数
+          // 新投手の最初の打席 = outsAtAb >= outsAtStart の最初の打席
+          if((ab.outsAtAb||0) >= outs){
             fromSeq = ab.seq;
             break;
           }
@@ -3669,7 +3671,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v364")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v365")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3747,7 +3749,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v364")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v365")
         )
 
         // ===== 新規チーム作成 =====

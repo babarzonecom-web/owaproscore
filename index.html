@@ -3680,7 +3680,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v366")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v367")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3758,7 +3758,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v366")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v367")
         )
 
         // ===== 新規チーム作成 =====
@@ -4905,6 +4905,8 @@ function App() {
                       }, "＋ 投手を追加")
                     , React.createElement('span', {style:{fontSize:11,color:"#475569"}},
                         pitEditMode?"投手の追加・削除・数値修正ができます":"※ 投手名タップで編集。「登板」ボタンで投手交代。")
+                    , React.createElement('div', {style:{fontSize:9,color:"#334155",marginTop:4,fontFamily:"monospace",wordBreak:"break-all"}},
+                        "LOG:"+JSON.stringify((game[side+"PitcherLog"]||[]).map(l=>l.pitcherIdx+":"+l.fromInning+l.fromHalf[0]+l.outsAtStart)))
                   )
               );
             })

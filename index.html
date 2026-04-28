@@ -1896,8 +1896,8 @@ const fbSaveGameToCode = (code, game) => {
       homeLineup: game.homeLineup||[],
       awayPitchers: game.awayPitchers||[],
       homePitchers: game.homePitchers||[],
-      awayPitcherLog: game.awayPitcherLog||[],
-      homePitcherLog: game.homePitcherLog||[],
+      awayPitcherLog: (game.awayPitcherLog||[]).map(l=>l.fromHalf==="bottom"?{...l,fromHalf:"top"}:l),
+      homePitcherLog: (game.homePitcherLog||[]).map(l=>l.fromHalf==="top"?{...l,fromHalf:"bottom"}:l),
       defenseLog: game.defenseLog||[],
       log: (game.log||[]),
       pitcherResults: game.pitcherResults||{},
@@ -2067,8 +2067,11 @@ function App() {
     homeLineup:     _toArr(rawGame.homeLineup, []).map(_fixPlayer),
     awayPitchers:   _toArr(rawGame.awayPitchers, []),
     homePitchers:   _toArr(rawGame.homePitchers, []),
-    awayPitcherLog: _toArr(rawGame.awayPitcherLog, []),
-    homePitcherLog: _toArr(rawGame.homePitcherLog, []),
+    // away投手はtop、home投手はbottomを守る。古いデータのfromHalfを自動修正
+    awayPitcherLog: _toArr(rawGame.awayPitcherLog, []).map(l=>
+      l.fromHalf==="bottom" ? {...l, fromHalf:"top"} : l),
+    homePitcherLog: _toArr(rawGame.homePitcherLog, []).map(l=>
+      l.fromHalf==="top" ? {...l, fromHalf:"bottom"} : l),
     log:            _toArr(rawGame.log, []),
     defenseLog:     _toArr(rawGame.defenseLog, []),
     awayScore:      (rawGame.awayScore && typeof rawGame.awayScore==="object") ? rawGame.awayScore : {},
@@ -2481,6 +2484,11 @@ function App() {
       setModal(null);
       showToast(`チェンジ！ ${_optionalChain([rOf, 'call', _9 => _9(code), 'optionalAccess', _10 => _10.label])||code} 記録`);
     } else {
+      // 得点があれば自責点モーダルを表示
+      if((runs||0) > 0) {
+        const defSide3 = team==="away" ? "home" : "away";
+        setModal({step:"earned_run", defSide:defSide3, runs, inning, scoredNames:scoredNames||[]});
+      }
       showToast(`${_optionalChain([rOf, 'call', _11 => _11(code), 'optionalAccess', _12 => _12.label])||code}${(runs||0)>0?` +${runs}点`:""} ✅`);
       
       // pitchModeはgameから直接取得（クロージャの古い値を避けるため）
@@ -3676,7 +3684,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v368")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v372")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3754,7 +3762,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v368")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v372")
         )
 
         // ===== 新規チーム作成 =====
@@ -4901,8 +4909,7 @@ function App() {
                       }, "＋ 投手を追加")
                     , React.createElement('span', {style:{fontSize:11,color:"#475569"}},
                         pitEditMode?"投手の追加・削除・数値修正ができます":"※ 投手名タップで編集。「登板」ボタンで投手交代。")
-                    , React.createElement('div', {style:{fontSize:9,color:"#334155",marginTop:4,fontFamily:"monospace",wordBreak:"break-all"}},
-                        "LOG:"+JSON.stringify((game[side+"PitcherLog"]||[]).map(l=>l.pitcherIdx+":"+l.fromInning+l.fromHalf[0]+l.outsAtStart)))
+
                   )
               );
             })
@@ -5370,6 +5377,83 @@ function App() {
           )
         );
 
+        if(modal.step==="earned_run") {
+          const defSide = modal.defSide;
+          const pitchers = game[defSide+"Pitchers"]||[];
+          const pitLog = game[defSide+"PitcherLog"]||[];
+          // 同イニングに投げた可能性のある投手を特定
+          const inningPitchers = pitLog.filter((l,li)=>{
+            const nextL = pitLog[li+1];
+            const lTime = l.fromInning*2+(l.fromHalf==="top"?0:1);
+            const innTime = modal.inning*2+(defSide==="away"?0:1);
+            const nextTime = nextL ? nextL.fromInning*2+(nextL.fromHalf==="top"?0:1) : 9999;
+            return lTime<=innTime && innTime<nextTime || (lTime===innTime && nextTime===innTime);
+          });
+          // 重複除去してそのイニングに投げた投手のインデックス一覧
+          const inningIdxSet = new Set();
+          pitLog.forEach((l,li)=>{
+            const lTime = l.fromInning*2+(l.fromHalf==="top"?0:1);
+            const innTime = modal.inning*2+(defSide==="away"?0:1);
+            const nextL = pitLog[li+1];
+            const nextTime = nextL ? nextL.fromInning*2+(nextL.fromHalf==="top"?0:1) : 9999;
+            if(lTime<=innTime && innTime<=nextTime) inningIdxSet.add(l.pitcherIdx);
+          });
+          const inningPit = [...inningIdxSet].map(idx=>({idx, name:(pitchers[idx]||{}).name||"投手"+idx}));
+
+          return React.createElement('div',{style:{position:"fixed",inset:0,background:"#000a",zIndex:300,
+              display:"flex",alignItems:"flex-end",justifyContent:"center"}, onClick:()=>setModal(null)}
+            , React.createElement('div',{style:{background:"#0d1f35",borderRadius:"14px 14px 0 0",
+                width:"100%",maxWidth:500,padding:"20px 20px 36px"},onClick:e=>e.stopPropagation()}
+              , React.createElement('div',{style:{fontSize:15,fontWeight:700,color:"#fbbf24",marginBottom:6}},
+                  modal.runs+"点 入りました")
+              , React.createElement('div',{style:{fontSize:12,color:"#94a3b8",marginBottom:16}},
+                  "自責点を記録しますか？")
+              , inningPit.length > 1 && React.createElement('div',null
+                  , React.createElement('div',{style:{fontSize:12,color:"#7db8e8",fontWeight:700,marginBottom:8}},"投手を選択")
+                  , React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}},
+                      inningPit.map(({idx,name})=>
+                        React.createElement('button',{key:idx,
+                          onClick:e=>{e.stopPropagation();setModal(m=>({...m,selPitIdx:idx}));},
+                          style:{padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,
+                            background:(modal.selPitIdx===idx)?"#1d4ed8":"#0d1f35",
+                            border:"2px solid "+(modal.selPitIdx===idx?"#3b82f6":"#1e3a5f"),
+                            color:(modal.selPitIdx===idx)?"#fff":"#94a3b8"}
+                        }, name)
+                      )
+                    )
+                )
+              , React.createElement('div',{style:{display:"flex",gap:10}}
+                , React.createElement('button',{
+                    onClick:()=>{
+                      // 自責点あり
+                      const pitIdx = modal.selPitIdx !== undefined ? modal.selPitIdx
+                        : (inningPit.length===1 ? inningPit[0].idx : (game[defSide+"PitcherIdx"]||0));
+                      mutGame(g=>{
+                        const ps=[...g[defSide+"Pitchers"]];
+                        if(ps[pitIdx]){
+                          ps[pitIdx]={...ps[pitIdx],
+                            manualOverride:true,
+                            er:(ps[pitIdx].er||0)+modal.runs,
+                            autoRuns:(ps[pitIdx].autoRuns||0)+modal.runs,
+                          };
+                        }
+                        return {...g,[defSide+"Pitchers"]:ps};
+                      });
+                      setModal(null);
+                    },
+                    style:{flex:1,padding:"14px",borderRadius:10,cursor:"pointer",
+                      background:"#dc2626",border:"none",color:"#fff",fontSize:15,fontWeight:700}
+                  }, "✅ 自責点あり")
+                , React.createElement('button',{
+                    onClick:()=>setModal(null),
+                    style:{flex:1,padding:"14px",borderRadius:10,cursor:"pointer",
+                      background:"#0d1f35",border:"1px solid #334155",color:"#94a3b8",fontSize:15,fontWeight:700}
+                  }, "なし")
+              )
+            )
+          );
+        }
+
         if(modal.step==="confirm_delete_team") return (
           React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
             , React.createElement('div', { style: {...S.mBox,maxWidth:300}, onClick: e=>e.stopPropagation(),}
@@ -5688,7 +5772,14 @@ function App() {
                           let seq=0;
                           (g[offKey]||[]).forEach(p=>{Object.values(p.atBats||{}).forEach(abs=>{
                             const arr=Array.isArray(abs)?abs:Object.values(abs||{});seq+=arr.length;});});
-                          const entry={pitcherIdx:newIdx,fromInning:g.inning,fromHalf:g.half,outsAtStart:g.outs,atBatSeq:seq};
+                          // away投手は表(top)、home投手は裏(bottom)を守る
+                          const _pitchHalf=pcTeam==="away"?"top":"bottom";
+                          const _sameHalf=g.half===_pitchHalf;
+                          const entry={pitcherIdx:newIdx,
+                            fromInning:_sameHalf?g.inning:(pcTeam==="away"?g.inning+1:g.inning),
+                            fromHalf:_pitchHalf,
+                            outsAtStart:_sameHalf?g.outs:0,
+                            atBatSeq:_sameHalf?seq:-1};
                           const newGameLog=[{
                             ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
                             msg:`【${g[pcTeam+"Team"]}】投手交代: ${name.trim()} 登板（${g.inning}回${g.half==="top"?"表":"裏"}）`,

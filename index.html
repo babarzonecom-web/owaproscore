@@ -614,7 +614,7 @@ const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:
   manualOverride:false, 
 });
 const makeLineup  = (n=DEFAULT_PLAYERS) => Array.from({length:n},(_,i)=>makePlayer(i+1));
-const makePitchers= () => Array.from({length:5},(_,i)=>makePitcher(i+1));
+const makePitchers= () => [makePitcher(1)]; // 先発1人だけ生成
 const emptyScore  = (n=9) => Object.fromEntries(Array.from({length:n},(_,i)=>i+1).map(i=>[i,""]));
 const calcTotal   = (s) => Object.values(s).reduce((a,v)=>a+(parseInt(v)||0),0);
 
@@ -1442,7 +1442,7 @@ const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:
   manualOverride:false, 
 });
 const makeLineup  = (n=DEFAULT_PLAYERS) => Array.from({length:n},(_,i)=>makePlayer(i+1));
-const makePitchers= () => Array.from({length:5},(_,i)=>makePitcher(i+1));
+const makePitchers= () => [makePitcher(1)]; // 先発1人だけ生成
 const emptyScore  = (n=9) => Object.fromEntries(Array.from({length:n},(_,i)=>i+1).map(i=>[i,""]));
 const calcTotal   = (s) => Object.values(s).reduce((a,v)=>a+(parseInt(v)||0),0);
 
@@ -3684,7 +3684,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v372")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v374")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3762,7 +3762,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v372")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v374")
         )
 
         // ===== 新規チーム作成 =====
@@ -4650,13 +4650,13 @@ function App() {
                     )
                     , React.createElement('tbody', null
                       , pitchers.filter((p,i)=>{
-                          // 未登板投手を非表示：デフォルト名かつ投球なし
+                          // 未登板投手を非表示：デフォルト名かつ投球なし、かつpitcherLogに登場しない
                           const auto = (pitcherStats[side]||[])[i]||{};
                           const isDefault = /^投手\d+$/.test(p.name||'');
                           const hasRecord = (auto._outsGot||0)>0||(auto.autoH||0)>0||(auto.autoBb||0)>0||(auto.autoK||0)>0;
-                          // 試合終了後は全投手表示（追加した投手も見えるように）
-                          if(game.finished) return true;
-                          return !isDefault || hasRecord || i===curPIdx;
+                          const inLog = ((game[side+"PitcherLog"]||[]).some(l=>l.pitcherIdx===i));
+                          // 登板実績（ログに登場 or 記録あり）または現在の投手 or 非デフォルト名のみ表示
+                          return inLog || hasRecord || i===curPIdx || (!isDefault);
                         }).map((p,_i) => {
                           const i = pitchers.indexOf(p); // 元のインデックスを保持
                           const isCur = !game.finished && i===curPIdx;
@@ -4909,6 +4909,8 @@ function App() {
                       }, "＋ 投手を追加")
                     , React.createElement('span', {style:{fontSize:11,color:"#475569"}},
                         pitEditMode?"投手の追加・削除・数値修正ができます":"※ 投手名タップで編集。「登板」ボタンで投手交代。")
+                    , React.createElement('div', {style:{fontSize:9,color:"#334155",marginTop:4,fontFamily:"monospace",wordBreak:"break-all"}},
+                        "LOG:"+JSON.stringify((game[side+"PitcherLog"]||[]).map(l=>l.pitcherIdx+":"+l.fromInning+l.fromHalf[0]+l.outsAtStart)))
 
                   )
               );
@@ -6570,8 +6572,12 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       sides.forEach(side=>{
         const pitchers = g[side+"Pitchers"]||[];
         const autoArr = (pStats[side]||[]);
+        // 実際に登板した投手のインデックスを取得（pitcherLogから）
+        const playedIdxSet = new Set((g[side+"PitcherLog"]||[]).map(l=>l.pitcherIdx));
         pitchers.forEach((p,i)=>{
           if(!p.name) return;
+          // 登板していない投手（デフォルトの「投手1」「投手2」など）はスキップ
+          if(!playedIdxSet.has(i)) return;
           if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set(),outsXinnings:0,win:0,lose:0,save:0,hold:0,bs:0};
           const m = map[p.name];
           m.games.add(g.id);

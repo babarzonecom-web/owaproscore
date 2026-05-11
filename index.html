@@ -565,6 +565,8 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
               opacity: isECode ? 0.6 : 1, cursor: isECode ? "default" : "pointer"},
           }, adjErrorPos ? `🔴 エラー: ${adjErrorPos}` : "🔴 エラーを追加（任意）")
           , !isECode && showErrPicker && React.createElement('div', {style:{background:"#0a1628",borderRadius:8,padding:10,border:"1px solid #1e3a5f"}},
+            React.createElement('div', {style:{fontSize:9,color:"#334155",marginBottom:4,wordBreak:"break-all",fontFamily:"monospace"}},
+                "DBG:"+(defTeamLineup||[]).map(p=>p.name+":"+p.pos).join(",")),
             React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:8}}, "エラーをつけるポジションを選択"),
             React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}},
               ["投","捕","一","二","三","遊","左","中","右"].map(pos => {
@@ -1393,6 +1395,8 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
               opacity: isECode ? 0.6 : 1, cursor: isECode ? "default" : "pointer"},
           }, adjErrorPos ? `🔴 エラー: ${adjErrorPos}` : "🔴 エラーを追加（任意）")
           , !isECode && showErrPicker && React.createElement('div', {style:{background:"#0a1628",borderRadius:8,padding:10,border:"1px solid #1e3a5f"}},
+            React.createElement('div', {style:{fontSize:9,color:"#334155",marginBottom:4,wordBreak:"break-all",fontFamily:"monospace"}},
+                "DBG:"+(defTeamLineup||[]).map(p=>p.name+":"+p.pos).join(",")),
             React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:8}}, "エラーをつけるポジションを選択"),
             React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}},
               ["投","捕","一","二","三","遊","左","中","右"].map(pos => {
@@ -3686,7 +3690,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v377")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v378")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3764,7 +3768,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v377")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v378")
         )
 
         // ===== 新規チーム作成 =====

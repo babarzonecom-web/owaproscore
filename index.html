@@ -3684,7 +3684,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v374")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v375")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3762,7 +3762,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v374")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v375")
         )
 
         // ===== 新規チーム作成 =====
@@ -5984,7 +5984,7 @@ function App() {
                   const defTeam = modal.team==="away"?"home":"away";
                   mutGame(g=>{
                     const dlk = defTeam+"Lineup";
-                    const dl = (g[dlk]||[]).map(p=>p.pos===errorPos?{...p,e:(p.e||0)+1}:p);
+                    const dl = (g[dlk]||[]).map(p=>abbrPos(p.pos||"")===abbrPos(errorPos)?{...p,e:(p.e||0)+1}:p);
                     return {...g,[dlk]:dl};
                   });
                 }

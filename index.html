@@ -2383,7 +2383,7 @@ function App() {
         const defLk = defTeam+"Lineup";
         const defLineup = g[defLk].map(p => {
           // 現在その守備位置にいる選手（交代後も含む）
-          if(p.pos===errorPos) return {...p, e:(p.e||0)+1};
+          if(abbrPos(p.pos||"")=== abbrPos(errorPos||"")) return {...p, e:(p.e||0)+1};
           return p;
         });
         defLineupUpdate = {[defLk]:defLineup};
@@ -3686,7 +3686,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v379")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v380")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3764,7 +3764,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v379")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v380")
         )
 
         // ===== 新規チーム作成 =====

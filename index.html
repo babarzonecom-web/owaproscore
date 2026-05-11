@@ -3700,7 +3700,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v384")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v385")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3778,7 +3778,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v384")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v385")
         )
 
         // ===== 新規チーム作成 =====
@@ -8078,8 +8078,13 @@ function EndGameModal({ game, onConfirm, onCancel }) {
   const [endHalf,  setEndHalf]  = useState(game.half);
   const [note,     setNote]     = useState("");
 
-  // 投手成績チェック
-  const allPitchers = [...(game.awayPitchers||[]), ...(game.homePitchers||[])].filter(p=>p&&p.name);
+  // 投手成績チェック（pitcherLogに登場した投手のみ・デフォルト名を除外）
+  const _playedAway = new Set((game.awayPitcherLog||[]).map(l=>l.pitcherIdx));
+  const _playedHome = new Set((game.homePitcherLog||[]).map(l=>l.pitcherIdx));
+  const allPitchers = [
+    ...(game.awayPitchers||[]).filter((p,i)=>p&&p.name&&(_playedAway.has(i)||!/^投手\d+$/.test(p.name))),
+    ...(game.homePitchers||[]).filter((p,i)=>p&&p.name&&(_playedHome.has(i)||!/^投手\d+$/.test(p.name))),
+  ];
   const initPR = {};
   allPitchers.forEach(p=>{
     const existing = (game.pitcherResults||{})[p.name]||{};

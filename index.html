@@ -1864,8 +1864,9 @@ const fbSaveTeamGame = (teamId, game) => {
       homeScoreTotal: sumScore(game.homeScore),
       awayScore: game.awayScore||{},
       homeScore: game.homeScore||{},
-      awayLineup: game.awayLineup||[],
-      homeLineup: game.homeLineup||[],
+      // posの「D」→「指」への自動変換（後方互換）
+      awayLineup: (game.awayLineup||[]).map(p=>p&&p.pos==="D"?{...p,pos:"指"}:p),
+      homeLineup: (game.homeLineup||[]).map(p=>p&&p.pos==="D"?{...p,pos:"指"}:p),
       awayPitchers: game.awayPitchers||[],
       homePitchers: game.homePitchers||[],
       pitcherResults: game.pitcherResults||{},
@@ -1892,8 +1893,9 @@ const fbSaveGameToCode = (code, game) => {
       homeTeam: game.homeTeam||"",
       awayScore: game.awayScore||{},
       homeScore: game.homeScore||{},
-      awayLineup: game.awayLineup||[],
-      homeLineup: game.homeLineup||[],
+      // posの「D」→「指」への自動変換（後方互換）
+      awayLineup: (game.awayLineup||[]).map(p=>p&&p.pos==="D"?{...p,pos:"指"}:p),
+      homeLineup: (game.homeLineup||[]).map(p=>p&&p.pos==="D"?{...p,pos:"指"}:p),
       awayPitchers: game.awayPitchers||[],
       homePitchers: game.homePitchers||[],
       awayPitcherLog: (game.awayPitcherLog||[]).map(l=>l.fromHalf==="bottom"?{...l,fromHalf:"top"}:l),
@@ -3684,7 +3686,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v375")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v376")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3762,7 +3764,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v375")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v376")
         )
 
         // ===== 新規チーム作成 =====
@@ -8332,7 +8334,7 @@ function PitcherPicker({ members, teams, currentTeamName, onSelect }) {
     )
   );
 }
-const POS_OPTS = ["投","捕","一","二","三","遊","左","中","右","D","代"];
+const POS_OPTS = ["投","捕","一","二","三","遊","左","中","右","指","代"];
 
 function PosSelector({ value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -8392,7 +8394,7 @@ function PosSelector({ value, onChange }) {
     )
   );
 }
-const POSITIONS = ["投","捕","一","二","三","遊","左","中","右","D","代"];
+const POSITIONS = ["投","捕","一","二","三","遊","左","中","右","指","代"];
 
 function SubstituteModal({ player, team, game, pidx, teams, onConfirm, onCancel }) {
   const [newName, setNewName] = useState("");

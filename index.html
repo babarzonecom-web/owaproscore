@@ -3700,7 +3700,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v383")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v384")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3778,7 +3778,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v383")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v384")
         )
 
         // ===== 新規チーム作成 =====
@@ -6691,7 +6691,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           , React.createElement('tbody', null
             , players.map((p,i)=>
                 React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0a1628":"#0d1f35"}}
-                  , React.createElement('td', {style:{...tdN,color:"#e2e8f0"}}
+                  , React.createElement('td', {style:{...tdN,color:"#e2e8f0",whiteSpace:"nowrap"}}
                     , p.name
                     , editMode && (statOverrides||{})[p.name] && React.createElement('button',{
                         onClick:()=>clearOverride&&clearOverride(p.name),
@@ -8090,13 +8090,18 @@ function EndGameModal({ game, onConfirm, onCancel }) {
   });
   const [pitcherResults, setPitcherResults] = useState(initPR);
 
-  // 失点・自責点の修正
+  // 失点・自責点の修正（自動計算値を初期値として表示）
+  const _pStats = computePitcherStats(game);
   const initRuns = {};
   allPitchers.forEach(p=>{
     const pr = (game.pitcherResults||{})[p.name]||{};
+    // 先にaway/homeどちらかのstatsから現在値を取得
+    const autoStatA = (_pStats.away||[]).find(s=>s.name===p.name);
+    const autoStatH = (_pStats.home||[]).find(s=>s.name===p.name);
+    const autoStat = autoStatA || autoStatH || {};
     initRuns[p.name] = {
-      runs: pr.manualRuns !== undefined ? pr.manualRuns : "",
-      er:   pr.manualEr   !== undefined ? pr.manualEr   : "",
+      runs: pr.manualRuns !== undefined ? pr.manualRuns : (autoStat.autoRuns||0),
+      er:   pr.manualEr   !== undefined ? pr.manualEr   : (autoStat.autoEr||0),
     };
   });
   const [pitcherRuns, setPitcherRuns] = useState(initRuns);

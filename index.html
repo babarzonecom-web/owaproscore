@@ -3700,7 +3700,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v385")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v386")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3778,7 +3778,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v385")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v386")
         )
 
         // ===== 新規チーム作成 =====
@@ -6338,9 +6338,11 @@ function App() {
                   preErrorPos: modal.errorPos||null,
                   defTeamLineup: game[(modal.team==="away"?"home":"away")+"Lineup"]||[],
                   onConfirm: (adjBases,scoredNames,adjOuts,adjErrorPos)=>{
+                    const _adjRuns = (scoredNames||[]).length + (adjBases && modal.pendingCode==="HR" ? 1 : 0);
                     commitAtBat(modal.team,modal.pidx,modal.inning,
                       modal.pendingCode,modal.pendingDir||null,scoredNames,adjBases,adjOuts,adjErrorPos||modal.errorPos||null,modal.skipPitchAdd||false);
-                    setModal(null);
+                    // 得点がある場合は自責点モーダルがcommitAtBat内でsetModalされるのでここではnullにしない
+                    if(_adjRuns === 0) setModal(null);
                   },
                   onCancel: ()=>setModal(null),}
                 )

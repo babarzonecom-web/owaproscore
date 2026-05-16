@@ -2355,10 +2355,7 @@ function App() {
     const runs = (scoredNames||[]).length;
     const batterName = (() => { try { return _optionalChain([game, 'access', _4 => _4[team+"Lineup"], 'access', _5 => _5[pidx], 'optionalAccess', _6 => _6.name])||""; } catch(e){return "";} })();
     const batterScored = (scoredNames||[]).includes(batterName);
-    // 得点圏打率計算のため打席前のランナー状態を保存
-      const _preB = g.bases||[null,null,null];
-      const _inSP = !!(_preB[1]||_preB[2]); // 2塁or3塁にランナー = 得点圏
-      const entry = {code, ...(dir?{dir}:{}), runs, ...(batterScored?{scored:true}:{}), ...(errorPos?{errorPos}:{}), ...((scoredNames||[]).length>0?{scoredNames:scoredNames}:{}), ...(_inSP?{sp:true}:{})};
+    const entry = {code, ...(dir?{dir}:{}), runs, ...(batterScored?{scored:true}:{}), ...(errorPos?{errorPos}:{}), ...((scoredNames||[]).length>0?{scoredNames:scoredNames}:{})};
     let nextPidx = -1;
     mutGame(g=>{
       const lk=team+"Lineup";
@@ -3262,21 +3259,10 @@ function App() {
 
   const endGame = useCallback((reason, endInning, endNote, pitcherResults)=>{
     mutGame(g=>{
-      // pitcherResultsのmanualRuns/manualErを投手データに反映
-      const pr = pitcherResults||{};
-      const applyRunsToSide = (side) => {
-        const ps = [...(g[side+"Pitchers"]||[])];
-        ps.forEach((p,i)=>{
-          const r = pr[p.name]||{};
-          if(r.manualRuns!==undefined) ps[i]={...ps[i],autoRuns:r.manualRuns,manualOverride:true};
-          if(r.manualEr!==undefined)   ps[i]={...ps[i],er:r.manualEr,autoEr:r.manualEr,manualOverride:true};
-        });
-        return ps;
-      };
+      // 試合終了時: 現在のアウトカウントを最終アウト数として記録
+      // computePitcherStatsで使用してズレを補正する
       return {...g, finished:true, endReason:reason, endInning, endNote:endNote||"",
-        pitcherResults:pr,
-        awayPitchers: applyRunsToSide("away"),
-        homePitchers: applyRunsToSide("home"),
+        pitcherResults:pitcherResults||{},
         finalOuts: g.outs, finalInning: g.inning, finalHalf: g.half};
     });
     
@@ -3700,7 +3686,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v388")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v389")
         , tab!=="login" && [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
           React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
             background:"transparent",border:"none",
@@ -3778,7 +3764,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v388")
+          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v389")
         )
 
         // ===== 新規チーム作成 =====
@@ -6534,7 +6520,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             // 全チーム表示時はチーム名で区別、チーム絞り込み時はそのまま
             const key = filterTeamName ? name : (teamName ? teamName+" "+name : name);
             const dispName = filterTeamName ? name : (teamName ? teamName+" "+name : name);
-            if(!map[key]) map[key]={name:dispName,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,sb:0,cs:0,run:0,sac:0,sf:0,tb:0,e:0,spAb:0,spH:0,games:new Set()};
+            if(!map[key]) map[key]={name:dispName,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,sb:0,cs:0,run:0,sac:0,sf:0,tb:0,e:0,games:new Set()};
             const m = map[key];
           m.games.add(g.id);
           Object.values(v.atBats||{}).flat().forEach(e=>{
@@ -6542,9 +6528,6 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             const c = ne.code; if(!c) return;
             const noab = ["BB","HBP","SAC","SF","IBB","CI"].includes(c); // CI(打撃妨害)も打数なし
             if(!noab) m.ab++;
-            // 得点圏打率
-            if(ne.sp && !noab) m.spAb++;
-            if(ne.sp && !noab && ["H1","H2","H3","HR"].includes(c)) m.spH++;
             if(["H1","H2","H3","HR"].includes(c)){m.h++;m.tb+=c==="H1"?1:c==="H2"?2:c==="H3"?3:4;}
             if(c==="H2") m.h2++;
             if(c==="H3") m.h3++;
@@ -6565,8 +6548,6 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
     });
     });
     return Object.values(map).map(m=>{
-      const spAvg = m.spAb>0 ? (m.spH/m.spAb).toFixed(3).replace(/^0/,"") : "---";
-      m.spAvg = spAvg;
       const pa = m.ab+m.bb+m.hbp+m.sac+m.sf;
       const avg = m.ab>0?(m.h/m.ab).toFixed(3).replace(/^0/,""):".---";
       const slg = m.ab>0?(m.tb/m.ab).toFixed(3).replace(/^0/,""):".---";
@@ -6672,8 +6653,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           , React.createElement('thead', null
             , React.createElement('tr', null
               , [
-                  ["選手",null],["試","games"],["打席","pa"],["打数","ab"],["安打","h"],["二","h2"],["三","h3"],
-                  ["打率","avg"],["得点圏","spAvg"],["長打率","slg"],["出塁率","obp"],["OPS","ops"],
+                  ["選手",null],["試","games"],["打席","pa"],["打数","ab"],["安打","h"],
+                  ["打率","avg"],["長打率","slg"],["出塁率","obp"],["OPS","ops"],
                   ["本塁","hr"],["打点","rbi"],["得点","run"],["四球","bb"],["三振","k"],["盗塁","sb"],["失策","e"]
                 ].map(([label,key])=>
                   React.createElement('th', {key:label, style:{...thS,
@@ -6691,7 +6672,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           , React.createElement('tbody', null
             , players.map((p,i)=>
                 React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0a1628":"#0d1f35"}}
-                  , React.createElement('td', {style:{...tdN,color:"#e2e8f0",whiteSpace:"nowrap"}}
+                  , React.createElement('td', {style:{...tdN,color:"#e2e8f0"}}
                     , p.name
                     , editMode && (statOverrides||{})[p.name] && React.createElement('button',{
                         onClick:()=>clearOverride&&clearOverride(p.name),
@@ -6709,8 +6690,6 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                       const editable = [
                         ["ab",p.ab,tdS],
                         ["h",p.h,{...tdS,color:"#4ade80",fontWeight:700}],
-                        ["h2",p.h2||0,{...tdS,color:"#4ade80"}],
-                        ["h3",p.h3||0,{...tdS,color:"#4ade80"}],
                       ];
                       // 自動再計算される派生指標
                       const effectiveAb = getV("ab", p.ab);
@@ -6736,7 +6715,6 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                       })();
                       const readonly = [
                         ["avg", recalcAvg, {...tdS,color:"#fbbf24",fontWeight:900}],
-                        ["spAvg", p.spAvg||"---", {...tdS,color:"#fb923c",fontSize:10}],
                         ["slg", recalcSlg, tdS],
                         ["obp", recalcObp, tdS],
                         ["ops", recalcOps, {...tdS,color:"#f59e0b",fontWeight:700}],
@@ -8078,13 +8056,8 @@ function EndGameModal({ game, onConfirm, onCancel }) {
   const [endHalf,  setEndHalf]  = useState(game.half);
   const [note,     setNote]     = useState("");
 
-  // 投手成績チェック（pitcherLogに登場した投手のみ・デフォルト名を除外）
-  const _playedAway = new Set((game.awayPitcherLog||[]).map(l=>l.pitcherIdx));
-  const _playedHome = new Set((game.homePitcherLog||[]).map(l=>l.pitcherIdx));
-  const allPitchers = [
-    ...(game.awayPitchers||[]).filter((p,i)=>p&&p.name&&(_playedAway.has(i)||!/^投手\d+$/.test(p.name))),
-    ...(game.homePitchers||[]).filter((p,i)=>p&&p.name&&(_playedHome.has(i)||!/^投手\d+$/.test(p.name))),
-  ];
+  // 投手成績チェック
+  const allPitchers = [...(game.awayPitchers||[]), ...(game.homePitchers||[])].filter(p=>p&&p.name);
   const initPR = {};
   allPitchers.forEach(p=>{
     const existing = (game.pitcherResults||{})[p.name]||{};
@@ -8094,23 +8067,6 @@ function EndGameModal({ game, onConfirm, onCancel }) {
     };
   });
   const [pitcherResults, setPitcherResults] = useState(initPR);
-
-  // 失点・自責点の修正（自動計算値を初期値として表示）
-  const _pStats = computePitcherStats(game);
-  const initRuns = {};
-  allPitchers.forEach(p=>{
-    const pr = (game.pitcherResults||{})[p.name]||{};
-    // 先にaway/homeどちらかのstatsから現在値を取得
-    const autoStatA = (_pStats.away||[]).find(s=>s.name===p.name);
-    const autoStatH = (_pStats.home||[]).find(s=>s.name===p.name);
-    const autoStat = autoStatA || autoStatH || {};
-    initRuns[p.name] = {
-      runs: pr.manualRuns !== undefined ? pr.manualRuns : (autoStat.autoRuns||0),
-      er:   pr.manualEr   !== undefined ? pr.manualEr   : (autoStat.autoEr||0),
-    };
-  });
-  const [pitcherRuns, setPitcherRuns] = useState(initRuns);
-
   const togglePR = (name, key) => {
     setPitcherResults(pr=>{
       const cur = pr[name]||{};
@@ -8227,39 +8183,10 @@ function EndGameModal({ game, onConfirm, onCancel }) {
                       background:(pitcherResults[p.name]||{})[key]?color+"33":"transparent",
                       border:`1.5px solid ${(pitcherResults[p.name]||{})[key]?color:"#1e3a5f"}`,
                       color:(pitcherResults[p.name]||{})[key]?color:"#475569"}}, label))
-              , React.createElement('div',{style:{display:"flex",gap:6,alignItems:"center",marginTop:4,width:"100%"}}
-                  , React.createElement('span',{style:{fontSize:10,color:"#64748b"}},"失点")
-                  , React.createElement('input',{type:"number",min:0,max:99,
-                      value:(pitcherRuns[p.name]||{}).runs,
-                      onChange:e=>setPitcherRuns(r=>({...r,[p.name]:{...(r[p.name]||{}),runs:e.target.value}})),
-                      placeholder:"—",
-                      style:{width:44,background:"#0d1f35",border:"1px solid #1e3a5f",borderRadius:5,
-                        color:"#e2e8f0",fontSize:12,padding:"2px 5px",textAlign:"center"}})
-                  , React.createElement('span',{style:{fontSize:10,color:"#64748b"}},"自責")
-                  , React.createElement('input',{type:"number",min:0,max:99,
-                      value:(pitcherRuns[p.name]||{}).er,
-                      onChange:e=>setPitcherRuns(r=>({...r,[p.name]:{...(r[p.name]||{}),er:e.target.value}})),
-                      placeholder:"—",
-                      style:{width:44,background:"#0d1f35",border:"1px solid #1e3a5f",borderRadius:5,
-                        color:"#e2e8f0",fontSize:12,padding:"2px 5px",textAlign:"center"}})
-                )
             ))
         )
 
-        , React.createElement('button', { onClick: ()=>{
-            // pitcherRunsをpitcherResultsにマージ
-            const mergedPR = {...pitcherResults};
-            Object.keys(pitcherRuns).forEach(name=>{
-              const r = pitcherRuns[name]||{};
-              const runs = r.runs!==""&&r.runs!==undefined ? Number(r.runs) : undefined;
-              const er   = r.er  !==""&&r.er  !==undefined ? Number(r.er)   : undefined;
-              mergedPR[name] = {...(mergedPR[name]||{}),
-                ...(runs!==undefined?{manualRuns:runs}:{}),
-                ...(er  !==undefined?{manualEr:er}  :{}),
-              };
-            });
-            onConfirm(reason, reason==="normal"?null:endInn, note, mergedPR);
-          },
+        , React.createElement('button', { onClick: ()=>onConfirm(reason, reason==="normal"?null:endInn, note, pitcherResults),
           style: {...sBt("#dc2626"),width:"100%",padding:"12px",fontSize:15,fontWeight:700,marginBottom:6},}, "⚾ この内容で試合終了"
 
         )

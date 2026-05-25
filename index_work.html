@@ -8935,5 +8935,22 @@ try {
 }
   
 </script>
+<script>
+if('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js?v=1004')
+      .then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          nw.addEventListener('statechange', () => {
+            if(nw.state === 'installed' && navigator.serviceWorker.controller) {
+              window.location.reload();
+            }
+          });
+        });
+      });
+  });
+}
+</script>
 </body>
 </html>

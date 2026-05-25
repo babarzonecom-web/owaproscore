@@ -3795,7 +3795,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v418")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v419")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3881,7 +3881,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v418")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v419")
         )
 
         // ===== 新規チーム作成 =====
@@ -5017,13 +5017,12 @@ function App() {
                     )
                     , React.createElement('tbody', null
                       , pitchers.filter((p,i)=>{
-                          // 未登板投手を非表示：デフォルト名かつ投球なし、かつpitcherLogに登場しない
-                          const auto = (pitcherStats[side]||[])[i]||{};
                           const isDefault = /^投手\d+$/.test(p.name||'');
-                          const hasRecord = (auto._outsGot||0)>0||(auto.autoH||0)>0||(auto.autoBb||0)>0||(auto.autoK||0)>0;
                           const inLog = ((game[side+"PitcherLog"]||[]).some(l=>l.pitcherIdx===i));
-                          // 登板実績（ログに登場 or 記録あり）または現在の投手 or 非デフォルト名のみ表示
-                          return inLog || hasRecord || i===curPIdx || (!isDefault);
+                          // デフォルト名はpitcherLogに明示登場 or 現在登板中のみ表示
+                          // 非デフォルト名は常に表示（実名を入力した投手）
+                          if(isDefault) return inLog || i===curPIdx;
+                          return true;
                         }).map((p,_i) => {
                           const i = pitchers.indexOf(p); // 元のインデックスを保持
                           const isCur = !game.finished && i===curPIdx;
@@ -7139,18 +7138,18 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
         const sortedRawLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1));
         const starterIdxForSide = sortedRawLog.length>0 ? sortedRawLog[0].pitcherIdx : 0;
         // pitcherLogが空でも先発(index=0またはstarterIdx)は登板扱い
+        // pitcherLogに明示的に登場したインデックスのみ
         const playedIdxSet = new Set(rawLog.map(l=>l.pitcherIdx));
-        // autoArrに成績がある投手も登板扱いに含める（先発補完で追加されたエントリ対応）
-        autoArr.forEach((a,ai)=>{ if(a&&((a._outsGot||0)>0||(a.autoH||0)>0||(a.autoBb||0)>0||(a.autoK||0)>0)) playedIdxSet.add(ai); });
-        // pitcherLogが空の場合は先発(index=0)を追加
+        // pitcherLogが空の場合はindex=0を先発とみなす
         if(rawLog.length===0 && pitchers.length>0) playedIdxSet.add(0);
         pitchers.forEach((p,i)=>{
           if(!p.name) return;
-          // 登板していない かつ デフォルト名（「投手N」）→スキップ
-          const hasStats = !!(autoArr[i]&&((autoArr[i]._outsGot||0)>0||(autoArr[i].autoH||0)>0||(autoArr[i].autoBb||0)>0||(autoArr[i].autoK||0)>0));
           const isDefaultName = /^投手\d+$/.test(p.name);
-          if(!playedIdxSet.has(i)) return; // pitcherLogに登場しない → スキップ
-          if(isDefaultName && !hasStats) return; // デフォルト名で成績なし → スキップ
+          // デフォルト名はpitcherLogに明示登場している場合のみ表示
+          // （autoArrに成績があっても先発補完由来の可能性があるため除外）
+          if(isDefaultName && !rawLog.some(l=>l.pitcherIdx===i)) return;
+          // 非デフォルト名でもpitcherLogに登場しない場合はスキップ
+          if(!playedIdxSet.has(i)) return;
           if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set(),outsXinnings:0,win:0,lose:0,save:0,hold:0,bs:0};
           const m = map[p.name];
           m.games.add(g.id);

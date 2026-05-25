@@ -776,8 +776,10 @@ const computePitcherStats = (g) => {
 
     
     // pitchersが配列でない場合の防御
-    const safePitchers = Array.isArray(pitchers) ? pitchers : (pitchers ? Object.values(pitchers) : []);
-    if(!safePitchers.length) { result[defTeam]=[]; return; }
+    const rawPitchers = Array.isArray(pitchers) ? pitchers : (pitchers ? Object.values(pitchers) : []);
+    // nullエントリを除去しつつindexを保持するため、nullは空オブジェクトに変換
+    const safePitchers = rawPitchers.map(p=>p||{});
+    if(!safePitchers.length || safePitchers.every(p=>!p.name)) { result[defTeam]=[]; return; }
     const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, _outsGot:0, _brOutsCount:0}));
 
     
@@ -1604,8 +1606,10 @@ const computePitcherStats = (g) => {
 
     
     // pitchersが配列でない場合の防御
-    const safePitchers = Array.isArray(pitchers) ? pitchers : (pitchers ? Object.values(pitchers) : []);
-    if(!safePitchers.length) { result[defTeam]=[]; return; }
+    const rawPitchers = Array.isArray(pitchers) ? pitchers : (pitchers ? Object.values(pitchers) : []);
+    // nullエントリを除去しつつindexを保持するため、nullは空オブジェクトに変換
+    const safePitchers = rawPitchers.map(p=>p||{});
+    if(!safePitchers.length || safePitchers.every(p=>!p.name)) { result[defTeam]=[]; return; }
     const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, _outsGot:0, _brOutsCount:0}));
 
     
@@ -3813,7 +3817,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v415")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v416")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3899,7 +3903,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v415")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v416")
         )
 
         // ===== 新規チーム作成 =====
@@ -5337,7 +5341,6 @@ function App() {
               onDelete:delHistory,
               onExcel:(g)=>{ showToast("📊 出力処理を開始します..."); exportExcel(g); },
               onRecompute:()=>{
-                // 全履歴試合をcomputePitcherStatsで再計算して保存し直す
                 setStorage(s=>{
                   const newHist = (s.history||[]).map(g=>{
                     try {
@@ -5345,10 +5348,19 @@ function App() {
                       const rebuildSide = (side) => {
                         const pitchers = [...(g[side+"Pitchers"]||[])];
                         const autoArr = pStats[side]||[];
+                        // indexベースで直接マッピング（safePitchersと同じ配列を使う）
                         return pitchers.map((p,i)=>{
-                          const a = autoArr[i]||{};
-                          // manualOverrideがある場合はerとmanualIpのみ保持、他はautoで上書き
+                          // autoArr[i]が正しいindexで対応しているか確認
+                          // computePitcherStatsはsafePitchers.mapで作るので
+                          // pitchers配列が配列形式なら必ず同じindex
+                          const a = autoArr[i];
+                          // aが存在しない or 成績が全て0の場合は元データを保持
+                          if(!a || (a.autoIp===0 && a.autoH===0 && a.autoBb===0 && a.autoK===0 && a._outsGot===0)) {
+                            // 元データをそのまま返す（上書きしない）
+                            return p;
+                          }
                           if(p.manualOverride){
+                            // 手動修正済み: erとmanualIpは保持、被安打等はautoで更新
                             return {...p,
                               autoH:   a.autoH||0,
                               autoBb:  a.autoBb||0,
@@ -5357,7 +5369,6 @@ function App() {
                               autoHr:  a.autoHr||0,
                               autoIp:  a.autoIp||0,
                               _outsGot:a._outsGot||0,
-                              // er/autoRunsはmanualOverrideがある場合は保持
                             };
                           }
                           return {...p,
@@ -5370,6 +5381,7 @@ function App() {
                             autoIp:   a.autoIp||0,
                             autoRuns: a.autoRuns||0,
                             _outsGot: a._outsGot||0,
+                            manualOverride: false,
                           };
                         });
                       };
@@ -5378,7 +5390,6 @@ function App() {
                         awayPitchers: rebuildSide("away"),
                         homePitchers: rebuildSide("home"),
                       };
-                      // Firebaseにも保存
                       if(window.__teamShareCode) fbSaveHistory(window.__teamShareCode, updated);
                       return updated;
                     } catch(e){

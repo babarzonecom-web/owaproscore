@@ -3585,7 +3585,7 @@ function App() {
       `)
 
       
-      , React.createElement('header', { style: S.header,}
+      , !isReadOnly && React.createElement('header', { style: S.header,}
         , React.createElement('div', { style: S.hRow,}
           , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0},}
             , React.createElement('span', { style: {fontSize:24,flexShrink:0},}, "⚾")
@@ -3716,9 +3716,9 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v394")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v396")
         , tab!=="login" && (isReadOnly
-          ? [["live","📡 速報"],["score","📊 スコア"],["stats","📈 成績"]].map(([id,l])=>(
+          ? [["live","📡 速報"],["score","📊 スコア"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
                 background:"transparent",border:"none",
                 borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
@@ -3802,7 +3802,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v394")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v396")
         )
 
         // ===== 新規チーム作成 =====
@@ -5207,6 +5207,27 @@ function App() {
         , tab==="stats"&&(React.createElement(React.Fragment, null
           , React.createElement(StatsTab, {game:game, history:history, teams:teams, myTeam:myTeam, opponents:opponents, tournaments:tournaments, onExcel:(g)=>exportExcel(g)})
         ))
+
+        , tab==="logout"&&(
+          React.createElement('div', {style:{maxWidth:400,margin:"0 auto",padding:"20px 0"}}
+            , React.createElement('div', {style:{
+                background:"#0a1628",border:"1px solid #1e3a5f",borderRadius:12,padding:"20px"
+              }}
+              , React.createElement('div', {style:{fontSize:13,color:"#64748b",marginBottom:4}}, "接続中のチームコード")
+              , React.createElement('div', {style:{fontSize:22,fontWeight:900,color:"#7dd3fc",marginBottom:20,letterSpacing:2}}, teamShareCode)
+              , React.createElement('div', {style:{fontSize:12,color:"#475569",marginBottom:20}},
+                "閲覧モード（メンバー）として接続中です"
+              )
+              , React.createElement('button', {
+                  onClick: ()=>{ disconnectTeam(); setTab("login"); },
+                  style:{
+                    background:"#7f1d1d",border:"1px solid #dc2626",borderRadius:10,
+                    color:"#fff",padding:"12px",width:"100%",fontSize:14,fontWeight:700,cursor:"pointer"
+                  }
+                }, "🚪 ログアウト")
+            )
+          )
+        )
 
         , tab==="history"&&(React.createElement(React.Fragment, null
           , React.createElement(HistoryTab, {

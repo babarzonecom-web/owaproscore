@@ -3716,7 +3716,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v401")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v402")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3802,7 +3802,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v401")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v402")
         )
 
         // ===== 新規チーム作成 =====
@@ -4128,45 +4128,25 @@ function App() {
                   )
                 )
 
-                // アウト + BSO
+                // BSO 1行
                 ,React.createElement('div',{style:{
-                  display:"flex",flexDirection:"column",gap:8,minWidth:90
+                  background:"#0a1628",border:"1px solid #1e3a5f",borderRadius:12,
+                  padding:"10px 12px",minWidth:90,
+                  display:"flex",flexDirection:"column",justifyContent:"center",gap:7
                 }}
-                  // アウト
-                  ,React.createElement('div',{style:{
-                    background:"#0a1628",border:"1px solid #1e3a5f",borderRadius:12,
-                    padding:"10px 12px",textAlign:"center",flex:1,
-                    display:"flex",flexDirection:"column",justifyContent:"center",gap:4
-                  }}
-                    ,React.createElement('div',{style:{fontSize:11,color:"#64748b",fontWeight:700}},"アウト")
-                    ,React.createElement('div',{style:{display:"flex",gap:6,justifyContent:"center",marginTop:4}}
-                      ,[0,1,2].map(i=>React.createElement('div',{key:i,style:{
-                        width:18,height:18,borderRadius:"50%",
-                        background:i<_outs?"#f87171":"transparent",
-                        border:"2px solid "+(i<_outs?"#f87171":"#2a4a7a")
-                      }}))
-                    )
-                    ,React.createElement('div',{style:{fontSize:22,fontWeight:900,color:"#f87171"}},_outs)
-                  )
-                  // BSO
-                  ,React.createElement('div',{style:{
-                    background:"#0a1628",border:"1px solid #1e3a5f",borderRadius:12,
-                    padding:"10px 12px",flex:1,
-                    display:"flex",flexDirection:"column",justifyContent:"center",gap:6
-                  }}
-                    ,[
-                      {label:"B",count:_pitchCount_b,max:4,color:"#4ade80"},
-                      {label:"S",count:_pitchCount_s,max:3,color:"#fbbf24"},
-                    ].map(({label,count,max,color})=>
-                      React.createElement('div',{key:label,style:{display:"flex",alignItems:"center",gap:4}}
-                        ,React.createElement('span',{style:{fontSize:12,fontWeight:700,color:"#64748b",minWidth:14}},label)
-                        ,React.createElement('div',{style:{display:"flex",gap:3}}
-                          ,Array.from({length:max},(_,i)=>React.createElement('div',{key:i,style:{
-                            width:12,height:12,borderRadius:"50%",
-                            background:i<count?color:"transparent",
-                            border:"2px solid "+(i<count?color:"#2a4a7a")
-                          }}))
-                        )
+                  ,[
+                    {label:"B",count:_pitchCount_b,max:4,color:"#4ade80"},
+                    {label:"S",count:_pitchCount_s,max:3,color:"#fbbf24"},
+                    {label:"O",count:_outs,        max:3,color:"#f87171"},
+                  ].map(({label,count,max,color})=>
+                    React.createElement('div',{key:label,style:{display:"flex",alignItems:"center",gap:5}}
+                      ,React.createElement('span',{style:{fontSize:12,fontWeight:700,color:"#64748b",minWidth:14}},label)
+                      ,React.createElement('div',{style:{display:"flex",gap:3}}
+                        ,Array.from({length:max},(_,i)=>React.createElement('div',{key:i,style:{
+                          width:13,height:13,borderRadius:"50%",
+                          background:i<count?color:"transparent",
+                          border:"2px solid "+(i<count?color:"#2a4a7a")
+                        }}))
                       )
                     )
                   )

@@ -1879,6 +1879,61 @@ const fbSaveTeamGame = (teamId, game) => {
 };
 
 // チームコードに試合を保存（team_rooms/{code}/games/{id}）
+// Firebase history 操作
+const FB_BASE = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+const fbSaveHistory = async (code, game) => {
+  if(!code||!game||!game.id) return;
+  try {
+    await fetch(`${FB_BASE}/team_rooms/${code}/history/${game.id}.json`, {
+      method:"PUT", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(game)
+    });
+  } catch(e){ console.error("[FB] history save error", e); }
+};
+
+const fbDeleteHistory = async (code, gameId) => {
+  if(!code||!gameId) return;
+  try {
+    await fetch(`${FB_BASE}/team_rooms/${code}/history/${gameId}.json`, {method:"DELETE"});
+  } catch(e){ console.error("[FB] history delete error", e); }
+};
+
+const fbLoadHistory = async (code) => {
+  if(!code) return [];
+  try {
+    const res = await fetch(`${FB_BASE}/team_rooms/${code}/history.json`);
+    const d = await res.json();
+    if(!d) return [];
+    // オブジェクト形式（{gameId: gameObj}）→配列に変換
+    return Object.values(d).filter(Boolean).sort((a,b)=>{
+      const ta = a.savedAt||a.date||""; const tb = b.savedAt||b.date||"";
+      return tb.localeCompare(ta);
+    });
+  } catch(e){ return []; }
+};
+
+// statOverridesをFirebaseに保存
+const fbSaveStatOverrides = async (code, overrides) => {
+  if(!code) return;
+  try {
+    await fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+code+"/statOverrides.json", {
+      method:"PUT", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(overrides||{})
+    });
+  } catch(e){ console.error("[FB] statOverrides save error", e); }
+};
+
+// statOverridesをFirebaseから読み込む
+const fbLoadStatOverrides = async (code) => {
+  if(!code) return {};
+  try {
+    const res = await fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+code+"/statOverrides.json");
+    const d = await res.json();
+    return d||{};
+  } catch(e){ return {}; }
+};
+
 const fbSaveGameToCode = (code, game) => {
   if(!code || !game || !game.id) return;
   try {
@@ -2105,6 +2160,27 @@ function App() {
   },[isViewer, syncGameId]);
 
   const showToast = (msg)=>{setToast(msg);setTimeout(()=>setToast(""),2600);};
+
+  // チームコード接続時にFirebase履歴を読み込んでlocalとマージ
+  useEffect(()=>{
+    const code = window.__teamShareCode;
+    if(!code) return;
+    fbLoadHistory(code).then(fbHist=>{
+      if(!fbHist||fbHist.length===0) return;
+      setStorage(s=>{
+        const localIds = new Set((s.history||[]).map(g=>g.id));
+        // Firebase履歴のうちlocalにないものを追加
+        const merged = [...(s.history||[])];
+        fbHist.forEach(g=>{ if(g&&g.id&&!localIds.has(g.id)) merged.push(g); });
+        // savedAtで降順ソートして最大50件
+        merged.sort((a,b)=>{
+          const ta=a.savedAt||a.date||""; const tb=b.savedAt||b.date||"";
+          return tb.localeCompare(ta);
+        });
+        return {...s, history:merged.slice(0,50)};
+      });
+    });
+  },[teamShareCode]);
 
   const disconnectTeam = () => {
     // ポーリング停止
@@ -3288,6 +3364,7 @@ function App() {
       // チームコード管理者なら必ずFirebaseにアップロード
       if(window.__teamShareRole==="admin" && window.__teamShareCode){
         fbSaveGameToCode(window.__teamShareCode, saved);
+        fbSaveHistory(window.__teamShareCode, saved);
       }
       const hist = [saved, ...(s.history||[]).filter(h=>h.id!==saved.id).slice(0,49)];
       return {...s, history:hist};
@@ -3323,6 +3400,7 @@ function App() {
       const g = finished;
       if(window.__teamShareRole==="admin" && window.__teamShareCode){
         fbSaveGameToCode(window.__teamShareCode, g);
+        fbSaveHistory(window.__teamShareCode, g);
       }
       // 旧来の shared_teams への保存も維持（後方互換）
       const allTeams = [...(s.teams||[]), ...(s.myTeam?[s.myTeam]:[]), ...(s.opponents||[])];
@@ -3734,7 +3812,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v406")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v408")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3820,7 +3898,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v406")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v408")
         )
 
         // ===== 新規チーム作成 =====
@@ -5840,6 +5918,8 @@ function App() {
               )
               , React.createElement('button', { onClick: ()=>{
                 setStorage(s=>({...s,history:s.history.filter(g=>g.id!==modal.targetId)}));
+                // Firebaseからも削除
+                if(window.__teamShareCode) fbDeleteHistory(window.__teamShareCode, modal.targetId);
                 setModal(null);
                 showToast("削除しました");
               }, style: {...sBt("#dc2626"),width:"100%",padding:"12px",fontSize:14,fontWeight:700,marginBottom:8},}, "🗑 削除する"
@@ -6716,25 +6796,57 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const [editMode, setEditMode] = useState(false);   // 手動修正モード
   const [editPitchMode, setEditPitchMode] = useState(false);
   const [pitchOverrides, setPitchOverrides] = React.useState(()=>{
-    // localStorageとFirebase（game.awayPitchers/homePitchers）の両方からマージして初期値を作成
     let base = {};
     try { base = JSON.parse(localStorage.getItem("pitchOverrides")||"{}"); } catch(e){}
-    // gameのpitcherデータからmanualOverrideのものをpitchOverridesに反映
     [...(game.awayPitchers||[]), ...(game.homePitchers||[])].forEach(p=>{
       if(!p||!p.name||!p.manualOverride) return;
       const existing = base[p.name]||{};
       base[p.name] = {
         ...existing,
-        ...(p.autoH      !==undefined ? {h:     p.autoH}      : {}),
-        ...(p.autoEr     !==undefined ? {er:    p.autoEr}     : p.er!==undefined?{er:p.er}:{}),
-        ...(p.autoBb     !==undefined ? {bb:    p.autoBb}     : {}),
-        ...(p.autoK      !==undefined ? {k:     p.autoK}      : {}),
-        ...(p.autoRuns   !==undefined ? {runs:  p.autoRuns}   : {}),
-        ...(p.ipDisp     !==undefined ? {ipDisp:p.ipDisp}     : {}),
+        ...(p.autoH    !==undefined?{h:    p.autoH}:{}),
+        ...(p.autoEr   !==undefined?{er:   p.autoEr}:p.er!==undefined?{er:p.er}:{}),
+        ...(p.autoBb   !==undefined?{bb:   p.autoBb}:{}),
+        ...(p.autoK    !==undefined?{k:    p.autoK}:{}),
+        ...(p.autoRuns !==undefined?{runs: p.autoRuns}:{}),
+        ...(p.ipDisp   !==undefined?{ipDisp:p.ipDisp}:{}),
       };
     });
     return base;
   });
+
+  // Firebase から pitchOverrides を読み込んでマージ（初回のみ）
+  React.useEffect(()=>{
+    const code = window.__teamShareCode;
+    if(!code) return;
+    fbLoadStatOverrides(code).then(fbOv=>{
+      // pitchOverridesはキーが "pitch_" プレフィックスで区別
+      const pitchPart = {};
+      Object.keys(fbOv||{}).filter(k=>k.startsWith("pitch_")).forEach(k=>{
+        pitchPart[k.slice(6)] = fbOv[k];
+      });
+      if(Object.keys(pitchPart).length===0) return;
+      setPitchOverrides(prev=>{
+        const merged = {...pitchPart, ...prev};
+        localStorage.setItem("pitchOverrides", JSON.stringify(merged));
+        return merged;
+      });
+    });
+  },[]);
+
+  const _persistPitchOverrides = (next) => {
+    localStorage.setItem("pitchOverrides", JSON.stringify(next));
+    const code = window.__teamShareCode;
+    if(code) {
+      // pitchOverridesは "pitch_" プレフィックスでstatOverridesと同じパスに保存
+      fbLoadStatOverrides(code).then(existing=>{
+        const merged = {...existing};
+        // 既存のpitch_キーを一度クリア
+        Object.keys(merged).filter(k=>k.startsWith("pitch_")).forEach(k=>delete merged[k]);
+        Object.keys(next).forEach(k=>{ merged["pitch_"+k] = next[k]; });
+        fbSaveStatOverrides(code, merged);
+      });
+    }
+  };
   const savePitchOverride = (playerKey, field, val) => {
     // まずlocalStateを更新（表示用）
     setPitchOverrides(prev=>{
@@ -6742,7 +6854,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       if(field==="_clear") { delete next[playerKey]; }
       else if(val===undefined){ if(next[playerKey]) { delete next[playerKey][field]; if(Object.keys(next[playerKey]).length===0) delete next[playerKey]; } }
       else next[playerKey] = {...(next[playerKey]||{}), [field]:val};
-      localStorage.setItem("pitchOverrides", JSON.stringify(next));
+      _persistPitchOverrides(next);
 
       // Firebase（mutGame）にも保存：現在試合のときのみ
       if(mutGame) {
@@ -6785,17 +6897,37 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const [statOverrides, setStatOverrides] = React.useState(()=>{
     try { return JSON.parse(localStorage.getItem("statOverrides")||"{}"); } catch(e){ return {}; }
   });
+
+  // Firebase から statOverrides を読み込んでマージ（初回のみ）
+  React.useEffect(()=>{
+    const code = window.__teamShareCode;
+    if(!code) return;
+    fbLoadStatOverrides(code).then(fbOv=>{
+      if(!fbOv||Object.keys(fbOv).length===0) return;
+      setStatOverrides(prev=>{
+        const merged = {...fbOv, ...prev}; // localが優先
+        localStorage.setItem("statOverrides", JSON.stringify(merged));
+        return merged;
+      });
+    });
+  },[]);
+
+  const _persistStatOverrides = (next) => {
+    localStorage.setItem("statOverrides", JSON.stringify(next));
+    const code = window.__teamShareCode;
+    if(code) fbSaveStatOverrides(code, next);
+  };
+
   const saveOverride = (playerKey, field, val) => {
     setStatOverrides(prev=>{
       let next;
       if(field === "_merge") {
-        // 特定フィールドを削除して残りを保持
         next = {...prev, [playerKey]: val};
         if(!val || Object.keys(val).length === 0) { next = {...prev}; delete next[playerKey]; }
       } else {
         next = {...prev, [playerKey]:{...(prev[playerKey]||{}), [field]:val}};
       }
-      localStorage.setItem("statOverrides", JSON.stringify(next));
+      _persistStatOverrides(next);
       return next;
     });
   };
@@ -6803,7 +6935,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
     setStatOverrides(prev=>{
       const next = {...prev};
       delete next[playerKey];
-      localStorage.setItem("statOverrides", JSON.stringify(next));
+      _persistStatOverrides(next);
       return next;
     });
   };
@@ -7837,30 +7969,33 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
     if(!fbInit()){ setFbMsg("Firebaseに接続できません"); return; }
     setFbLoading(true); setFbMsg("読み込み中...");
 
-    // team_rooms/{code}/games を読む（メイン）
-    // shared_teams/{code}/games も読む（後方互換）
-    const p1 = fbDB.ref("team_rooms/"+code+"/games").once("value").catch(()=>null);
-    const p2 = fbDB.ref("shared_teams/"+code+"/games").once("value").catch(()=>null);
+    // team_rooms/{code}/history（新方式）、games（旧方式）、shared_teams（後方互換）を読む
+    const p1 = fbDB.ref("team_rooms/"+code+"/history").once("value").catch(()=>null);
+    const p2 = fbDB.ref("team_rooms/"+code+"/games").once("value").catch(()=>null);
+    const p3 = fbDB.ref("shared_teams/"+code+"/games").once("value").catch(()=>null);
 
-    Promise.all([p1, p2]).then(([snap1, snap2])=>{
+    Promise.all([p1, p2, p3]).then(([snap1, snap2, snap3])=>{
       setFbLoading(false);
       const toArr = (snap) => {
         if(!snap||!snap.val()) return [];
         const val = snap.val();
-        return Array.isArray(val) ? val : Object.values(val);
+        return Array.isArray(val) ? val.filter(Boolean) : Object.values(val).filter(Boolean);
       };
       const seen = new Set();
-      const games = [...toArr(snap1), ...toArr(snap2)].filter(g=>{
+      const games = [...toArr(snap1), ...toArr(snap2), ...toArr(snap3)].filter(g=>{
         if(!g||!g.id||seen.has(String(g.id))) return false;
         seen.add(String(g.id)); return true;
-      }).sort((a,b)=>(b._ts||0)-(a._ts||0));
+      }).sort((a,b)=>{
+        const ta=a.savedAt||a.date||""; const tb=b.savedAt||b.date||"";
+        return tb.localeCompare(ta)||(b._ts||0)-(a._ts||0);
+      });
 
       if(games.length===0){
         setFbMsg("試合データが見つかりません。チームコードを確認してください。");
         return;
       }
       setFbMsg(games.length+"試合を読み込みました ✅");
-      onImport(games); // 一括で渡す
+      onImport(games);
     }).catch(e=>{ setFbLoading(false); setFbMsg("エラー: "+e.message); });
   };
 

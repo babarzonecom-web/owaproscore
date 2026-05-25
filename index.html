@@ -3716,7 +3716,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v399")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v400")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3802,7 +3802,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v399")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v400")
         )
 
         // ===== 新規チーム作成 =====
@@ -4059,9 +4059,15 @@ function App() {
                   ,React.createElement('div',{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
                     ,React.createElement('div',{style:{fontSize:13,fontWeight:700,color:"#7dd3fc"}},"📊 スコアボード")
                     ,React.createElement('div',{style:{
-                      background:"#dc2626",borderRadius:6,padding:"3px 10px",
+                      background:g.finished?"#334155":"#dc2626",borderRadius:6,padding:"3px 10px",
                       fontSize:12,fontWeight:700,color:"#fff"
-                    }},(g.inning||1)+"回"+(g.half==="top"?"表":"裏")+(g.finished?" 終了":""))
+                    }},g.finished
+                      ? (g.endReason==="cold"?`コールドゲーム — ${g.endInning||g.inning}回終了`
+                        :g.endReason==="mercy"?"コールドゲーム成立"
+                        :g.endReason==="weather"?"降雨コールド"
+                        :g.endReason==="dark"?"日没コールド"
+                        :"⚾ 試合終了")
+                      : (g.inning||1)+"回"+(g.half==="top"?"表":"裏")))
                   )
                   ,React.createElement('table',{style:{width:"100%",borderCollapse:"collapse",fontSize:13}}
                     ,React.createElement('thead',null

@@ -3170,40 +3170,18 @@ function App() {
       const pitchers = g[side+"Pitchers"];
       const autoStats = pStats[side]||[];
       pitchers.forEach((p,i)=>{
-        const auto = autoStats[i]||{autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0};
-        const isOverride = p.manualOverride;
-        // manualIp（アウト数ベース）が最優先、次にmanualOverride、最後にauto
-        // autoIpは10進数形式（52=5回2/3）→アウト数に変換
-        const toOuts = (autoIp) => Math.floor(autoIp/10)*3 + (autoIp%10);
-        const ip  = p.manualIp !== undefined ? p.manualIp
-                  : isOverride ? toOuts(p.autoIp!==undefined?p.autoIp:(p.ip||auto.autoIp))
-                  : toOuts(auto.autoIp);
-        const h   = isOverride ? (p.autoH!==undefined?p.autoH:(p.h||auto.autoH))   : auto.autoH;
-        const er  = isOverride ? (p.er!==undefined?p.er:auto.autoEr)               : auto.autoEr;
-        const bb  = isOverride ? (p.autoBb!==undefined?p.autoBb:(p.bb||auto.autoBb)): auto.autoBb;
-        const k   = isOverride ? (p.autoK!==undefined?p.autoK:(p.k||auto.autoK))   : auto.autoK;
-        
-        const ipNum = Math.floor(ip/10) + (ip%10)/3;
+        const auto = autoStats[i]||{};
+        // 打席データから再計算した値を使用。erのみ手動修正を尊重
+        const autoIpOuts = Math.floor((auto.autoIp||0)/10)*3 + ((auto.autoIp||0)%10);
+        const ipOuts = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
+        const ipDisp = Math.floor(ipOuts/3)+"."+ipOuts%3;
+        const h  = auto.autoH||0;
+        const er = p.manualOverride && p.er!==undefined ? p.er : (auto.autoEr||0);
+        const bb = auto.autoBb||0;
+        const k  = auto.autoK||0;
+        const ipNum = Math.floor(ipOuts/3)+(ipOuts%3)/3;
         const era = ipNum>0 ? (er*(g.innings||9)/ipNum).toFixed(2) : "---";
-        // manualIpはアウト数ベースなので表示変換
-        const rawIpDisp = p.manualIp !== undefined
-          ? Math.floor(p.manualIp/3)+"."+p.manualIp%3
-          : (p.manualOverride && p.ipDisp ? p.ipDisp : `${Math.floor(ip/10)}.${ip%10}`);
-        const ipDisp = rawIpDisp;
-        // pitchOverridesを適用（成績タブの手動修正）
-        const pitOv2 = (() => { try { return JSON.parse(localStorage.getItem("pitchOverrides")||"{}"); } catch(e){ return {}; } })();
-        const pov = pitOv2[p.name]||{};
-        const finalIpDisp = pov.ipDisp !== undefined ? pov.ipDisp : ipDisp;
-        const finalH  = pov.h  !== undefined ? Number(pov.h)  : h;
-        const finalEr = pov.er !== undefined ? Number(pov.er) : er;
-        const finalBb = pov.bb !== undefined ? Number(pov.bb) : bb;
-        const finalK  = pov.k  !== undefined ? Number(pov.k)  : k;
-        const finalIpNum2 = (() => {
-          const parts = String(finalIpDisp).split(".");
-          return parseInt(parts[0]||0) + (parseInt(parts[1]||0)/3);
-        })();
-        const finalEra = finalIpNum2>0 ? (finalEr*(g.innings||9)/finalIpNum2).toFixed(2) : "---";
-        pitRows.push([teamName,p.name,finalIpDisp,finalH,finalEr,finalBb,finalK,finalEra]);
+        pitRows.push([teamName,p.name,ipDisp,h,er,bb,k,era]);
       });
       pitRows.push([]);
     });
@@ -3817,7 +3795,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v416")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v418")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3903,7 +3881,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v416")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v418")
         )
 
         // ===== 新規チーム作成 =====
@@ -5059,16 +5037,15 @@ function App() {
                           // デバッグ表示
                           const _dbg = "[og:"+(auto._outsGot||0)+" mIp:"+(p.manualIp!==undefined?p.manualIp:"—")+"]";
                           const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
-                          const hasManual = !!p.manualOverride;
-                          const er      = hasManual && p.er!==undefined      ? p.er       : (auto.autoEr||0);
-                          const hDisp   = hasManual && p.autoH!==undefined   ? p.autoH    : (auto.autoH||0);
-                          const bbDisp  = hasManual && p.autoBb!==undefined  ? p.autoBb   : (auto.autoBb||0);
-                          const kDisp   = hasManual && p.autoK!==undefined   ? p.autoK    : (auto.autoK||0);
-                          const hbpDisp = hasManual && p.autoHbp!==undefined ? p.autoHbp  : (auto.autoHbp||0);
-                          const hrDisp  = hasManual && p.autoHr!==undefined  ? p.autoHr   : (auto.autoHr||0);
-                          const runsDisp= hasManual && p.autoRuns!==undefined? p.autoRuns : (auto.autoRuns||0);
-                          const h=hDisp; const bb=bbDisp; const k=kDisp; const hbp=hbpDisp; const hr=hrDisp; const runs=runsDisp;
-                          const era = ipNum>0 ? (er*(game.innings||9)/ipNum).toFixed(2) : (er>0?"∞":"—");
+                          // 打席データから毎回再計算した値を使用（保存値は使わない）
+                          const er    = p.manualOverride && p.er!==undefined ? p.er : (auto.autoEr||0);
+                          const h     = auto.autoH||0;
+                          const bb    = auto.autoBb||0;
+                          const k     = auto.autoK||0;
+                          const hbp   = auto.autoHbp||0;
+                          const hr    = auto.autoHr||0;
+                          const runs  = p.manualOverride && p.autoRuns!==undefined ? p.autoRuns : (auto.autoRuns||0);
+                          const era   = ipNum>0 ? (er*(game.innings||9)/ipNum).toFixed(2) : (er>0?"∞":"—");
                           return React.createElement('tr', {key:p.id||i,
                             style:{background:isCur?(color+"22"):i%2===0?"#0a1628":"transparent",
                               outline:isCur?`1px solid ${color}33`:"none"}}
@@ -5213,44 +5190,23 @@ function App() {
                                 })()
                               )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                              , React.createElement('input', {readOnly:!pitEditMode, type:"text", inputMode:"numeric", min:0, defaultValue:hDisp, key:"h_"+i+"_"+hDisp,
-                                  onBlur:e=>{ if(!pitEditMode) return; const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoH:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
-                                  style:{width:34,textAlign:"center",background:pitEditMode?"#1a2a40":"transparent",border:pitEditMode?"1px solid #a78bfa":"none",
-                                    borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
+                              , React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}}, h)
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                              , React.createElement('input', {readOnly:!pitEditMode, type:"text", inputMode:"numeric", min:0,
-                                  defaultValue:hrDisp,
-                                  key:"hr_"+i+"_"+hrDisp,
-                                  onBlur:e=>{ if(!pitEditMode) return; const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoHr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
-                                  style:{width:34,textAlign:"center",background:pitEditMode?"#1a2a40":"transparent",border:pitEditMode?"1px solid #a78bfa":"none",
-                                    borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
-                            , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                              , React.createElement('input', {readOnly:!pitEditMode, type:"text", inputMode:"numeric", min:0, defaultValue:kDisp, key:"k_"+i+"_"+kDisp,
-                                  onBlur:e=>{ if(!pitEditMode) return; const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoK:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
-                                  style:{width:34,textAlign:"center",background:pitEditMode?"#1a2a40":"transparent",border:pitEditMode?"1px solid #a78bfa":"none",
-                                    borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
+                              , React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}}, hr)
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                              , React.createElement('input', {readOnly:!pitEditMode, type:"text", inputMode:"numeric", min:0, defaultValue:bbDisp, key:"bb_"+i+"_"+bbDisp,
-                                  onBlur:e=>{ if(!pitEditMode) return; const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoBb:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
-                                  style:{width:34,textAlign:"center",background:pitEditMode?"#1a2a40":"transparent",border:pitEditMode?"1px solid #a78bfa":"none",
-                                    borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
+                              , React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}}, k)
                             )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                              , React.createElement('input', {readOnly:!pitEditMode, type:"text", inputMode:"numeric", min:0,
-                                  defaultValue:hbpDisp,
-                                  key:"hbp_"+i+"_"+hbpDisp,
-                                  onBlur:e=>{ if(!pitEditMode) return; const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoHbp:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
-                                  style:{width:34,textAlign:"center",background:pitEditMode?"#1a2a40":"transparent",border:pitEditMode?"1px solid #a78bfa":"none",
-                                    borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
+                              , React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}}, bb)
+                            )
                             , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                              , React.createElement('input', {readOnly:!pitEditMode, type:"text", inputMode:"numeric", min:0,
-                                  defaultValue:runsDisp,
-                                  key:"runs_"+i+"_"+runsDisp,
-                                  onBlur:e=>{ if(!pitEditMode) return; const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];ps[i]={...ps[i],autoRuns:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
-                                  style:{width:34,textAlign:"center",background:pitEditMode?"#1a2a40":"transparent",border:pitEditMode?"1px solid #a78bfa":"none",
-                                    borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})                            )
+                              , React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}}, hbp)
+                            )
+                            , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
+                              , React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}}, runs)
+                            )
                             , React.createElement('td', {style:{...S.td, textAlign:"center"}}
                               , React.createElement('input', {type:"number", min:0,
                                   defaultValue:er, key:"er_"+i+"_"+er,
@@ -5270,14 +5226,13 @@ function App() {
                     , React.createElement('button', {
                         onClick:()=>{
                           if(pitEditMode){
-                            if(window.confirm("この内容で手動修正を確定しますか？\nキャンセルすると自動計算値に戻ります。")){
+                            if(window.confirm("自責点・投球回の修正を確定しますか？")){
                               setPitEditMode(false);
                             } else {
                               mutGame(g=>({...g,
                                 [side+"Pitchers"]:g[side+"Pitchers"].map(p=>({
                                   ...p, manualOverride:false,
-                                  er:undefined, autoH:undefined, autoBb:undefined,
-                                  autoK:undefined, autoHbp:undefined, autoHr:undefined, autoRuns:undefined
+                                  er:undefined, autoRuns:undefined
                                 }))
                               }));
                               setPitEditMode(false);
@@ -5348,30 +5303,50 @@ function App() {
                       const rebuildSide = (side) => {
                         const pitchers = [...(g[side+"Pitchers"]||[])];
                         const autoArr = pStats[side]||[];
-                        // indexベースで直接マッピング（safePitchersと同じ配列を使う）
                         return pitchers.map((p,i)=>{
-                          // autoArr[i]が正しいindexで対応しているか確認
-                          // computePitcherStatsはsafePitchers.mapで作るので
-                          // pitchers配列が配列形式なら必ず同じindex
                           const a = autoArr[i];
-                          // aが存在しない or 成績が全て0の場合は元データを保持
-                          if(!a || (a.autoIp===0 && a.autoH===0 && a.autoBb===0 && a.autoK===0 && a._outsGot===0)) {
-                            // 元データをそのまま返す（上書きしない）
+                          // 計算結果が全て0なら元データを保持（計算失敗とみなす）
+                          if(!a || (a._outsGot===0 && a.autoH===0 && a.autoBb===0 && a.autoK===0)) {
                             return p;
                           }
+                          // 元のpitcher情報（name,pitchCount等）は保持しつつ
+                          // 古いauto*/手動修正値は全てaからの値で上書き
+                          // {...p}は使わず必要フィールドのみ明示
+                          const base = {
+                            // 基本情報は保持
+                            id:         p.id,
+                            name:       p.name,
+                            pitchCount: p.pitchCount||0,
+                            ballCount:  p.ballCount||0,
+                            strikeCount:p.strikeCount||0,
+                            // 勝敗等は保持
+                            win:  p.win,
+                            lose: p.lose,
+                            save: p.save,
+                            hold: p.hold,
+                            bs:   p.bs,
+                            // manualIpは保持
+                            ...(p.manualIp!==undefined?{manualIp:p.manualIp}:{}),
+                          };
                           if(p.manualOverride){
-                            // 手動修正済み: erとmanualIpは保持、被安打等はautoで更新
-                            return {...p,
-                              autoH:   a.autoH||0,
-                              autoBb:  a.autoBb||0,
-                              autoK:   a.autoK||0,
-                              autoHbp: a.autoHbp||0,
-                              autoHr:  a.autoHr||0,
-                              autoIp:  a.autoIp||0,
-                              _outsGot:a._outsGot||0,
+                            // 手動修正あり: erとautoRunsは保持、他はautoで更新
+                            return {...base,
+                              manualOverride: true,
+                              er:      p.er,
+                              autoEr:  p.autoEr,
+                              autoRuns:p.autoRuns,
+                              // 被安打等はautoで更新
+                              autoH:    a.autoH||0,
+                              autoBb:   a.autoBb||0,
+                              autoK:    a.autoK||0,
+                              autoHbp:  a.autoHbp||0,
+                              autoHr:   a.autoHr||0,
+                              autoIp:   a.autoIp||0,
+                              _outsGot: a._outsGot||0,
                             };
                           }
-                          return {...p,
+                          return {...base,
+                            manualOverride: false,
                             autoH:    a.autoH||0,
                             autoEr:   a.autoEr||0,
                             autoBb:   a.autoBb||0,
@@ -5381,7 +5356,6 @@ function App() {
                             autoIp:   a.autoIp||0,
                             autoRuns: a.autoRuns||0,
                             _outsGot: a._outsGot||0,
-                            manualOverride: false,
                           };
                         });
                       };
@@ -7181,23 +7155,17 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           const m = map[p.name];
           m.games.add(g.id);
           const a = autoArr[i]||{};
-          const autoOutsGot = a._outsGot||0;
+          // 打席データから再計算した値を使用。erのみ手動修正を尊重
           const autoIpOuts = Math.floor((a.autoIp||0)/10)*3 + ((a.autoIp||0)%10);
-          const outsGot = p.manualIp !== undefined ? p.manualIp : autoOutsGot;
+          const outsGot = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
           m.outs += outsGot;
-          // 優先順位: manualOverride（投手タブ手動修正・Firebase保存）> auto
-          // pitchOverridesはゲームをまたいで上書きされるため集計には使わない
-          const getVal = (pKey, aKey) => {
-            if(p.manualOverride && p[pKey]!==undefined) return p[pKey];
-            return a[aKey]||0;
-          };
-          m.h    += getVal("autoH",   "autoH");
-          m.er   += getVal("er",      "autoEr");
-          m.bb   += getVal("autoBb",  "autoBb");
-          m.k    += getVal("autoK",   "autoK");
-          m.hbp  += getVal("autoHbp", "autoHbp");
-          m.hr   += getVal("autoHr",  "autoHr");
-          m.runs += getVal("autoRuns","autoRuns");
+          m.h    += a.autoH||0;
+          m.er   += (p.manualOverride && p.er!==undefined) ? p.er : (a.autoEr||0);
+          m.bb   += a.autoBb||0;
+          m.k    += a.autoK||0;
+          m.hbp  += a.autoHbp||0;
+          m.hr   += a.autoHr||0;
+          m.runs += (p.manualOverride && p.autoRuns!==undefined) ? p.autoRuns : (a.autoRuns||0);
           // 勝敗・セーブ・ホールド
           const pr = (g.pitcherResults||{})[p.name]||{};
           if(pr.win)  m.win++;
@@ -7395,41 +7363,17 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           )
           , React.createElement('tbody', null
             , pitchers.map((p,i)=>{
-                const ov = (pitchOverrides||{})[p.name]||{};
-                // 手動修正した値から再計算
-                const getPV = (k, d) => ov[k]!==undefined ? ov[k] : d;
-                const effIpDisp = getPV("ipDisp", p.ipDisp);
-                const effH  = Number(getPV("h", p.h))||0;
-                const effEr = Number(getPV("er", p.er))||0;
-                const effBb = Number(getPV("bb", p.bb))||0;
-                const effK  = Number(getPV("k", p.k))||0;
-                // ipDispからイニング数を算出（例: "6回2/3" → 6.667）
-                const parseIp = (s) => {
-                  const m = String(s||"").match(/(\d+)回(?:(\d+)\/3)?/);
-                  if(!m) return 0;
-                  return Number(m[1]) + (Number(m[2]||0)/3);
-                };
-                const effIpNum = parseIp(effIpDisp);
-                // pitchOverridesで修正がある場合のみ再計算、なければaggregateが計算済みのeraを使う
-                const hasOv = Object.keys(ov).length > 0;
-                const recalcEra = hasOv
-                  ? (effIpNum>0 ? (effEr*(p.avgInnings||innings||9)/effIpNum).toFixed(2) : (effEr>0?"∞":"—"))
-                  : (p.era||"—");
-                // pitchOverridesで修正がある場合のみ再計算、なければaggregateが計算済みのwhipを使う
-                const recalcWhip = hasOv
-                  ? (effIpNum>0 ? ((effBb+effH)/effIpNum).toFixed(2) : "—")
-                  : (p.whip||"—");
-
-                // 表示順を維持：投球回・被安打・自責点・防御率・WHIP・四球・三振
+                // aggregatePitcherStatsの値をそのまま使用（pitchOverrides廃止）
+                // erのみ手動修正を尊重（aggregateが既に反映済みなのでp.erを直接使う）
                 const displayFields = [
-                  {k:"ipDisp", v:p.ipDisp, s:tdS, editable:true},
-                  {k:"h", v:p.h, s:tdS, editable:true},
-                  {k:"runs", v:p.runs, s:{...tdS,color:"#fb923c"}, editable:true},
-                  {k:"er", v:p.er, s:{...tdS,color:"#f87171"}, editable:true},
-                  {k:"era", v:recalcEra, s:{...tdS,color:parseFloat(recalcEra)<3?"#4ade80":parseFloat(recalcEra)<5?"#fbbf24":"#f87171",fontWeight:900}, editable:false},
-                  {k:"whip", v:recalcWhip, s:tdS, editable:false},
-                  {k:"bb", v:p.bb, s:{...tdS,color:"#60a5fa"}, editable:true},
-                  {k:"k", v:p.k, s:{...tdS,color:"#a78bfa"}, editable:true},
+                  {k:"ipDisp", v:p.ipDisp, s:tdS, editable:false},
+                  {k:"h",      v:p.h,      s:tdS, editable:false},
+                  {k:"runs",   v:p.runs,   s:{...tdS,color:"#fb923c"}, editable:false},
+                  {k:"er",     v:p.er,     s:{...tdS,color:"#f87171"}, editable:false},
+                  {k:"era",    v:p.era,    s:{...tdS,color:parseFloat(p.era)<3?"#4ade80":parseFloat(p.era)<5?"#fbbf24":"#f87171",fontWeight:900}, editable:false},
+                  {k:"whip",   v:p.whip,   s:tdS, editable:false},
+                  {k:"bb",     v:p.bb,     s:{...tdS,color:"#60a5fa"}, editable:false},
+                  {k:"k",      v:p.k,      s:{...tdS,color:"#a78bfa"}, editable:false},
                 ];
                 return React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0a1628":"#0d1f35"}}
                   , React.createElement('td', {style:{...tdN,color:"#e2e8f0",whiteSpace:"nowrap",minWidth:70}}
@@ -8135,20 +8079,6 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
             , React.createElement('button', {onClick:()=>setRestoreTarget(null), style:S.cBtn}, "キャンセル")
           )
         )
-
-      // 全試合再計算ボタン
-      , onRecompute && history && history.length>0 && React.createElement('div', {style:{...S.card, borderLeft:"4px solid #f97316", marginBottom:14}}
-        , React.createElement('div', {style:{...S.ct, marginBottom:6}}, "🔄 投手成績を再計算")
-        , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:10}},
-            "保存済みの全試合（"+history.length+"試合）の投手成績を最新のロジックで再計算して上書き保存します。計算ミスが疑われる場合に使ってください。")
-        , React.createElement('button', {
-            onClick:()=>{
-              if(!window.confirm("全"+history.length+"試合の投手成績を再計算します。よろしいですか？")) return;
-              onRecompute();
-            },
-            style:{...sBt("#f97316"),width:"100%",padding:"10px",fontSize:14,fontWeight:700}
-          }, "⚾ 全試合の投手成績を再計算する")
-      )
 
       // Firebase読み込みUI
       , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #22c55e", marginBottom:14}}

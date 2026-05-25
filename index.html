@@ -3716,9 +3716,9 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v398")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v399")
         , tab!=="login" && (isReadOnly
-          ? [["live","📡 速報"],["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
+          ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
                 background:"transparent",border:"none",
                 borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
@@ -3802,7 +3802,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v398")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v399")
         )
 
         // ===== 新規チーム作成 =====
@@ -4049,28 +4049,49 @@ function App() {
 
             return React.createElement('div', {style:{maxWidth:480,margin:"0 auto"}}
 
-              // ① スコアボード（大きく）
-              ,React.createElement('div',{style:{
-                background:"linear-gradient(135deg,#0a1628,#0d1f35)",
-                border:"2px solid #1e3a5f",borderRadius:16,
-                padding:"18px 20px 14px",marginBottom:12
-              }}
-                ,React.createElement('div',{style:{fontSize:11,color:"#475569",marginBottom:10,textAlign:"center",fontWeight:700,letterSpacing:1}},
-                  (g.inning||1)+"回"+(g.half==="top"?"表":"裏")+(g.finished?" — 試合終了":"")
-                )
-                // チーム vs スコア
-                ,React.createElement('div',{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}
-                  ,React.createElement('div',{style:{flex:1,textAlign:"left"}}
-                    ,React.createElement('div',{style:{fontSize:12,color:"#fbbf24",fontWeight:700,marginBottom:4}},g.awayTeam||"アウェイ")
-                    ,React.createElement('div',{style:{fontSize:52,fontWeight:900,color:"#fbbf24",lineHeight:1}},_aTotal)
+              // ① スコアボード（表形式）
+              ,(()=>{
+                const _innings = Array.from({length:g.innings||9},(_,i)=>i+1);
+                return React.createElement('div',{style:{
+                  background:"#0a1628",border:"2px solid #1e3a5f",borderRadius:16,
+                  padding:"14px 16px",marginBottom:12,overflowX:"auto"
+                }}
+                  ,React.createElement('div',{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}
+                    ,React.createElement('div',{style:{fontSize:13,fontWeight:700,color:"#7dd3fc"}},"📊 スコアボード")
+                    ,React.createElement('div',{style:{
+                      background:"#dc2626",borderRadius:6,padding:"3px 10px",
+                      fontSize:12,fontWeight:700,color:"#fff"
+                    }},(g.inning||1)+"回"+(g.half==="top"?"表":"裏")+(g.finished?" 終了":""))
                   )
-                  ,React.createElement('div',{style:{fontSize:22,color:"#334155",fontWeight:700}},"—")
-                  ,React.createElement('div',{style:{flex:1,textAlign:"right"}}
-                    ,React.createElement('div',{style:{fontSize:12,color:"#7dd3fc",fontWeight:700,marginBottom:4}},g.homeTeam||"ホーム")
-                    ,React.createElement('div',{style:{fontSize:52,fontWeight:900,color:"#7dd3fc",lineHeight:1}},_hTotal)
+                  ,React.createElement('table',{style:{width:"100%",borderCollapse:"collapse",fontSize:13}}
+                    ,React.createElement('thead',null
+                      ,React.createElement('tr',null
+                        ,React.createElement('th',{style:{textAlign:"left",color:"#64748b",fontWeight:600,padding:"4px 8px 4px 0",fontSize:11,whiteSpace:"nowrap",minWidth:80}},"チーム")
+                        ,_innings.map(i=>React.createElement('th',{key:i,style:{textAlign:"center",color:"#64748b",fontWeight:600,padding:"4px 6px",fontSize:11,minWidth:24}},i))
+                        ,React.createElement('th',{style:{textAlign:"center",color:"#fbbf24",fontWeight:800,padding:"4px 8px",fontSize:13}},"計")
+                        ,React.createElement('th',{style:{textAlign:"center",color:"#64748b",fontWeight:600,padding:"4px 6px",fontSize:11}},"H")
+                      )
+                    )
+                    ,React.createElement('tbody',null
+                      ,[
+                        {label:g.awayTeam||"アウェイ",score:g.awayScore||{},total:_aTotal,color:"#fbbf24",
+                         hits:Object.values(g.awayLineup||[]).reduce((s,p)=>s+Object.values(p.atBats||{}).flatMap(v=>Array.isArray(v)?v:[v]).filter(e=>e&&["H1","H2","H3","HR"].includes(e.code||e)).length,0)},
+                        {label:g.homeTeam||"ホーム",score:g.homeScore||{},total:_hTotal,color:"#7dd3fc",
+                         hits:Object.values(g.homeLineup||[]).reduce((s,p)=>s+Object.values(p.atBats||{}).flatMap(v=>Array.isArray(v)?v:[v]).filter(e=>e&&["H1","H2","H3","HR"].includes(e.code||e)).length,0)},
+                      ].map((row,ri)=>
+                        React.createElement('tr',{key:ri,style:{background:ri%2===0?"#0d1f35":"transparent"}}
+                          ,React.createElement('td',{style:{color:row.color,fontWeight:700,padding:"6px 8px 6px 0",whiteSpace:"nowrap"}},row.label)
+                          ,_innings.map(i=>React.createElement('td',{key:i,style:{textAlign:"center",padding:"6px",fontSize:15,fontWeight:700,color:"#fff"}},
+                            row.score[i]===""||row.score[i]===undefined?"":row.score[i]
+                          ))
+                          ,React.createElement('td',{style:{textAlign:"center",fontWeight:900,fontSize:20,color:"#fbbf24",padding:"6px 8px"}},row.total)
+                          ,React.createElement('td',{style:{textAlign:"center",color:"#4ade80",padding:"6px"}},row.hits)
+                        )
+                      )
+                    )
                   )
-                )
-              )
+                );
+              })()
 
               // ② ランナー + アウト + BSO
               ,React.createElement('div',{style:{
@@ -4853,7 +4874,7 @@ function App() {
                           return (
                             React.createElement('td', { key: inn, style: {...S.td,padding:2},}
                               , React.createElement('button', {
-                                onClick: ()=>list.length>0?openEdit(team,idx,inn):openNew(team,idx,inn),
+                                onClick: ()=>{ if(isReadOnly){showToast("👁 閲覧モードでは操作できません");return;} list.length>0?openEdit(team,idx,inn):openNew(team,idx,inn); },
                                 style: {width:"100%",minWidth:50,padding:"3px 2px",
                                   cursor:"pointer",textAlign:"center",whiteSpace:"nowrap",
                                   fontSize:9,fontWeight:700,borderRadius:5,
@@ -5163,7 +5184,7 @@ function App() {
                     )
                   )
                 )
-                , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginTop:10,flexWrap:"wrap"}}
+                , !isReadOnly && React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginTop:10,flexWrap:"wrap"}}
                     , React.createElement('button', {
                         onClick:()=>{
                           if(pitEditMode){

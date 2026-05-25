@@ -1653,7 +1653,7 @@ const computePitcherStats = (g) => {
         return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
       });
     };
-        const seqLog = buildSeqLog();
+        const seqLog = buildSeqLog().sort((a,b)=>a.fromSeq-b.fromSeq);
 
     const findActivePitcher = (abSeq) => {
       // seqがundefined（旧データ）の場合は現在の投手インデックスを返す
@@ -2994,20 +2994,38 @@ function App() {
       // 実際には攻撃チームの打席数が重要：offTeam = defTeam==="away"?"home":"away"
       const offLineupKey = defTeam==="away" ? "homeLineup" : "awayLineup";
       const offLineup = g[offLineupKey]||[];
-      // イニング順にソートして通し番号を計算（computePitcherStatsのallAtBatsと同じ順序）
+      // computePitcherStatsのallAtBats構築と同じロジックで通し番号を計算
+      // （_subOuts含む、打順ソート済み）
       let atBatSeqNow = 0;
-      const _maxInnNow = Math.max(g.inning||1, ...offLineup.flatMap(p=>Object.keys(p.atBats||{}).map(Number).filter(n=>!isNaN(n))));
       const _offSide = defTeam==="away"?"home":"away";
+      const _maxInnNow = Math.max(g.inning||1, ...offLineup.flatMap(p=>[
+        ...Object.keys(p.atBats||{}),
+        ...((p._subOuts||[]).flatMap(so=>Object.keys(so.atBats||{})))
+      ].map(Number).filter(n=>!isNaN(n))));
       for(let _inn=1; _inn<=_maxInnNow; _inn++){
         for(const _half of ["top","bottom"]){
           const _battingTeam = _half==="top"?"away":"home";
           if(_battingTeam !== _offSide) continue;
-          offLineup.forEach(p=>{
-            const _entries = p.atBats&&p.atBats[_inn];
-            if(!_entries) return;
-            const _arr = Array.isArray(_entries)?_entries:Object.values(_entries||{});
-            atBatSeqNow += _arr.length;
+          // 打順ごとに集計（_subOuts含む）
+          const _halfAbs = [];
+          offLineup.forEach((p,pi)=>{
+            // 交代前選手の打席
+            const _legacySub = (p._subOut&&!p._subOuts)?[p._subOut]:[];
+            [..._legacySub,...(p._subOuts||[])].forEach(so=>{
+              const _e = so.atBats&&so.atBats[_inn];
+              if(!_e) return;
+              const _arr = Array.isArray(_e)?_e:Object.values(_e||{});
+              _arr.forEach((_,ei)=>_halfAbs.push({pi,ei:ei-1000}));
+            });
+            // 現選手の打席
+            const _e2 = p.atBats&&p.atBats[_inn];
+            if(_e2){
+              const _arr2 = Array.isArray(_e2)?_e2:Object.values(_e2||{});
+              _arr2.forEach((_,ei)=>_halfAbs.push({pi,ei}));
+            }
           });
+          _halfAbs.sort((a,b)=>a.pi!==b.pi?a.pi-b.pi:a.ei-b.ei);
+          atBatSeqNow += _halfAbs.length;
         }
       }
       const entry = {
@@ -3716,7 +3734,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v403")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v404")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3802,7 +3820,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v403")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v404")
         )
 
         // ===== 新規チーム作成 =====
@@ -4006,71 +4024,38 @@ function App() {
 
             // 大きなダイヤモンド描画（SVG）
             const BigDiamond = () => {
-              // リアルグラウンド風ダイヤモンド
-              const W = 200, H = 170;
-              // 各塁の座標（俯瞰パース風）
-              const home = [W/2, H-18];
-              const first = [W-22, H*0.54];
-              const second = [W/2, 18];
-              const third = [22, H*0.54];
-
-              // ランナーがいる塁をハイライト
-              const baseData = [
-                {pt:first,  bi:0, label:"1"},
-                {pt:second, bi:1, label:"2"},
-                {pt:third,  bi:2, label:"3"},
+              const sz = 140;
+              const cx = sz/2, cy = sz/2;
+              const r = sz*0.38;
+              const pts = [
+                {x:cx+r, y:cy, bi:0},
+                {x:cx,   y:cy-r, bi:1},
+                {x:cx-r, y:cy, bi:2},
               ];
-
-              // 外野フェンス（半楕円）
-              const fenceRx = W*0.46, fenceRy = H*0.38;
-              const fenceCx = W/2, fenceCy = H*0.13;
-
-              return React.createElement('svg',{width:W,height:H,viewBox:`0 0 ${W} ${H}`,style:{display:"block"}}
-                // 外野グリーン（半楕円）
-                ,React.createElement('ellipse',{cx:fenceCx,cy:fenceCy+fenceRy*0.6,rx:fenceRx,ry:fenceRy*1.15,fill:"#2d5a1b"})
-                // 内野グラウンド（ダイヤ形の土エリア）
+              return React.createElement('svg',{width:sz,height:sz,viewBox:"0 0 "+sz+" "+sz}
                 ,React.createElement('polygon',{
-                  points:`${home[0]},${home[1]} ${first[0]},${first[1]} ${second[0]},${second[1]} ${third[0]},${third[1]}`,
-                  fill:"#8b5e3c"
+                  points:`${cx+r},${cy} ${cx},${cy-r} ${cx-r},${cy} ${cx},${cy+r}`,
+                  fill:"none",stroke:"#1e3a5f",strokeWidth:2
                 })
-                // 内野グリーン（ダイヤ内の芝）
-                ,React.createElement('polygon',{
-                  points:`${home[0]},${home[1]-14} ${first[0]-14},${first[1]} ${second[0]},${second[1]+14} ${third[0]+14},${third[1]}`,
-                  fill:"#3a7a24"
-                })
-                // ピッチャーマウンド
-                ,React.createElement('ellipse',{
-                  cx:W/2,cy:(home[1]+second[1])/2+4,rx:10,ry:7,fill:"#9b6b45",stroke:"#7a5230",strokeWidth:1
-                })
-                // ファウルライン
-                ,React.createElement('line',{x1:home[0],y1:home[1],x2:first[0]+8,y2:first[1]-20,stroke:"#fff",strokeWidth:1,opacity:0.5})
-                ,React.createElement('line',{x1:home[0],y1:home[1],x2:third[0]-8,y2:third[1]-20,stroke:"#fff",strokeWidth:1,opacity:0.5})
-                // フェンスライン
-                ,React.createElement('path',{
-                  d:`M ${third[0]-8},${third[1]-20} Q ${W/2},${fenceCy} ${first[0]+8},${first[1]-20}`,
-                  fill:"none",stroke:"#c8a84b",strokeWidth:2.5,opacity:0.8
-                })
-                // 各塁
-                ,baseData.map(({pt,bi,label})=>{
-                  const occ = !!_bases[bi];
+                ,pts.map(({x,y,bi})=>{
+                  const occupied = !!_bases[bi];
                   return React.createElement('g',{key:bi}
                     ,React.createElement('rect',{
-                      x:pt[0]-9,y:pt[1]-9,width:18,height:18,
-                      fill:occ?"#f97316":"#e8dcc8",
-                      stroke:occ?"#fb923c":"#c8b89a",
-                      strokeWidth:occ?2:1.5,
-                      transform:`rotate(45,${pt[0]},${pt[1]})`
+                      x:x-12,y:y-12,width:24,height:24,rx:4,
+                      fill:occupied?"#f97316":"#0d1f35",
+                      stroke:occupied?"#fb923c":"#2a4a7a",
+                      strokeWidth:occupied?2.5:1.5,
+                      transform:`rotate(45,${x},${y})`
                     })
-                    ,occ&&React.createElement('text',{
-                      x:pt[0],y:pt[1]+4,
-                      textAnchor:"middle",fontSize:9,fill:"#fff",fontWeight:900
+                    ,occupied&&React.createElement('text',{
+                      x,y:y+5,textAnchor:"middle",fontSize:10,fill:"#fff",fontWeight:700
                     },_bases[bi].length<=3?_bases[bi]:_bases[bi].slice(0,3))
                   );
                 })
-                // 本塁
-                ,React.createElement('polygon',{
-                  points:`${home[0]},${home[1]-9} ${home[0]+7},${home[1]-4} ${home[0]+7},${home[1]+4} ${home[0]-7},${home[1]+4} ${home[0]-7},${home[1]-4}`,
-                  fill:"#e8dcc8",stroke:"#c8b89a",strokeWidth:1.5
+                ,React.createElement('rect',{
+                  x:cx-10,y:cy+r-10,width:20,height:20,rx:3,
+                  fill:"#1e3a5f",stroke:"#3b82f6",strokeWidth:1.5,
+                  transform:`rotate(45,${cx},${cy+r})`
                 })
               );
             };

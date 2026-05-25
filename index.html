@@ -3734,7 +3734,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v404")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v405")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3820,7 +3820,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v404")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v405")
         )
 
         // ===== 新規チーム作成 =====
@@ -8404,6 +8404,15 @@ function EndGameModal({ game, onConfirm, onCancel }) {
     };
   });
   const [pitcherResults, setPitcherResults] = useState(initPR);
+
+  // 失点・自責点の初期値
+  const initRuns = {};
+  allPitchers.forEach(p=>{
+    const existing = (game.pitcherRuns||{})[p.name]||{};
+    initRuns[p.name] = { runs: existing.runs!==undefined?existing.runs:"", er: existing.er!==undefined?existing.er:"" };
+  });
+  const [pitcherRuns, setPitcherRuns] = useState(initRuns);
+
   const togglePR = (name, key) => {
     setPitcherResults(pr=>{
       const cur = pr[name]||{};

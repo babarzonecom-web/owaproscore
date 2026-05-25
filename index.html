@@ -3734,7 +3734,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v405")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v406")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3820,7 +3820,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v405")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v406")
         )
 
         // ===== 新規チーム作成 =====
@@ -5225,7 +5225,7 @@ function App() {
         ))
 
         , tab==="stats"&&(React.createElement(React.Fragment, null
-          , React.createElement(StatsTab, {game:game, history:history, teams:teams, myTeam:myTeam, opponents:opponents, tournaments:tournaments, onExcel:(g)=>exportExcel(g)})
+          , React.createElement(StatsTab, {game:game, history:history, teams:teams, myTeam:myTeam, opponents:opponents, tournaments:tournaments, onExcel:(g)=>exportExcel(g), mutGame:mutGame})
         ))
 
         , tab==="logout"&&(
@@ -6703,7 +6703,7 @@ function App() {
   );
 }
 // ===== 成績タブ =====
-function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExcel }) {
+function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExcel, mutGame }) {
   const [statsView, setStatsView] = useState("batting");
   const [selectedSeason, setSelectedSeason] = useState(new Date().getFullYear());
   const [selectedTournament, setSelectedTournament] = useState(null);
@@ -6716,15 +6716,69 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const [editMode, setEditMode] = useState(false);   // 手動修正モード
   const [editPitchMode, setEditPitchMode] = useState(false);
   const [pitchOverrides, setPitchOverrides] = React.useState(()=>{
-    try { return JSON.parse(localStorage.getItem("pitchOverrides")||"{}"); } catch(e){ return {}; }
+    // localStorageとFirebase（game.awayPitchers/homePitchers）の両方からマージして初期値を作成
+    let base = {};
+    try { base = JSON.parse(localStorage.getItem("pitchOverrides")||"{}"); } catch(e){}
+    // gameのpitcherデータからmanualOverrideのものをpitchOverridesに反映
+    [...(game.awayPitchers||[]), ...(game.homePitchers||[])].forEach(p=>{
+      if(!p||!p.name||!p.manualOverride) return;
+      const existing = base[p.name]||{};
+      base[p.name] = {
+        ...existing,
+        ...(p.autoH      !==undefined ? {h:     p.autoH}      : {}),
+        ...(p.autoEr     !==undefined ? {er:    p.autoEr}     : p.er!==undefined?{er:p.er}:{}),
+        ...(p.autoBb     !==undefined ? {bb:    p.autoBb}     : {}),
+        ...(p.autoK      !==undefined ? {k:     p.autoK}      : {}),
+        ...(p.autoRuns   !==undefined ? {runs:  p.autoRuns}   : {}),
+        ...(p.ipDisp     !==undefined ? {ipDisp:p.ipDisp}     : {}),
+      };
+    });
+    return base;
   });
   const savePitchOverride = (playerKey, field, val) => {
+    // まずlocalStateを更新（表示用）
     setPitchOverrides(prev=>{
       const next = {...prev};
       if(field==="_clear") { delete next[playerKey]; }
       else if(val===undefined){ if(next[playerKey]) { delete next[playerKey][field]; if(Object.keys(next[playerKey]).length===0) delete next[playerKey]; } }
       else next[playerKey] = {...(next[playerKey]||{}), [field]:val};
       localStorage.setItem("pitchOverrides", JSON.stringify(next));
+
+      // Firebase（mutGame）にも保存：現在試合のときのみ
+      if(mutGame) {
+        mutGame(g=>{
+          // awayPitchersとhomePitchersを両方検索して該当選手を更新
+          const updateSide = (side) => {
+            const ps = [...(g[side+"Pitchers"]||[])];
+            const idx = ps.findIndex(p=>p&&p.name===playerKey);
+            if(idx<0) return null;
+            const p = {...ps[idx]};
+            if(field==="_clear"){
+              // 手動上書きをクリア
+              delete p.manualOverride;
+              delete p.autoH; delete p.autoK; delete p.autoBb; delete p.autoHbp;
+              delete p.autoRuns; delete p.autoEr; delete p.manualIp;
+            } else {
+              p.manualOverride = true;
+              if(field==="h")      p.autoH    = Number(val);
+              if(field==="er")     { p.er = Number(val); p.autoEr = Number(val); }
+              if(field==="bb")     p.autoBb   = Number(val);
+              if(field==="k")      p.autoK    = Number(val);
+              if(field==="runs")   p.autoRuns = Number(val);
+              if(field==="ipDisp") p.ipDisp   = val;
+            }
+            ps[idx] = p;
+            return ps;
+          };
+          const newAway = updateSide("away");
+          const newHome = updateSide("home");
+          return {
+            ...g,
+            ...(newAway?{awayPitchers:newAway}:{}),
+            ...(newHome?{homePitchers:newHome}:{}),
+          };
+        });
+      }
       return next;
     });
   };

@@ -3813,7 +3813,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v409")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v415")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3899,7 +3899,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v409")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v415")
         )
 
         // ===== 新規チーム作成 =====
@@ -5336,6 +5336,60 @@ function App() {
               onLoad:loadGame,
               onDelete:delHistory,
               onExcel:(g)=>{ showToast("📊 出力処理を開始します..."); exportExcel(g); },
+              onRecompute:()=>{
+                // 全履歴試合をcomputePitcherStatsで再計算して保存し直す
+                setStorage(s=>{
+                  const newHist = (s.history||[]).map(g=>{
+                    try {
+                      const pStats = computePitcherStats(g);
+                      const rebuildSide = (side) => {
+                        const pitchers = [...(g[side+"Pitchers"]||[])];
+                        const autoArr = pStats[side]||[];
+                        return pitchers.map((p,i)=>{
+                          const a = autoArr[i]||{};
+                          // manualOverrideがある場合はerとmanualIpのみ保持、他はautoで上書き
+                          if(p.manualOverride){
+                            return {...p,
+                              autoH:   a.autoH||0,
+                              autoBb:  a.autoBb||0,
+                              autoK:   a.autoK||0,
+                              autoHbp: a.autoHbp||0,
+                              autoHr:  a.autoHr||0,
+                              autoIp:  a.autoIp||0,
+                              _outsGot:a._outsGot||0,
+                              // er/autoRunsはmanualOverrideがある場合は保持
+                            };
+                          }
+                          return {...p,
+                            autoH:    a.autoH||0,
+                            autoEr:   a.autoEr||0,
+                            autoBb:   a.autoBb||0,
+                            autoK:    a.autoK||0,
+                            autoHbp:  a.autoHbp||0,
+                            autoHr:   a.autoHr||0,
+                            autoIp:   a.autoIp||0,
+                            autoRuns: a.autoRuns||0,
+                            _outsGot: a._outsGot||0,
+                          };
+                        });
+                      };
+                      const updated = {
+                        ...g,
+                        awayPitchers: rebuildSide("away"),
+                        homePitchers: rebuildSide("home"),
+                      };
+                      // Firebaseにも保存
+                      if(window.__teamShareCode) fbSaveHistory(window.__teamShareCode, updated);
+                      return updated;
+                    } catch(e){
+                      console.error("recompute error", g.id, e);
+                      return g;
+                    }
+                  });
+                  return {...s, history:newHist};
+                });
+                showToast("✅ 全試合を再計算しました");
+              },
               onImport:(games)=>{
                 // gamesは配列で一括受け取り
                 const arr = Array.isArray(games)?games:[games];
@@ -7094,30 +7148,45 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       sides.forEach(side=>{
         const pitchers = g[side+"Pitchers"]||[];
         const autoArr = (pStats[side]||[]);
-        // 実際に登板した投手のインデックスを取得（pitcherLogから）
-        const playedIdxSet = new Set((g[side+"PitcherLog"]||[]).map(l=>l.pitcherIdx));
+        // 実際に登板した投手のインデックスを取得（computePitcherStatsと同じ先発補完ロジック）
+        const rawLog = g[side+"PitcherLog"]||[];
+        const starterHalfForSide = side==="home" ? "top" : "bottom";
+        const sortedRawLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1));
+        const starterIdxForSide = sortedRawLog.length>0 ? sortedRawLog[0].pitcherIdx : 0;
+        // pitcherLogが空でも先発(index=0またはstarterIdx)は登板扱い
+        const playedIdxSet = new Set(rawLog.map(l=>l.pitcherIdx));
+        // autoArrに成績がある投手も登板扱いに含める（先発補完で追加されたエントリ対応）
+        autoArr.forEach((a,ai)=>{ if(a&&((a._outsGot||0)>0||(a.autoH||0)>0||(a.autoBb||0)>0||(a.autoK||0)>0)) playedIdxSet.add(ai); });
+        // pitcherLogが空の場合は先発(index=0)を追加
+        if(rawLog.length===0 && pitchers.length>0) playedIdxSet.add(0);
         pitchers.forEach((p,i)=>{
           if(!p.name) return;
-          // 登板していない投手（デフォルトの「投手1」「投手2」など）はスキップ
-          if(!playedIdxSet.has(i)) return;
+          // 登板していない かつ デフォルト名（「投手N」）→スキップ
+          const hasStats = !!(autoArr[i]&&((autoArr[i]._outsGot||0)>0||(autoArr[i].autoH||0)>0||(autoArr[i].autoBb||0)>0||(autoArr[i].autoK||0)>0));
+          const isDefaultName = /^投手\d+$/.test(p.name);
+          if(!playedIdxSet.has(i)) return; // pitcherLogに登場しない → スキップ
+          if(isDefaultName && !hasStats) return; // デフォルト名で成績なし → スキップ
           if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set(),outsXinnings:0,win:0,lose:0,save:0,hold:0,bs:0};
           const m = map[p.name];
           m.games.add(g.id);
           const a = autoArr[i]||{};
           const autoOutsGot = a._outsGot||0;
-          // manualIpがある場合はアウト数として優先（投手タブでの手動修正）
-          // autoIpは10進数形式（6回=60）→アウト数（6回=18）に変換
           const autoIpOuts = Math.floor((a.autoIp||0)/10)*3 + ((a.autoIp||0)%10);
           const outsGot = p.manualIp !== undefined ? p.manualIp : autoOutsGot;
           m.outs += outsGot;
-          // 手動修正値を優先
-          m.h    += p.manualOverride&&p.autoH!==undefined ? p.autoH : (a.autoH||0);
-          m.er   += p.er!==undefined&&p.manualOverride ? p.er : (a.autoEr||0);
-          m.bb   += p.manualOverride&&p.autoBb!==undefined ? p.autoBb : (a.autoBb||0);
-          m.k    += p.manualOverride&&p.autoK!==undefined ? p.autoK : (a.autoK||0);
-          m.hbp  += p.manualOverride&&p.autoHbp!==undefined ? p.autoHbp : (a.autoHbp||0);
-          m.hr   += p.manualOverride&&p.autoHr!==undefined ? p.autoHr : (a.autoHr||0);
-          m.runs += p.manualOverride&&p.autoRuns!==undefined ? p.autoRuns : (a.autoRuns||0);
+          // 優先順位: manualOverride（投手タブ手動修正・Firebase保存）> auto
+          // pitchOverridesはゲームをまたいで上書きされるため集計には使わない
+          const getVal = (pKey, aKey) => {
+            if(p.manualOverride && p[pKey]!==undefined) return p[pKey];
+            return a[aKey]||0;
+          };
+          m.h    += getVal("autoH",   "autoH");
+          m.er   += getVal("er",      "autoEr");
+          m.bb   += getVal("autoBb",  "autoBb");
+          m.k    += getVal("autoK",   "autoK");
+          m.hbp  += getVal("autoHbp", "autoHbp");
+          m.hr   += getVal("autoHr",  "autoHr");
+          m.runs += getVal("autoRuns","autoRuns");
           // 勝敗・セーブ・ホールド
           const pr = (g.pitcherResults||{})[p.name]||{};
           if(pr.win)  m.win++;
@@ -7139,7 +7208,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       const avgInnings = m.outs>0 ? m.outsXinnings/m.outs : 9;
       const era = ipNum>0?(m.er*avgInnings/ipNum).toFixed(2):(m.er>0?"∞":"—");
       const whip= ipNum>0?((m.bb+m.h)/ipNum).toFixed(2):"—";
-      return {...m, ipDisp, ipNum, era, whip, games:m.games.size, runs:m.runs,
+      return {...m, ipDisp, ipNum, era, whip, avgInnings, games:m.games.size, runs:m.runs,
         win:m.win, lose:m.lose, save:m.save, hold:m.hold, bs:m.bs};
     }).sort((a,b)=>b.ipNum-a.ipNum);
   };
@@ -7330,8 +7399,15 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                   return Number(m[1]) + (Number(m[2]||0)/3);
                 };
                 const effIpNum = parseIp(effIpDisp);
-                const recalcEra = effIpNum>0 ? (effEr*(innings||9)/effIpNum).toFixed(2) : (effEr>0?"∞":"—");
-                const recalcWhip = effIpNum>0 ? ((effBb+effH)/effIpNum).toFixed(2) : "—";
+                // pitchOverridesで修正がある場合のみ再計算、なければaggregateが計算済みのeraを使う
+                const hasOv = Object.keys(ov).length > 0;
+                const recalcEra = hasOv
+                  ? (effIpNum>0 ? (effEr*(p.avgInnings||innings||9)/effIpNum).toFixed(2) : (effEr>0?"∞":"—"))
+                  : (p.era||"—");
+                // pitchOverridesで修正がある場合のみ再計算、なければaggregateが計算済みのwhipを使う
+                const recalcWhip = hasOv
+                  ? (effIpNum>0 ? ((effBb+effH)/effIpNum).toFixed(2) : "—")
+                  : (p.whip||"—");
 
                 // 表示順を維持：投球回・被安打・自責点・防御率・WHIP・四球・三振
                 const displayFields = [
@@ -7962,7 +8038,7 @@ function PasswordChangeCard({ teamCode, showToast }) {
   );
 }
 
-function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam, onRestoreOpp, showToast }) {
+function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam, onRestoreOpp, showToast, onRecompute }) {
   const [restoreTarget, setRestoreTarget] = React.useState(null);
   const [fbTeamId, setFbTeamId] = useState(teamShareCode||"");
   const [fbLoading, setFbLoading] = useState(false);
@@ -8048,6 +8124,20 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
             , React.createElement('button', {onClick:()=>setRestoreTarget(null), style:S.cBtn}, "キャンセル")
           )
         )
+
+      // 全試合再計算ボタン
+      , onRecompute && history && history.length>0 && React.createElement('div', {style:{...S.card, borderLeft:"4px solid #f97316", marginBottom:14}}
+        , React.createElement('div', {style:{...S.ct, marginBottom:6}}, "🔄 投手成績を再計算")
+        , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:10}},
+            "保存済みの全試合（"+history.length+"試合）の投手成績を最新のロジックで再計算して上書き保存します。計算ミスが疑われる場合に使ってください。")
+        , React.createElement('button', {
+            onClick:()=>{
+              if(!window.confirm("全"+history.length+"試合の投手成績を再計算します。よろしいですか？")) return;
+              onRecompute();
+            },
+            style:{...sBt("#f97316"),width:"100%",padding:"10px",fontSize:14,fontWeight:700}
+          }, "⚾ 全試合の投手成績を再計算する")
+      )
 
       // Firebase読み込みUI
       , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #22c55e", marginBottom:14}}

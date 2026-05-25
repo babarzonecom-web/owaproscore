@@ -3676,7 +3676,7 @@ function App() {
             );
           })()
 
-          , React.createElement('div', { style: {display:"flex",gap:5,marginLeft:"auto",flexWrap:"wrap"},}
+          , !isReadOnly && React.createElement('div', { style: {display:"flex",gap:5,marginLeft:"auto",flexWrap:"wrap"},}
             , React.createElement('button', { onClick: undoPlay,
               disabled: undoStack.length===0,
               title: "1つ前のプレーに戻す",
@@ -3716,7 +3716,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v393")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v394")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["score","📊 スコア"],["stats","📈 成績"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3802,7 +3802,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v393")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v394")
         )
 
         // ===== 新規チーム作成 =====
@@ -4243,7 +4243,7 @@ function App() {
           ) : (
           React.createElement(React.Fragment, null
 
-          , React.createElement('div', { style: S.card,}
+          , !isReadOnly && React.createElement('div', { style: S.card,}
             , React.createElement('div', { style: S.ct,}, "⚙️ 試合情報" )
             , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-end"},}
               , [["awayTeam","アウェイ",game.awayTeam],["homeTeam","ホーム",game.homeTeam],["venue","球場",game.venue]].map(([k,l,v])=>(
@@ -4330,7 +4330,7 @@ function App() {
           )
 
           
-          , game.finished&&(
+          , !isReadOnly && game.finished&&(
             React.createElement('div', { style: {background:"linear-gradient(135deg,#7f1d1d,#991b1b)",
               border:"1px solid #dc2626",borderRadius:12,padding:"14px 18px",
               marginBottom:14,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"},}
@@ -4351,7 +4351,7 @@ function App() {
           )
 
           
-          , React.createElement('div', { style: {...S.card, opacity:game.finished?0.5:1, pointerEvents:game.finished?"none":"auto"},}
+          , !isReadOnly && React.createElement('div', { style: {...S.card, opacity:game.finished?0.5:1, pointerEvents:game.finished?"none":"auto"},}
             , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"},}
               , React.createElement('div', { style: S.ct,}, "⚡ 打席記録 — "   , game.inning, "回", game.half==="top"?"表":"裏", "（", curLabel, "）")
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:6,marginLeft:"auto"},}
@@ -4635,7 +4635,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', { style: S.card,}
+          , !isReadOnly && React.createElement('div', { style: S.card,}
             , React.createElement('div', { style: {display:"flex",alignItems:"center",marginBottom:12,gap:10},}
               , React.createElement('div', { style: S.ct,}, "📝 プレーログ" )
               , undoStack.length>0&&(
@@ -4674,7 +4674,7 @@ function App() {
           ) // Fragment閉じ
         ))
 
-        , tab==="score"&&(game.defenseLog||[]).length>0&&(
+        , !isReadOnly && tab==="score"&&(game.defenseLog||[]).length>0&&(
           React.createElement('div', { style: S.card,}
             , React.createElement('div', { style: {...S.ct,marginBottom:8},}, "🔄 守備交代記録" )
             , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:4},}

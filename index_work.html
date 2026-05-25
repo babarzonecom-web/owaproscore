@@ -3716,7 +3716,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:9,color:"#334155",marginBottom:2,paddingRight:4}}, "v393")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v393")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["score","📊 スコア"],["stats","📈 成績"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3802,7 +3802,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#334155"}}, "v393")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v393")
         )
 
         // ===== 新規チーム作成 =====

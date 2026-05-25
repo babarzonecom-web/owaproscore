@@ -3716,7 +3716,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v402")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v403")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3802,7 +3802,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v402")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v403")
         )
 
         // ===== 新規チーム作成 =====
@@ -4006,43 +4006,71 @@ function App() {
 
             // 大きなダイヤモンド描画（SVG）
             const BigDiamond = () => {
-              const sz = 140;
-              const cx = sz/2, cy = sz/2;
-              const r = sz*0.38;
-              // 各塁の座標（右・上・左・下）= 1塁・2塁・3塁・本塁
-              const pts = [
-                {x:cx+r, y:cy, bi:0},   // 1塁
-                {x:cx,   y:cy-r, bi:1}, // 2塁
-                {x:cx-r, y:cy, bi:2},   // 3塁
+              // リアルグラウンド風ダイヤモンド
+              const W = 200, H = 170;
+              // 各塁の座標（俯瞰パース風）
+              const home = [W/2, H-18];
+              const first = [W-22, H*0.54];
+              const second = [W/2, 18];
+              const third = [22, H*0.54];
+
+              // ランナーがいる塁をハイライト
+              const baseData = [
+                {pt:first,  bi:0, label:"1"},
+                {pt:second, bi:1, label:"2"},
+                {pt:third,  bi:2, label:"3"},
               ];
-              return React.createElement('svg',{width:sz,height:sz,viewBox:"0 0 "+sz+" "+sz}
-                // ダイヤ輪郭
+
+              // 外野フェンス（半楕円）
+              const fenceRx = W*0.46, fenceRy = H*0.38;
+              const fenceCx = W/2, fenceCy = H*0.13;
+
+              return React.createElement('svg',{width:W,height:H,viewBox:`0 0 ${W} ${H}`,style:{display:"block"}}
+                // 外野グリーン（半楕円）
+                ,React.createElement('ellipse',{cx:fenceCx,cy:fenceCy+fenceRy*0.6,rx:fenceRx,ry:fenceRy*1.15,fill:"#2d5a1b"})
+                // 内野グラウンド（ダイヤ形の土エリア）
                 ,React.createElement('polygon',{
-                  points:`${cx+r},${cy} ${cx},${cy-r} ${cx-r},${cy} ${cx},${cy+r}`,
-                  fill:"none",stroke:"#1e3a5f",strokeWidth:2
+                  points:`${home[0]},${home[1]} ${first[0]},${first[1]} ${second[0]},${second[1]} ${third[0]},${third[1]}`,
+                  fill:"#8b5e3c"
+                })
+                // 内野グリーン（ダイヤ内の芝）
+                ,React.createElement('polygon',{
+                  points:`${home[0]},${home[1]-14} ${first[0]-14},${first[1]} ${second[0]},${second[1]+14} ${third[0]+14},${third[1]}`,
+                  fill:"#3a7a24"
+                })
+                // ピッチャーマウンド
+                ,React.createElement('ellipse',{
+                  cx:W/2,cy:(home[1]+second[1])/2+4,rx:10,ry:7,fill:"#9b6b45",stroke:"#7a5230",strokeWidth:1
+                })
+                // ファウルライン
+                ,React.createElement('line',{x1:home[0],y1:home[1],x2:first[0]+8,y2:first[1]-20,stroke:"#fff",strokeWidth:1,opacity:0.5})
+                ,React.createElement('line',{x1:home[0],y1:home[1],x2:third[0]-8,y2:third[1]-20,stroke:"#fff",strokeWidth:1,opacity:0.5})
+                // フェンスライン
+                ,React.createElement('path',{
+                  d:`M ${third[0]-8},${third[1]-20} Q ${W/2},${fenceCy} ${first[0]+8},${first[1]-20}`,
+                  fill:"none",stroke:"#c8a84b",strokeWidth:2.5,opacity:0.8
                 })
                 // 各塁
-                ,pts.map(({x,y,bi})=>{
-                  const occupied = !!_bases[bi];
+                ,baseData.map(({pt,bi,label})=>{
+                  const occ = !!_bases[bi];
                   return React.createElement('g',{key:bi}
                     ,React.createElement('rect',{
-                      x:x-12,y:y-12,width:24,height:24,
-                      rx:4,
-                      fill:occupied?"#f97316":"#0d1f35",
-                      stroke:occupied?"#fb923c":"#2a4a7a",
-                      strokeWidth:occupied?2.5:1.5,
-                      transform:`rotate(45,${x},${y})`
+                      x:pt[0]-9,y:pt[1]-9,width:18,height:18,
+                      fill:occ?"#f97316":"#e8dcc8",
+                      stroke:occ?"#fb923c":"#c8b89a",
+                      strokeWidth:occ?2:1.5,
+                      transform:`rotate(45,${pt[0]},${pt[1]})`
                     })
-                    ,occupied&&React.createElement('text',{
-                      x,y:y+5,textAnchor:"middle",fontSize:10,fill:"#fff",fontWeight:700
+                    ,occ&&React.createElement('text',{
+                      x:pt[0],y:pt[1]+4,
+                      textAnchor:"middle",fontSize:9,fill:"#fff",fontWeight:900
                     },_bases[bi].length<=3?_bases[bi]:_bases[bi].slice(0,3))
                   );
                 })
                 // 本塁
-                ,React.createElement('rect',{
-                  x:cx-10,y:cy+r-10,width:20,height:20,rx:3,
-                  fill:"#1e3a5f",stroke:"#3b82f6",strokeWidth:1.5,
-                  transform:`rotate(45,${cx},${cy+r})`
+                ,React.createElement('polygon',{
+                  points:`${home[0]},${home[1]-9} ${home[0]+7},${home[1]-4} ${home[0]+7},${home[1]+4} ${home[0]-7},${home[1]+4} ${home[0]-7},${home[1]-4}`,
+                  fill:"#e8dcc8",stroke:"#c8b89a",strokeWidth:1.5
                 })
               );
             };

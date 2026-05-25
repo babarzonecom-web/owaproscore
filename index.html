@@ -3716,9 +3716,9 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v396")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v398")
         , tab!=="login" && (isReadOnly
-          ? [["live","📡 速報"],["score","📊 スコア"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
+          ? [["live","📡 速報"],["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
                 background:"transparent",border:"none",
                 borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
@@ -3802,7 +3802,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v396")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v398")
         )
 
         // ===== 新規チーム作成 =====
@@ -4056,7 +4056,7 @@ function App() {
                 padding:"18px 20px 14px",marginBottom:12
               }}
                 ,React.createElement('div',{style:{fontSize:11,color:"#475569",marginBottom:10,textAlign:"center",fontWeight:700,letterSpacing:1}},
-                  g.inning+"回"+(g.half==="top"?"表":"裏")+(g.finished?" — 試合終了":"")
+                  (g.inning||1)+"回"+(g.half==="top"?"表":"裏")+(g.finished?" — 試合終了":"")
                 )
                 // チーム vs スコア
                 ,React.createElement('div',{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}

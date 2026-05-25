@@ -780,7 +780,7 @@ const computePitcherStats = (g) => {
     // nullエントリを除去しつつindexを保持するため、nullは空オブジェクトに変換
     const safePitchers = rawPitchers.map(p=>p||{});
     if(!safePitchers.length || safePitchers.every(p=>!p.name)) { result[defTeam]=[]; return; }
-    const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, _outsGot:0, _brOutsCount:0}));
+    const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, autoHbp:0, autoHr:0, autoRuns:0, _outsGot:0, _brOutsCount:0}));
 
     
     
@@ -1610,7 +1610,7 @@ const computePitcherStats = (g) => {
     // nullエントリを除去しつつindexを保持するため、nullは空オブジェクトに変換
     const safePitchers = rawPitchers.map(p=>p||{});
     if(!safePitchers.length || safePitchers.every(p=>!p.name)) { result[defTeam]=[]; return; }
-    const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, _outsGot:0, _brOutsCount:0}));
+    const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, autoHbp:0, autoHr:0, autoRuns:0, _outsGot:0, _brOutsCount:0}));
 
     
     
@@ -3795,7 +3795,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v419")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v420")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3881,7 +3881,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v419")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v420")
         )
 
         // ===== 新規チーム作成 =====
@@ -7377,11 +7377,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                 return React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0a1628":"#0d1f35"}}
                   , React.createElement('td', {style:{...tdN,color:"#e2e8f0",whiteSpace:"nowrap",minWidth:70}}
                     , p.name
-                    , editMode && ov && Object.keys(ov).length>0 && React.createElement('button',{
-                        onClick:()=>savePitchOverride&&savePitchOverride(p.name,"_clear",null),
-                        style:{fontSize:9,marginLeft:4,background:"#4c1d9533",border:"1px solid #a78bfa",
-                          borderRadius:4,color:"#c4b5fd",cursor:"pointer",padding:"1px 4px"}
-                      },"解除")
+
                   )
                   , React.createElement('td', {style:tdS}, p.games)
                   , (game.pitchMode||"result")==="pitch" && React.createElement('td', {style:tdS},

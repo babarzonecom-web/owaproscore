@@ -2245,25 +2245,35 @@ function App() {
 
   const showToast = (msg)=>{setToast(msg);setTimeout(()=>setToast(""),2600);};
 
-  // チームコード接続時にFirebase履歴を読み込んでlocalとマージ
-  useEffect(()=>{
-    const code = window.__teamShareCode;
+  // チームコード接続時にFirebase履歴を自動読み込み（ログイン時・ページリロード時両対応）
+  const _loadFbHistory = useCallback((code)=>{
     if(!code) return;
     fbLoadHistory(code).then(fbHist=>{
       if(!fbHist||fbHist.length===0) return;
       setStorage(s=>{
         const localIds = new Set((s.history||[]).map(g=>g.id));
         const deletedIds = new Set(s.deletedIds||[]);
-        // Firebase履歴のうちlocalにない かつ 削除済みでないものを追加
         const merged = [...(s.history||[])];
         fbHist.forEach(g=>{ if(g&&g.id&&!localIds.has(g.id)&&!deletedIds.has(g.id)) merged.push(g); });
+        // 日付順（新しい順）でソート
         merged.sort((a,b)=>{
           const ta=a.savedAt||a.date||""; const tb=b.savedAt||b.date||"";
-          return tb.localeCompare(ta);
+          return tb.localeCompare(ta)||(b._ts||0)-(a._ts||0);
         });
-        return {...s, history:merged.slice(0,50)};
+        return {...s, history:merged.slice(0,100)};
       });
     });
+  },[]);
+
+  // ページ初回マウント時（リロード後のlocalStorage復元時）
+  useEffect(()=>{
+    const code = localStorage.getItem("tsCode");
+    if(code) _loadFbHistory(code);
+  },[]);
+
+  // チームコードが変わったとき（新規ログイン時）
+  useEffect(()=>{
+    if(teamShareCode) _loadFbHistory(teamShareCode);
   },[teamShareCode]);
 
   const disconnectTeam = () => {
@@ -3428,7 +3438,9 @@ function App() {
         fbSaveGameToCode(window.__teamShareCode, saved);
         fbSaveHistory(window.__teamShareCode, saved);
       }
-      const hist = [saved, ...(s.history||[]).filter(h=>h.id!==saved.id).slice(0,49)];
+      const hist = [saved, ...(s.history||[]).filter(h=>h.id!==saved.id)]
+        .sort((a,b)=>{ const ta=a.savedAt||a.date||""; const tb=b.savedAt||b.date||""; return tb.localeCompare(ta)||(b._ts||0)-(a._ts||0); })
+        .slice(0,100);
       return {...s, history:hist};
     });
     if(!silent) showToast("保存しました ✅");
@@ -3469,7 +3481,9 @@ function App() {
       const matchedTeam = allTeams.find(t=>t.name===g.awayTeam||t.name===g.homeTeam);
       if(matchedTeam) fbSaveTeamGame(matchedTeam.id, g);
 
-      const hist = [finished, ...(s.history||[]).filter(h=>h.id!==finished.id).slice(0,49)];
+      const hist = [finished, ...(s.history||[]).filter(h=>h.id!==finished.id)]
+        .sort((a,b)=>{ const ta=a.savedAt||a.date||""; const tb=b.savedAt||b.date||""; return tb.localeCompare(ta)||(b._ts||0)-(a._ts||0); })
+        .slice(0,100);
       return {...s, history:hist};
     });
     showToast(reason==="cold"?`コールドゲーム（${endInning}回）`:reason==="mercy"?"コールド成立":"⚾ 試合終了");
@@ -3874,7 +3888,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v426")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v428")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3960,7 +3974,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v426")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v428")
         )
 
         // ===== 新規チーム作成 =====
@@ -5503,154 +5517,100 @@ function App() {
 
         , tab==="teams"&&(React.createElement(React.Fragment, null
 
-          // ===== チーム同期カード（接続状態で内容が変わる）=====
-          , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #a78bfa"}}
+          // ===== 接続状態カード =====
+          , React.createElement('div', {style:{
+              ...S.card,
+              borderLeft: isTeamConnected
+                ? (teamShareRole==="admin" ? "4px solid #4ade80" : "4px solid #3b82f6")
+                : "4px solid #475569"
+            }}
 
-            , isTeamConnected ? (
-              // 接続中：チームコード・履歴・試合を一元表示
-              React.createElement(React.Fragment, null
-                , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:12}}
-                  , React.createElement('div', {style:{...S.ct,marginBottom:0}}, "📡 チーム同期中")
-                  , React.createElement('div', {style:{
-                      marginLeft:"auto",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:6,
-                      background:teamShareRole==="admin"?"#065f46":"#1e3a5f",
-                      color:teamShareRole==="admin"?"#4ade80":"#7dd3fc",
-                      border:`1px solid ${teamShareRole==="admin"?"#4ade80":"#3b82f6"}`
-                    }}, teamShareRole==="admin"?"🔑 管理者":"👁 閲覧中")
-                )
-                // チームコード表示
-                , React.createElement('div', {style:{background:"#0a1628",borderRadius:10,
-                    border:`2px solid ${teamShareRole==="admin"?"#4ade80":"#3b82f6"}`,
-                    padding:"10px 14px",marginBottom:12,textAlign:"center"}}
-                  , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:2}}, "接続中のチームコード")
-                  , React.createElement('div', {style:{fontFamily:"monospace",fontSize:26,fontWeight:900,color:"#fff",letterSpacing:4}}, teamShareCode)
-                  , React.createElement('div', {style:{display:"flex",gap:6,justifyContent:"center",marginTop:8}}
-                    , React.createElement('button', {
-                        onClick:()=>navigator.clipboard&&navigator.clipboard.writeText(teamShareCode).then(()=>showToast("コードをコピーしました")),
-                        style:{...sBt("#475569"),fontSize:11,padding:"3px 12px"}
-                      }, "📋 コピー")
-                    , React.createElement('button', {
-                        onClick: disconnectTeam,
-                        style:{...sBt("#dc2626",true),fontSize:11,padding:"3px 12px"}
-                      }, "ログアウト")
-                  )
-                )
-                // パスワード変更（管理者のみ）
-                , teamShareRole==="admin" && React.createElement(PasswordChangeCard, {
-                    teamCode: teamShareCode,
-                    showToast,
-                  })
-                // 履歴読み込み（チームコードで自動取得）
-                , React.createElement('div', {style:{marginBottom:8}}
-                  , React.createElement('div', {style:{fontSize:11,color:"#7db8e8",marginBottom:6,fontWeight:700}},
-                    "☁️ このチームの試合履歴")
-                  , React.createElement('div', {style:{display:"flex",gap:8,alignItems:"center"}}
-                    , React.createElement('button', {
-                        onClick:()=>{
-                          if(!fbInit()){ showToast("Firebaseに接続できません"); return; }
-                          const code = teamShareCode.toUpperCase();
-                          const p1 = fbDB.ref("team_rooms/"+code+"/games").once("value").catch(()=>null);
-                          const p2 = fbDB.ref("shared_teams/"+code+"/games").once("value").catch(()=>null);
-                          showToast("読み込み中...");
-                          Promise.all([p1,p2]).then(([s1,s2])=>{
-                            const toArr = s => s&&s.val() ? (Array.isArray(s.val())?s.val():Object.values(s.val())) : [];
-                            const seen = new Set();
-                            const games = [...toArr(s1),...toArr(s2)].filter(g=>{
-                              if(!g||!g.id||seen.has(String(g.id))) return false;
-                              seen.add(String(g.id)); return true;
-                            }).sort((a,b)=>(b._ts||0)-(a._ts||0));
-                            if(games.length===0){ showToast("試合データがありません"); return; }
-                            setStorage(s=>{
-                              let hist = [...(s.history||[])];
-                              games.forEach(g=>{
-                                const idx = hist.findIndex(h=>h.id===g.id);
-                                if(idx>=0) hist[idx]=g;
-                                else hist=[g,...hist];
-                              });
-                              return {...s, history:hist.slice(0,50)};
-                            });
-                            showToast(games.length+"試合を読み込みました ✅");
-                          }).catch(e=>showToast("エラー: "+e.message));
-                        },
-                        style:{...sBt("#22c55e"),fontSize:12,padding:"6px 16px"}
-                      }, "☁️ 履歴を取得")
-                    , React.createElement('span', {style:{fontSize:11,color:"#475569"}},
-                        "現在の履歴:", (history||[]).length, "試合保存済み")
-                  )
-                )
+            , isTeamConnected ? React.createElement(React.Fragment, null
 
-
+              // 接続中ヘッダー
+              , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:14}}
+                , React.createElement('div', {style:{
+                    fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,
+                    background:teamShareRole==="admin"?"#065f46":"#1e3a5f",
+                    color:teamShareRole==="admin"?"#4ade80":"#7dd3fc",
+                    border:`1px solid ${teamShareRole==="admin"?"#4ade80":"#3b82f6"}`
+                  }}, teamShareRole==="admin"?"🔑 管理者モード":"👁 閲覧モード")
+                , React.createElement('div', {style:{marginLeft:"auto",fontSize:11,color:"#64748b"}},
+                    "チームコード")
               )
-            ) : (
-              // 未接続：ログイン画面へ誘導
-              React.createElement(React.Fragment, null
-                , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:14}}
-                  , React.createElement('div', {style:S.ct}, "📡 チーム接続")
-                )
 
-                , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:10}}
+              // チームコード大表示
+              , React.createElement('div', {style:{
+                  background:"#0a1628",borderRadius:12,
+                  border:`2px solid ${teamShareRole==="admin"?"#4ade80":"#3b82f6"}`,
+                  padding:"14px 16px",marginBottom:12,textAlign:"center"
+                }}
+                , React.createElement('div', {style:{
+                    fontFamily:"monospace",fontSize:32,fontWeight:900,
+                    color:"#fff",letterSpacing:6,marginBottom:8
+                  }}, teamShareCode)
+                , React.createElement('div', {style:{display:"flex",gap:8,justifyContent:"center"}}
                   , React.createElement('button', {
-                      onClick:()=>setTab("login"),
-                      style:{...sBt("#22c55e"),width:"100%",padding:"12px",fontSize:14,fontWeight:700}
-                    }, "🏟 チームを作る / ログイン")
-                  , React.createElement('div', {style:{fontSize:11,color:"#475569",textAlign:"center"}},
-                    "ログイン画面からチームを作成するか、既存チームに参加してください")
+                      onClick:()=>navigator.clipboard&&navigator.clipboard.writeText(teamShareCode)
+                        .then(()=>showToast("コードをコピーしました")),
+                      style:{...sBt("#475569"),fontSize:12,padding:"5px 14px"}
+                    }, "📋 コピー")
+                  , React.createElement('button', {
+                      onClick: disconnectTeam,
+                      style:{...sBt("#dc2626",true),fontSize:12,padding:"5px 14px"}
+                    }, "🚪 ログアウト")
                 )
               )
-            )
-          )
 
-          // ===== 自チーム・対戦相手 =====
-          , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #f0a500"}}
-            , React.createElement('div', {style:{...S.ct, marginBottom:10}}, "🏆 大会登録")
-            , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10}}
-              , React.createElement('input', {
-                  id:"new-tour-input",
-                  placeholder:"大会名を入力（例：春季大会2026）",
-                  style:{...S.inp, flex:1}
+              // 管理者のみ：パスワード変更
+              , teamShareRole==="admin" && React.createElement(PasswordChangeCard, {
+                  teamCode: teamShareCode, showToast
                 })
-              , React.createElement('button', {
-                  onClick:()=>{
-                    const v=document.getElementById('new-tour-input').value.trim();
-                    if(!v){showToast('大会名を入力してください');return;}
-                    const t={id:Date.now().toString(36),name:v};
-                    setStorage(s=>({...s,tournaments:[...(s.tournaments||[]),t]}));
-                    document.getElementById('new-tour-input').value='';
-                    showToast('✅ 大会「'+v+'」を登録しました');
-                  },
-                  style:{...sBt("#f0a500"),fontSize:12,padding:"6px 14px",whiteSpace:"nowrap"}
-                }, "＋ 追加")
-            )
-            , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6}},
-              (tournaments||[]).length===0
-                ? React.createElement('div',{style:{fontSize:12,color:"#475569"}},'大会が登録されていません')
-                : (tournaments||[]).map(t=>
-                    React.createElement('div',{key:t.id,style:{display:"flex",alignItems:"center",gap:6,
-                      background:"#1a2234",border:"1px solid #2a3a55",borderRadius:8,padding:"4px 10px"}}
-                      , React.createElement('span',{style:{fontSize:12,color:"#e2e8f0",fontWeight:700}},t.name)
-                      , React.createElement('button',{
-                          onClick:()=>{
-                            if(!confirm('「'+t.name+'」を削除しますか？'))return;
-                            setStorage(s=>({...s,tournaments:(s.tournaments||[]).filter(x=>x.id!==t.id)}));
-                          },
-                          style:{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:12,padding:"0 2px"}
-                        },'×')
-                    )
-                  )
+
+              // 履歴の状態
+              , React.createElement('div', {style:{
+                  display:"flex",alignItems:"center",gap:8,
+                  background:"#0a1628",borderRadius:8,padding:"10px 12px"
+                }}
+                , React.createElement('span', {style:{fontSize:12,color:"#64748b"}},"📚 履歴")
+                , React.createElement('span', {style:{fontSize:13,fontWeight:700,color:"#e2e8f0"}},
+                    (history||[]).length+"試合")
+                , React.createElement('button', {
+                    onClick:()=> _loadFbHistory(teamShareCode).then?
+                      _loadFbHistory(teamShareCode).then(()=>showToast("✅ 履歴を更新しました")):
+                      (_loadFbHistory(teamShareCode), showToast("✅ 更新しました")),
+                    style:{...sBt("#22c55e",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
+                  }, "🔄 更新")
               )
+
+            ) : React.createElement(React.Fragment, null
+              // 未接続
+              , React.createElement('div', {style:{...S.ct,marginBottom:12}}, "📡 チームに接続")
+              , React.createElement('div', {style:{fontSize:12,color:"#64748b",marginBottom:14,lineHeight:1.6}},
+                  "チームコードを使って複数端末でリアルタイム同期できます。",
+                  React.createElement('br',null),
+                  "管理者（スコアをつける人）とメンバー（閲覧する人）でロールが分かれます。")
+              , React.createElement('button', {
+                  onClick:()=>setTab("login"),
+                  style:{...sBt("#a78bfa"),width:"100%",padding:"12px",fontSize:14,fontWeight:700}
+                }, "🏟 チームを作る / ログイン")
+            )
           )
 
+          // ===== 自チーム =====
           , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #fbbf24"}}
-            , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:12}}
+            , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:10}}
               , React.createElement('div', {style:S.ct}, "🏟 自チーム")
               , !myTeam && React.createElement('button', {
-                  onClick:()=>setModal({step:"team_edit", teamType:"my", editTeam:null}),
+                  onClick:()=>setModal({step:"team_edit",teamType:"my",editTeam:null}),
                   style:{...sBt("#16a34a"),marginLeft:"auto",fontSize:12,padding:"5px 14px"}
-                }, "＋ 自チームを登録")
+                }, "＋ 登録")
             )
             , myTeam ? React.createElement('div', null
                 , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:10}}
                   , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:"#fbbf24"}}, myTeam.name)
+                  , React.createElement('span', {style:{fontSize:11,color:"#64748b",marginLeft:8}},
+                      (myTeam.members||[]).length+"名登録")
                   , React.createElement('button', {
                       onClick:()=>setModal({step:"team_edit",teamType:"my",editTeam:myTeam}),
                       style:{...sBt("#475569",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
@@ -5660,47 +5620,18 @@ function App() {
                   , React.createElement('button', {
                       onClick:()=>{ setModal({step:"team_lineup",side:"away",preselect:myTeam}); setTab("lineup"); },
                       style:{...sBt("#1d4ed8"),fontSize:12,padding:"5px 14px"}
-                    }, "👥 ビジターに選ぶ")
+                    }, "⚾ ビジターで使う")
                   , React.createElement('button', {
                       onClick:()=>{ setModal({step:"team_lineup",side:"home",preselect:myTeam}); setTab("lineup"); },
                       style:{...sBt("#0369a1"),fontSize:12,padding:"5px 14px"}
-                    }, "👥 ホームに選ぶ")
+                    }, "🏠 ホームで使う")
                 )
-              ) : React.createElement('div', {style:{color:"#475569",fontSize:12}}, "まだ自チームが登録されていません")
+              )
+            : React.createElement('div', {style:{color:"#475569",fontSize:12}},
+                "まだ自チームが登録されていません。「登録」から追加してください。")
           )
 
-          , teamShareCode && React.createElement('div', {style:{...S.card, marginBottom:4, borderLeft:"4px solid #3b82f6"}}
-            , React.createElement('div', {style:{...S.ct, marginBottom:8}}, "☁️ チームデータをFirebaseに同期")
-            , React.createElement('div', {style:{fontSize:11, color:"#94a3b8", marginBottom:8}},
-                "メンバー情報を保存・読み込みできます")
-            , React.createElement('div', {style:{display:"flex", gap:8}}
-              , React.createElement('button', {
-                  onClick:()=>{
-                    const data={teams:storage.teams||[],myTeam:storage.myTeam||null,opponents:storage.opponents||[],savedAt:new Date().toISOString()};
-                    fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+teamShareCode+".json",
-                      {method:"PUT",body:JSON.stringify(data)})
-                      .then(()=>showToast("✅ 保存しました"))
-                      .catch(e=>showToast("❌ 保存失敗: "+e.message));
-                  },
-                  style:{...sBt("#3b82f6"),fontSize:12,padding:"6px 14px"}
-                }, "☁️ 保存")
-              , React.createElement('button', {
-                  onClick:()=>{
-                    if(!window.confirm("Firebaseからチームデータを読み込みます。現在のデータは上書きされます。")) return;
-                    fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+teamShareCode+".json",{cache:"no-store"})
-                      .then(r=>r.json())
-                      .then(data=>{
-                        if(!data||typeof data!=="object"){showToast("データなし");return;}
-                        setStorage(s=>({...s,teams:data.teams||s.teams,myTeam:data.myTeam!==undefined?data.myTeam:s.myTeam,opponents:data.opponents||s.opponents}));
-                        showToast("✅ 読み込みました");
-                      })
-                      .catch(e=>showToast("❌ 読み込み失敗: "+e.message));
-                  },
-                  style:{...sBt("#0369a1"),fontSize:12,padding:"6px 14px"}
-                }, "📥 読み込み")
-            )
-          )
-
+          // ===== 対戦相手 =====
           , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #7dd3fc"}}
             , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:10}}
               , React.createElement('div', {style:S.ct}, "⚔️ 対戦相手")
@@ -5710,38 +5641,130 @@ function App() {
                 }, "＋ 追加")
             )
             , opponents.length===0
-              ? React.createElement('div', {style:{color:"#475569",fontSize:12}}, "対戦相手が登録されていません")
+              ? React.createElement('div', {style:{color:"#475569",fontSize:12}},
+                  "対戦相手が登録されていません。「追加」から登録してください。")
               : React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:6}}
                 , opponents.map(t=>
-                    React.createElement('div', {key:t.id, style:{display:"flex",alignItems:"center",gap:8,
-                      background:"#0a1628",borderRadius:8,padding:"8px 12px"}}
-                      , React.createElement('span', {style:{fontWeight:700,color:"#e2e8f0",flex:1}}, t.name)
-                      , React.createElement('span', {style:{fontSize:11,color:"#475569"}}, (t.members||[]).length+"名")
-                      , React.createElement('button', {
-                          onClick:()=>{ setModal({step:"team_lineup",side:"away",preselect:t}); setTab("lineup"); },
-                          style:{...sBt("#1d4ed8",true),fontSize:11,padding:"3px 8px"}
-                        }, "V")
-                      , React.createElement('button', {
-                          onClick:()=>{ setModal({step:"team_lineup",side:"home",preselect:t}); setTab("lineup"); },
-                          style:{...sBt("#0369a1",true),fontSize:11,padding:"3px 8px"}
-                        }, "H")
-                      , React.createElement('button', {
-                          onClick:()=>setModal({step:"team_edit",teamType:"opponent",editTeam:t}),
-                          style:{...sBt("#475569",true),fontSize:11,padding:"3px 8px"}
-                        }, "✏️")
-                      , React.createElement('button', {
-                          onClick:()=>{
-                            if(window.confirm("「"+t.name+"」を削除しますか？\nこの操作は元に戻せません。")) {
-                              setStorage(s=>({...s, opponents:(s.opponents||[]).filter(o=>o.id!==t.id)}));
-                              showToast("✅ "+t.name+" を削除しました");
-                            }
-                          },
-                          style:{...sBt("#dc2626",true),fontSize:11,padding:"3px 8px"}
-                        }, "🗑")
+                    React.createElement('div', {key:t.id, style:{
+                      display:"flex",alignItems:"center",gap:8,
+                      background:"#0a1628",borderRadius:8,padding:"8px 12px"
+                    }}
+                      , React.createElement('div', {style:{flex:1}}
+                        , React.createElement('span', {style:{fontWeight:700,color:"#e2e8f0",fontSize:13}}, t.name)
+                        , React.createElement('span', {style:{fontSize:11,color:"#475569",marginLeft:8}},
+                            (t.members||[]).length+"名")
+                      )
+                      , React.createElement('div', {style:{display:"flex",gap:4}}
+                        , React.createElement('button', {
+                            onClick:()=>{ setModal({step:"team_lineup",side:"away",preselect:t}); setTab("lineup"); },
+                            style:{...sBt("#1d4ed8",true),fontSize:11,padding:"3px 8px"}
+                          }, "V")
+                        , React.createElement('button', {
+                            onClick:()=>{ setModal({step:"team_lineup",side:"home",preselect:t}); setTab("lineup"); },
+                            style:{...sBt("#0369a1",true),fontSize:11,padding:"3px 8px"}
+                          }, "H")
+                        , React.createElement('button', {
+                            onClick:()=>setModal({step:"team_edit",teamType:"opponent",editTeam:t}),
+                            style:{...sBt("#475569",true),fontSize:11,padding:"3px 8px"}
+                          }, "✏️")
+                        , React.createElement('button', {
+                            onClick:()=>{
+                              if(window.confirm("「"+t.name+"」を削除しますか？")) {
+                                setStorage(s=>({...s,opponents:(s.opponents||[]).filter(o=>o.id!==t.id)}));
+                                showToast("✅ "+t.name+" を削除しました");
+                              }
+                            },
+                            style:{...sBt("#dc2626",true),fontSize:11,padding:"3px 8px"}
+                          }, "×")
+                      )
                     )
                   )
               )
           )
+
+          // ===== 大会 =====
+          , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #f0a500"}}
+            , React.createElement('div', {style:{...S.ct,marginBottom:10}}, "🏆 大会登録")
+            , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:10}},
+                "登録した大会名は試合記録時に選択できます")
+            , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:10}}
+              , React.createElement('input', {
+                  id:"new-tour-input",
+                  placeholder:"大会名（例：春季大会2026）",
+                  style:{...S.inp,flex:1}
+                })
+              , React.createElement('button', {
+                  onClick:()=>{
+                    const v=document.getElementById("new-tour-input").value.trim();
+                    if(!v){showToast("大会名を入力してください");return;}
+                    const t={id:Date.now().toString(36),name:v};
+                    setStorage(s=>({...s,tournaments:[...(s.tournaments||[]),t]}));
+                    document.getElementById("new-tour-input").value="";
+                    showToast("✅ 大会「"+v+"」を登録しました");
+                  },
+                  style:{...sBt("#f0a500"),fontSize:12,padding:"6px 14px",whiteSpace:"nowrap"}
+                }, "＋ 追加")
+            )
+            , (tournaments||[]).length===0
+              ? React.createElement('div',{style:{fontSize:12,color:"#475569"}},"大会が登録されていません")
+              : React.createElement('div',{style:{display:"flex",flexWrap:"wrap",gap:6}}
+                , (tournaments||[]).map(t=>
+                    React.createElement('div',{key:t.id,style:{
+                      display:"flex",alignItems:"center",gap:6,
+                      background:"#1a2234",border:"1px solid #2a3a55",
+                      borderRadius:8,padding:"4px 10px"
+                    }}
+                      , React.createElement('span',{style:{fontSize:12,color:"#e2e8f0",fontWeight:700}},t.name)
+                      , React.createElement('button',{
+                          onClick:()=>{
+                            if(!confirm("「"+t.name+"」を削除しますか？"))return;
+                            setStorage(s=>({...s,tournaments:(s.tournaments||[]).filter(x=>x.id!==t.id)}));
+                          },
+                          style:{background:"transparent",border:"none",color:"#475569",cursor:"pointer",fontSize:13,padding:"0 2px"}
+                        },"×")
+                    )
+                  )
+              )
+          )
+
+          // ===== チームデータ同期（接続中のみ）=====
+          , teamShareCode && teamShareRole==="admin" && React.createElement('div', {style:{...S.card,borderLeft:"4px solid #3b82f6"}}
+            , React.createElement('div', {style:{...S.ct,marginBottom:6}}, "☁️ チームデータ同期")
+            , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:10}},
+                "自チーム・対戦相手のメンバー情報をFirebaseに保存して他の端末と共有できます")
+            , React.createElement('div', {style:{display:"flex",gap:8}}
+              , React.createElement('button', {
+                  onClick:()=>{
+                    const data={teams:storage.teams||[],myTeam:storage.myTeam||null,
+                      opponents:storage.opponents||[],savedAt:new Date().toISOString()};
+                    fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+teamShareCode+".json",
+                      {method:"PUT",body:JSON.stringify(data)})
+                      .then(()=>showToast("✅ 保存しました"))
+                      .catch(e=>showToast("❌ 保存失敗: "+e.message));
+                  },
+                  style:{...sBt("#3b82f6"),fontSize:12,padding:"6px 14px"}
+                }, "☁️ Firebaseに保存")
+              , React.createElement('button', {
+                  onClick:()=>{
+                    if(!window.confirm("Firebaseからチームデータを読み込みます。現在のデータは上書きされます。")) return;
+                    fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+teamShareCode+".json",{cache:"no-store"})
+                      .then(r=>r.json())
+                      .then(data=>{
+                        if(!data||typeof data!=="object"){showToast("データなし");return;}
+                        setStorage(s=>({...s,
+                          teams:data.teams||s.teams,
+                          myTeam:data.myTeam!==undefined?data.myTeam:s.myTeam,
+                          opponents:data.opponents||s.opponents
+                        }));
+                        showToast("✅ 読み込みました");
+                      })
+                      .catch(e=>showToast("❌ 読み込み失敗: "+e.message));
+                  },
+                  style:{...sBt("#0369a1"),fontSize:12,padding:"6px 14px"}
+                }, "📥 読み込み")
+            )
+          )
+
 
 
         )))
@@ -8259,157 +8282,236 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
   const [fbTeamId, setFbTeamId] = useState(teamShareCode||"");
   const [fbLoading, setFbLoading] = useState(false);
   const [fbMsg, setFbMsg] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterSeason, setFilterSeason] = useState("all");
+  const [showFbLoad, setShowFbLoad] = useState(false);
 
   const loadFromFirebase = () => {
     const code = fbTeamId.trim().toUpperCase();
     if(!code){ setFbMsg("チームコードを入力してください"); return; }
     if(!fbInit()){ setFbMsg("Firebaseに接続できません"); return; }
     setFbLoading(true); setFbMsg("読み込み中...");
-
-    // team_rooms/{code}/history（新方式）、games（旧方式）、shared_teams（後方互換）を読む
     const p1 = fbDB.ref("team_rooms/"+code+"/history").once("value").catch(()=>null);
     const p2 = fbDB.ref("team_rooms/"+code+"/games").once("value").catch(()=>null);
     const p3 = fbDB.ref("shared_teams/"+code+"/games").once("value").catch(()=>null);
-
-    Promise.all([p1, p2, p3]).then(([snap1, snap2, snap3])=>{
+    Promise.all([p1,p2,p3]).then(([snap1,snap2,snap3])=>{
       setFbLoading(false);
       const toArr = (snap) => {
         if(!snap||!snap.val()) return [];
         const val = snap.val();
-        return Array.isArray(val) ? val.filter(Boolean) : Object.values(val).filter(Boolean);
+        return Array.isArray(val)?val.filter(Boolean):Object.values(val).filter(Boolean);
       };
       const seen = new Set();
-      const games = [...toArr(snap1), ...toArr(snap2), ...toArr(snap3)].filter(g=>{
+      const games = [...toArr(snap1),...toArr(snap2),...toArr(snap3)].filter(g=>{
         if(!g||!g.id||seen.has(String(g.id))) return false;
         seen.add(String(g.id)); return true;
       }).sort((a,b)=>{
         const ta=a.savedAt||a.date||""; const tb=b.savedAt||b.date||"";
         return tb.localeCompare(ta)||(b._ts||0)-(a._ts||0);
       });
-
-      if(games.length===0){
-        setFbMsg("試合データが見つかりません。チームコードを確認してください。");
-        return;
-      }
+      if(games.length===0){ setFbMsg("試合データが見つかりません"); return; }
       setFbMsg(games.length+"試合を読み込みました ✅");
       onImport(games);
     }).catch(e=>{ setFbLoading(false); setFbMsg("エラー: "+e.message); });
   };
 
-  return (
-    React.createElement('div', null
+  // シーズン一覧
+  const seasons = ["all", ...new Set((history||[]).map(g=>g.season||g.date?.slice(0,4)||"").filter(Boolean))].sort((a,b)=>b>a?1:-1);
 
-      , restoreTarget && React.createElement('div', {style:S.overlay, onClick:()=>setRestoreTarget(null)}
-          , React.createElement('div', {style:{...S.mBox,maxWidth:320}, onClick:e=>e.stopPropagation()}
-            , React.createElement('div', {style:{...S.mt,marginBottom:12}}, "👥 チーム復元")
-            , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:16}}, restoreTarget.awayTeam+" vs "+restoreTarget.homeTeam+" のチームをチームタブに復元します")
-            , (()=>{
-                const teams2 = [
-                  {name:restoreTarget.awayTeam, role:"my"},
-                  {name:restoreTarget.awayTeam, role:"opp"},
-                  {name:restoreTarget.homeTeam, role:"my"},
-                  {name:restoreTarget.homeTeam, role:"opp"},
-                ];
-                return teams2.map((t,idx)=>{
-                  const isMy = t.role==="my";
-                  const myTeamSide = t.name===restoreTarget.awayTeam ? "away" : "home";
-                  return React.createElement('button', {key:idx,
-                    onClick:()=>{
-                      if(isMy){
-                        onRestoreTeam(restoreTarget, myTeamSide);
-                      } else {
-                        // 対戦相手のみ登録（自チームは変更しない）
-                        onRestoreOpp && onRestoreOpp(restoreTarget, t.name);
-                      }
-                      setRestoreTarget(null);
-                    },
-                    style:{width:"100%",marginBottom:8,padding:"10px 14px",borderRadius:10,
-                      border:"2px solid "+(isMy?"#4ade80":"#f59e0b"),
-                      background:isMy?"#0d2a1a":"#1a1200",
-                      color:"#e2e8f0",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"left",
-                      display:"flex",alignItems:"center",gap:10}
-                  }
-                  , React.createElement('span',{style:{fontSize:16}}, isMy?"🏠":"⚔️")
-                  , React.createElement('div',null
-                    , React.createElement('div',{style:{fontSize:13,fontWeight:700,color:isMy?"#4ade80":"#fbbf24"}}, t.name)
-                    , React.createElement('div',{style:{fontSize:11,color:"#64748b",marginTop:2}}, isMy?"自チームとして登録":"対戦相手として登録")
-                  )
-                  );
-                });
-              })()
-            , React.createElement('button', {onClick:()=>setRestoreTarget(null), style:S.cBtn}, "キャンセル")
-          )
-        )
+  // フィルター適用
+  const filtered = (history||[]).filter(g=>{
+    if(filterSeason!=="all" && String(g.season||g.date?.slice(0,4)||"")!==filterSeason) return false;
+    if(searchQuery){
+      const q = searchQuery.toLowerCase();
+      const away = (g.awayTeam||"").toLowerCase();
+      const home = (g.homeTeam||"").toLowerCase();
+      const venue = (g.venue||"").toLowerCase();
+      const tour = (g.tournament||"").toLowerCase();
+      if(!away.includes(q)&&!home.includes(q)&&!venue.includes(q)&&!tour.includes(q)) return false;
+    }
+    return true;
+  });
 
-      // Firebase読み込みUI
-      , React.createElement('div', {style:{...S.card, borderLeft:"4px solid #22c55e", marginBottom:14}}
-        , React.createElement('div', {style:{...S.ct, marginBottom:8}}, "☁️ 別端末の試合履歴を読み込む")
-        , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:10}},
-            "チームコード または チームIDを入力すると、そのチームで記録した試合をこの端末の履歴に取り込めます。チームIDはチームタブの自チーム欄で確認できます。")
-        , React.createElement('div', {style:{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}
-          , React.createElement('div', {style:{flex:1,minWidth:160}}
-            , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:4}}, "チームコード or チームID")
-            , React.createElement('input', {
-                value: fbTeamId,
-                onChange: e=>setFbTeamId(e.target.value),
-                onKeyDown: e=>{ if(e.key==="Enter") loadFromFirebase(); },
-                placeholder: "チームコード or チームID",
-                style:{...S.si, width:"100%", padding:"8px 10px", fontSize:13}
-              })
-          )
+  return React.createElement('div', null
+
+    // チーム復元モーダル
+    , restoreTarget && React.createElement('div', {style:S.overlay, onClick:()=>setRestoreTarget(null)}
+        , React.createElement('div', {style:{...S.mBox,maxWidth:320}, onClick:e=>e.stopPropagation()}
+          , React.createElement('div', {style:{...S.mt,marginBottom:12}}, "👥 チーム復元")
+          , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:16}},
+              restoreTarget.awayTeam+" vs "+restoreTarget.homeTeam+" のチームを登録します")
+          , (()=>{
+              const teams2 = [
+                {name:restoreTarget.awayTeam, role:"my"},
+                {name:restoreTarget.awayTeam, role:"opp"},
+                {name:restoreTarget.homeTeam, role:"my"},
+                {name:restoreTarget.homeTeam, role:"opp"},
+              ];
+              return teams2.map((t,idx)=>{
+                const isMy = t.role==="my";
+                const myTeamSide = t.name===restoreTarget.awayTeam ? "away" : "home";
+                return React.createElement('button', {key:idx,
+                  onClick:()=>{
+                    if(isMy){ onRestoreTeam(restoreTarget, myTeamSide); }
+                    else { onRestoreOpp(restoreTarget, myTeamSide==="away"?"home":"away"); }
+                    setRestoreTarget(null);
+                    showToast("✅ 復元しました");
+                  },
+                  style:{...sBt(isMy?"#fbbf24":"#7dd3fc"),width:"100%",padding:"10px",
+                    marginBottom:6,fontSize:12,fontWeight:700}
+                }, isMy ? "🏟 "+t.name+" を自チームに" : "⚔️ "+t.name+" を対戦相手に");
+              });
+            })()
           , React.createElement('button', {
-              onClick: loadFromFirebase, disabled: fbLoading,
-              style:{...sBt("#22c55e"), padding:"9px 16px", fontSize:13, opacity:fbLoading?0.5:1}
-            }, fbLoading ? "読込中..." : "☁️ 読み込む")
+              onClick:()=>setRestoreTarget(null),
+              style:{...sBt("#475569"),width:"100%",padding:"8px",fontSize:12,marginTop:4}
+            }, "キャンセル")
         )
-        , fbMsg && React.createElement('div', {style:{
-            fontSize:12, marginTop:8,
-            color: fbMsg.includes("エラー")||fbMsg.includes("見つかり") ? "#f87171" : "#4ade80"
-          }}, fbMsg)
       )
 
-      // ローカル履歴一覧
-      , (!history||history.length===0)
-        ? React.createElement('div', {style:{...S.card,textAlign:"center",padding:30,color:"#475569"}}
-            , React.createElement('div', {style:{fontSize:28,marginBottom:8}}, "🗂")
-            , React.createElement('div', null, "保存済みの試合はありません")
-            , React.createElement('div', {style:{fontSize:12,marginTop:6}}, "試合終了または「💾 保存」で自動保存されます")
-          )
-        : history.map((g,i)=>{
-            const awayTotal = Object.values(g.awayScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
-            const homeTotal = Object.values(g.homeScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
-            return React.createElement('div', {key:g.id||i, style:{...S.card,marginBottom:10}}
-              , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:6}}
-                , React.createElement('div', {style:{fontSize:11,color:"#64748b"}}, g.date||"—", g.venue?" @ "+g.venue:"")
-                , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:4,flexWrap:"nowrap"}}
-                  , React.createElement('span', {style:{color:"#fbbf24",fontSize:12,flex:"1 1 0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}, g.awayTeam)
-                  , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:"#fbbf24",flexShrink:0}}, awayTotal)
-                  , React.createElement('span', {style:{color:"#475569",fontSize:11,flexShrink:0,margin:"0 2px"}}, "—")
-                  , React.createElement('span', {style:{fontSize:18,fontWeight:900,color:"#7dd3fc",flexShrink:0}}, homeTotal)
-                  , React.createElement('span', {style:{color:"#7dd3fc",fontSize:12,flex:"1 1 0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0,textAlign:"right"}}, g.homeTeam)
-                )
-                , React.createElement('div', {style:{fontSize:11,color:"#475569"}}
-                  , g.finished?"✅ 試合終了":"⏸ 未完了"
-                  , g.savedAt?" · "+g.savedAt:""
-                )
-                , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
-                  , React.createElement('button', {onClick:()=>onLoad(g),
-                      style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}}, "📂 読込")
-                  , React.createElement('button', {onClick:()=>setRestoreTarget(g),
-                      style:{...sBt("#f59e0b"),fontSize:11,padding:"4px 10px"}}, "👥 チーム復元")
-                  , React.createElement('button', {onClick:()=>{ if(onExcel) onExcel(g); else showToast("❌ Excel機能が利用できません"); },
-                      style:{...sBt("#16a34a"),fontSize:11,padding:"4px 10px"}}, "📊 Excel")
-                  , React.createElement('button', {onClick:()=>onUpload(g),
-                      style:{...sBt("#7c3aed"),fontSize:11,padding:"4px 10px"}}, "☁️ 共有")
-                  , React.createElement('button', {onClick:()=>onDelete(g.id),
-                      style:{...sBt("#dc2626",true),fontSize:11,padding:"4px 10px"}}, "🗑")
-                )
-              )
-            );
-          })
+    // ===== ヘッダー：件数 + フィルター =====
+    , React.createElement('div', {style:{...S.card,marginBottom:8,padding:"12px 14px"}}
+      , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:10}}
+        , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#e2e8f0"}},
+            "📚 試合履歴")
+        , React.createElement('span', {style:{
+            fontSize:11,color:"#64748b",background:"#1e3a5f",
+            borderRadius:10,padding:"2px 8px"
+          }}, (history||[]).length+"試合")
+        , React.createElement('button', {
+            onClick:()=>setShowFbLoad(v=>!v),
+            style:{...sBt("#475569",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
+          }, showFbLoad ? "▲ 閉じる" : "☁️ 取得")
+      )
+
+      // 検索
+      , React.createElement('input', {
+          type:"text",
+          placeholder:"チーム名・球場・大会名で検索...",
+          value:searchQuery,
+          onChange:e=>setSearchQuery(e.target.value),
+          style:{...S.inp,width:"100%",marginBottom:8,boxSizing:"border-box"}
+        })
+
+      // シーズンフィルター
+      , seasons.length>1 && React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
+        , seasons.map(s=>React.createElement('button', {
+            key:s,
+            onClick:()=>setFilterSeason(s),
+            style:{
+              fontSize:11,padding:"3px 10px",borderRadius:12,cursor:"pointer",
+              background:filterSeason===s?"#3b82f6":"transparent",
+              border:"1px solid "+(filterSeason===s?"#3b82f6":"#2a4a7a"),
+              color:filterSeason===s?"#fff":"#7db8e8",fontWeight:filterSeason===s?700:400
+            }
+          }, s==="all"?"すべて":s+"年"))
+      )
+
+      // Firebase読み込みパネル（展開式）
+      , showFbLoad && React.createElement('div', {style:{
+          marginTop:10,borderTop:"1px solid #1e3a5f",paddingTop:10
+        }}
+        , React.createElement('div', {style:{fontSize:11,color:"#64748b",marginBottom:8}},
+            "別端末・チームコードから履歴を読み込む")
+        , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:6}}
+          , React.createElement('input', {
+              placeholder:"チームコード",
+              value:fbTeamId,
+              onChange:e=>setFbTeamId(e.target.value.toUpperCase()),
+              style:{...S.inp,flex:1,fontFamily:"monospace",letterSpacing:2}
+            })
+          , React.createElement('button', {
+              onClick:loadFromFirebase,
+              disabled:fbLoading,
+              style:{...sBt("#22c55e"),fontSize:12,padding:"6px 14px",whiteSpace:"nowrap"}
+            }, fbLoading?"読込中...":"📥 読み込む")
+        )
+        , fbMsg && React.createElement('div', {style:{fontSize:11,color:"#4ade80"}}, fbMsg)
+      )
     )
+
+    // ===== 試合リスト =====
+    , filtered.length===0
+      ? React.createElement('div', {style:{...S.card,textAlign:"center",color:"#475569",padding:"30px 20px"}}
+        , React.createElement('div', {style:{fontSize:32,marginBottom:8}}, "📭")
+        , React.createElement('div', {style:{fontSize:13}},
+            searchQuery||filterSeason!=="all" ? "条件に合う試合がありません" : "保存された試合がありません")
+      )
+      : filtered.map((g,idx)=>{
+          const awayScore = Object.values(g.awayScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
+          const homeScore = Object.values(g.homeScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0);
+          const awayWin = awayScore > homeScore;
+          const homeWin = homeScore > awayScore;
+          const dateStr = g.date||(g.savedAt?g.savedAt.split(" ")[0]:"");
+
+          return React.createElement('div', {key:g.id||idx, style:{
+            ...S.card,
+            borderLeft: g.finished ? "4px solid #334155" : "4px solid #f97316",
+            padding:"12px 14px",marginBottom:8
+          }}
+            // 上部：日付・球場・大会
+            , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:6,marginBottom:8}}
+              , dateStr && React.createElement('span', {style:{fontSize:11,color:"#64748b"}}, dateStr)
+              , g.venue && React.createElement('span', {style:{fontSize:11,color:"#475569"}}, "@ "+g.venue)
+              , g.tournament && React.createElement('span', {style:{
+                  fontSize:10,color:"#fbbf24",background:"#fbbf2415",
+                  borderRadius:4,padding:"1px 6px",marginLeft:"auto"
+                }}, g.tournament)
+              , !g.finished && React.createElement('span', {style:{
+                  fontSize:10,color:"#f97316",background:"#f9731615",
+                  borderRadius:4,padding:"1px 6px",marginLeft:g.tournament?"4px":"auto"
+                }}, "進行中")
+            )
+
+            // スコア表示
+            , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:10}}
+              , React.createElement('div', {style:{flex:1}}
+                , React.createElement('div', {style:{fontSize:12,color:"#fbbf24",fontWeight:700,marginBottom:2}},
+                    g.awayTeam||"アウェイ")
+                , React.createElement('div', {style:{
+                    fontSize:28,fontWeight:900,
+                    color:awayWin?"#fbbf24":"#94a3b8",lineHeight:1
+                  }}, awayScore)
+              )
+              , React.createElement('div', {style:{fontSize:14,color:"#334155",fontWeight:700}}, "—")
+              , React.createElement('div', {style:{flex:1,textAlign:"right"}}
+                , React.createElement('div', {style:{fontSize:12,color:"#7dd3fc",fontWeight:700,marginBottom:2}},
+                    g.homeTeam||"ホーム")
+                , React.createElement('div', {style:{
+                    fontSize:28,fontWeight:900,
+                    color:homeWin?"#7dd3fc":"#94a3b8",lineHeight:1
+                  }}, homeScore)
+              )
+            )
+
+            // アクションボタン
+            , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
+              , React.createElement('button', {
+                  onClick:()=>onLoad(g),
+                  style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}
+                }, "📂 読み込む")
+              , React.createElement('button', {
+                  onClick:()=>onExcel(g),
+                  style:{...sBt("#16a34a",true),fontSize:11,padding:"4px 10px"}
+                }, "📊 Excel")
+              , React.createElement('button', {
+                  onClick:()=>setRestoreTarget(g),
+                  style:{...sBt("#475569",true),fontSize:11,padding:"4px 10px"}
+                }, "👥 チーム復元")
+              , onUpload && React.createElement('button', {
+                  onClick:()=>onUpload(g),
+                  style:{...sBt("#475569",true),fontSize:11,padding:"4px 10px"}
+                }, "☁️ UP")
+              , React.createElement('button', {
+                  onClick:()=>onDelete(g.id),
+                  style:{...sBt("#dc2626",true),fontSize:11,padding:"4px 10px",marginLeft:"auto"}
+                }, "🗑")
+            )
+          );
+        })
   );
 }
+
 
 function SpecialPlayModal({ teamLabel, bases, inning, onCommit, onCancel }) {
   const [selCode, setSelCode] = useState(null);

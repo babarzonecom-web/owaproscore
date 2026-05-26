@@ -2477,7 +2477,7 @@ function App() {
       if(newGame && newGame.id){
         const hist = [...(s.history||[])];
         const idx = hist.findIndex(h=>h.id===newGame.id);
-        if(idx>=0) hist[idx]={...newGame, savedAt:hist[idx].savedAt};
+        if(idx>=0) hist[idx]={...newGame, savedAt:hist[idx].savedAt||new Date().toLocaleString("ja-JP")};
         return {...s, currentGame:newGame, undoStack:newUndoStack.slice(0,30), history:hist};
       }
       return {...s, currentGame:newGame, undoStack:newUndoStack.slice(0,30)};
@@ -3888,7 +3888,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v428")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v429")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3974,7 +3974,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v428")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v429")
         )
 
         // ===== 新規チーム作成 =====
@@ -6229,9 +6229,9 @@ function App() {
                   game:game, mutGame:mutGame
                 })
               ,React.createElement('button',{
-                  onClick:()=>setModal(null),
-                  style:{...sBt("#334155"),width:"100%",padding:"10px",fontSize:13}
-                },"閉じる")
+                  onClick:()=>{ setModal(null); saveGame(true); showToast("✅ 投手データを保存しました"); },
+                  style:{...sBt("#3b82f6"),width:"100%",padding:"10px",fontSize:13,fontWeight:700}
+                },"✅ 保存して閉じる")
             )
           );
         }

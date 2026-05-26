@@ -3795,7 +3795,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v422")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v424")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3881,7 +3881,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v422")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v424")
         )
 
         // ===== 新規チーム作成 =====
@@ -5016,15 +5016,14 @@ function App() {
                       )
                     )
                     , React.createElement('tbody', null
-                      , pitchers.filter((p,i)=>{
-                          const isDefault = /^投手\d+$/.test(p.name||'');
-                          const inLog = ((game[side+"PitcherLog"]||[]).some(l=>l.pitcherIdx===i));
-                          // デフォルト名はpitcherLogに明示登場 or 現在登板中のみ表示
-                          // 非デフォルト名は常に表示（実名を入力した投手）
+                      , pitchers.map((p,i)=>({p,i})).filter(({p,i})=>{
+                          if(!p||!p.name) return false; // nameなしは非表示
+                          const isDefault = /^投手\d+$/.test(p.name);
+                          const inLog = (game[side+"PitcherLog"]||[]).some(l=>l.pitcherIdx===i);
                           if(isDefault) return inLog || i===curPIdx;
                           return true;
-                        }).map((p,_i) => {
-                          const i = pitchers.indexOf(p); // 元のインデックスを保持
+                        }).map(({p,i}) => {
+                          // iは元のpitchers配列のindex（正確）
                           const isCur = !game.finished && i===curPIdx;
                           const auto = (pitcherStats[side]||[])[i]||{};
                           const rawIp = auto.autoIp||0;
@@ -5223,41 +5222,12 @@ function App() {
                 )
                 , !isReadOnly && React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginTop:10,flexWrap:"wrap"}}
                     , React.createElement('button', {
-                        onClick:()=>{
-                          if(pitEditMode){
-                            if(window.confirm("自責点・投球回の修正を確定しますか？")){
-                              setPitEditMode(false);
-                            } else {
-                              mutGame(g=>({...g,
-                                [side+"Pitchers"]:g[side+"Pitchers"].map(p=>({
-                                  ...p, manualOverride:false,
-                                  er:undefined, autoRuns:undefined
-                                }))
-                              }));
-                              setPitEditMode(false);
-                            }
-                          } else {
-                            setPitEditMode(true);
-                          }
-                        },
-                        style:{padding:"5px 14px",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,
-                          background:pitEditMode?"#4c1d9522":"transparent",
-                          border:"1px solid "+(pitEditMode?"#a78bfa":"#2a4a7a"),
-                          color:pitEditMode?"#a78bfa":"#7db8e8"}
-                      }, pitEditMode?"✏️ 修正中（完了）":"✏️ 手動修正")
-                    , pitEditMode && React.createElement('button', {
-                        onClick:()=>addPitcher(side),
-                        style:{background:"transparent",border:"1px dashed #a78bfa",
-                          borderRadius:7,color:"#a78bfa",padding:"5px 14px",cursor:"pointer",fontSize:12}
-                      }, "＋ 投手を追加")
-                    , React.createElement('span', {style:{fontSize:11,color:"#475569"}},
-                        pitEditMode?"投手の追加・削除・数値修正ができます":"※ 投手名タップで編集。「登板」ボタンで投手交代。")
-                    , !isReadOnly && React.createElement('button', {
                         onClick:()=>setModal({step:"edit_pitcher_log", side}),
-                        style:{background:"transparent",border:"1px dashed #64748b",
-                          borderRadius:7,color:"#64748b",padding:"5px 14px",cursor:"pointer",fontSize:12}
-                      }, "📋 登板記録を修正")
-
+                        style:{padding:"5px 14px",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,
+                          background:"transparent", border:"1px solid #a78bfa", color:"#a78bfa"}
+                      }, "✏️ 投手・登板記録を修正")
+                    , React.createElement('span', {style:{fontSize:11,color:"#475569"}},
+                        "投手の追加・登板記録・自責点・投球回を修正できます")
                   )
               );
             })
@@ -5951,152 +5921,291 @@ function App() {
 
         
         if(modal.step==="edit_pitcher_log") {
-          const side = modal.side; // "away" or "home"
+          const side = modal.side;
           const logKey = side+"PitcherLog";
-          const pitchers = game[side+"Pitchers"]||[];
-          const currentLog = [...(game[logKey]||[])].sort((a,b)=>
-            a.fromInning!==b.fromInning ? a.fromInning-b.fromInning :
-            (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1) || (a.outsAtStart||0)-(b.outsAtStart||0)
-          );
-          const halfLabel = side==="away" ? "表" : "裏";
           const pitchHalf = side==="away" ? "top" : "bottom";
-
-          return React.createElement('div', {style:S.overlay, onClick:()=>setModal(null)}
-            , React.createElement('div', {style:{...S.mBox, maxWidth:420, maxHeight:"80vh", overflowY:"auto"}, onClick:e=>e.stopPropagation()}
-              , React.createElement('div', {style:{...S.mt, marginBottom:12}}, "📋 登板記録を修正 — "+(side==="away"?game.awayTeam:game.homeTeam))
-              , React.createElement('div', {style:{fontSize:11,color:"#94a3b8",marginBottom:12}},
-                  "投手の登板開始回・アウト数を修正できます。「追加」で新しい登板記録を追加します。")
-
-              // 現在のログ一覧
-              , currentLog.map((entry, li)=>{
-                  const pitcher = pitchers[entry.pitcherIdx];
-                  return React.createElement('div', {key:li, style:{
-                    background:"#0d1f35",border:"1px solid #1e3a5f",borderRadius:8,
-                    padding:"10px 12px",marginBottom:8
+          const pitchers = game[side+"Pitchers"]||[];
+          const regTeam = teams.find(t=>t.name===(side==="away"?game.awayTeam:game.homeTeam));
+          const memberCands = (regTeam&&regTeam.members||[])
+            .map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean);
+          const sortedLog = [...(game[logKey]||[])].sort((a,b)=>
+            a.fromInning!==b.fromInning?a.fromInning-b.fromInning:
+            (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||(a.outsAtStart||0)-(b.outsAtStart||0)
+          );
+          const pStats = computePitcherStats(game);
+          const autoArr = pStats[side]||[];
+          const AddPitcherForm = ()=>{
+            const [newName,setNewName] = React.useState("");
+            const [newInn,setNewInn]   = React.useState(game.inning||1);
+            const [newOuts,setNewOuts] = React.useState(0);
+            const existNames = pitchers.map(p=>p.name||"").filter(Boolean);
+            const candNames  = memberCands.filter(n=>!existNames.includes(n));
+            return React.createElement('div',{style:{
+                background:"#0a1628",border:"1px dashed #3b82f6",borderRadius:10,
+                padding:"12px",marginBottom:10
+              }}
+              ,React.createElement('div',{style:{fontSize:12,fontWeight:700,color:"#60a5fa",marginBottom:10}},"＋ 投手を追加（登板記録も作成）")
+              ,React.createElement('div',{style:{marginBottom:8}}
+                ,React.createElement('div',{style:{fontSize:11,color:"#64748b",marginBottom:4}},"投手名")
+                ,React.createElement('input',{
+                    type:"text",value:newName,
+                    onChange:e=>setNewName(e.target.value),
+                    placeholder:"名前を入力",
+                    style:{width:"100%",background:"#0d1f35",border:"1px solid #2a4a7a",
+                      borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:12,boxSizing:"border-box"}
+                  })
+                ,candNames.length>0&&React.createElement('div',{style:{display:"flex",gap:4,flexWrap:"wrap",marginTop:6}}
+                  ,candNames.map(n=>React.createElement('button',{
+                    key:n,onClick:()=>setNewName(n),
+                    style:{fontSize:10,padding:"2px 8px",borderRadius:4,
+                      background:newName===n?"#1d4ed8":"#1e3a5f",
+                      border:"1px solid "+(newName===n?"#3b82f6":"#2a4a7a"),
+                      color:"#e2e8f0",cursor:"pointer"}
+                  },n))
+                )
+              )
+              ,React.createElement('div',{style:{display:"flex",gap:10,marginBottom:10}}
+                ,React.createElement('label',{style:{flex:1,fontSize:11,color:"#64748b",display:"flex",flexDirection:"column",gap:4}}
+                  ,"登板開始回"
+                  ,React.createElement('input',{
+                      type:"number",min:1,max:15,value:newInn,
+                      onChange:e=>setNewInn(Number(e.target.value)),
+                      style:{background:"#0d1f35",border:"1px solid #2a4a7a",
+                        borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:12,width:"100%"}
+                    })
+                )
+                ,React.createElement('label',{style:{flex:1,fontSize:11,color:"#64748b",display:"flex",flexDirection:"column",gap:4}}
+                  ,"開始アウト数"
+                  ,React.createElement('select',{
+                      value:newOuts,onChange:e=>setNewOuts(Number(e.target.value)),
+                      style:{background:"#0d1f35",border:"1px solid #2a4a7a",
+                        borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:12,width:"100%"}
+                    }
+                    ,[0,1,2].map(o=>React.createElement('option',{key:o,value:o},o+"アウト"))
+                  )
+                )
+              )
+              ,React.createElement('button',{
+                  onClick:()=>{
+                    const name=newName.trim();
+                    if(!name){alert("投手名を入力してください");return;}
+                    mutGame(g=>{
+                      const ps=[...g[side+"Pitchers"]];
+                      let pidx=ps.findIndex(p=>p.name===name);
+                      if(pidx<0){
+                        pidx=ps.length;
+                        ps.push({id:pidx+1,name,ip:0,h:0,er:0,bb:0,k:0,
+                          pitchCount:0,autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0,
+                          autoHbp:0,autoHr:0,autoRuns:0,manualOverride:false});
+                      }
+                      const newLog=[...(g[logKey]||[]),{
+                        pitcherIdx:pidx,fromInning:newInn,
+                        fromHalf:pitchHalf,outsAtStart:newOuts,atBatSeq:-1
+                      }];
+                      return {...g,[side+"Pitchers"]:ps,[logKey]:newLog};
+                    });
+                    setNewName(""); setNewInn(game.inning||1); setNewOuts(0);
+                  },
+                  style:{width:"100%",background:"#1d4ed8",border:"none",
+                    borderRadius:7,color:"#fff",padding:"9px",cursor:"pointer",
+                    fontSize:13,fontWeight:700}
+                },"追加する")
+            );
+          };
+          return React.createElement('div',{style:S.overlay,onClick:()=>setModal(null)}
+            ,React.createElement('div',{
+                style:{...S.mBox,maxWidth:460,maxHeight:"88vh",overflowY:"auto",padding:"16px"},
+                onClick:e=>e.stopPropagation()
+              }
+              ,React.createElement('div',{style:{...S.mt,marginBottom:4}},"✏️ 投手・登板記録を修正")
+              ,React.createElement('div',{style:{fontSize:11,color:"#64748b",marginBottom:14}},
+                  side==="away"?(game.awayTeam||"アウェイ"):(game.homeTeam||"ホーム"))
+              ,sortedLog.map((entry,li)=>{
+                  const pitcher=pitchers[entry.pitcherIdx]||{};
+                  const auto=autoArr[entry.pitcherIdx]||{};
+                  const autoIpOuts=Math.floor((auto.autoIp||0)/10)*3+((auto.autoIp||0)%10);
+                  const effectiveIp=pitcher.manualIp!==undefined?pitcher.manualIp:autoIpOuts;
+                  const ipDisp=Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?effectiveIp%3+"/3":"");
+                  const er=pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:(auto.autoEr||0);
+                  const entryKey=JSON.stringify(entry);
+                  return React.createElement('div',{key:li,style:{
+                    background:"#0d1f35",border:"1px solid #1e3a5f",borderRadius:10,
+                    padding:"12px",marginBottom:10
                   }}
-                    , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:8}}
-                      , React.createElement('span', {style:{fontWeight:700,color:"#7dd3fc",fontSize:13}},
-                          pitcher ? pitcher.name : "投手"+(entry.pitcherIdx+1))
-                      , React.createElement('span', {style:{fontSize:11,color:"#475569",marginLeft:"auto"}},
-                          "投手["+(entry.pitcherIdx)+"]")
-                    )
-                    // 投手選択
-                    , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}
-                      , React.createElement('label', {style:{fontSize:11,color:"#64748b",display:"flex",flexDirection:"column",gap:3}}
-                        , "投手"
-                        , React.createElement('select', {
-                            value: entry.pitcherIdx,
-                            onChange: e=>{
-                              const newIdx = Number(e.target.value);
-                              mutGame(g=>{
-                                const log = [...(g[logKey]||[])];
-                                const realIdx = (g[logKey]||[]).indexOf(entry);
-                                // 元のentryと一致するものを探して更新
-                                const entryStr = JSON.stringify(entry);
-                                const target = log.findIndex(l=>JSON.stringify(l)===entryStr);
-                                if(target>=0) log[target]={...log[target], pitcherIdx:newIdx};
-                                return {...g, [logKey]:log};
-                              });
-                            },
-                            style:{background:"#0a1628",border:"1px solid #2a4a7a",borderRadius:4,
-                              color:"#e2e8f0",padding:"3px 6px",fontSize:12}
-                          }
-                          , pitchers.map((p,pi)=>
-                              React.createElement('option',{key:pi,value:pi}, p.name||"投手"+(pi+1))
-                            )
-                        )
-                      )
-                      // 登板開始回
-                      , React.createElement('label', {style:{fontSize:11,color:"#64748b",display:"flex",flexDirection:"column",gap:3}}
-                        , "開始回"
-                        , React.createElement('input', {
-                            type:"number", min:1, max:15,
-                            value: entry.fromInning,
-                            onChange: e=>{
-                              const newInn = Number(e.target.value);
-                              if(isNaN(newInn)||newInn<1) return;
-                              mutGame(g=>{
-                                const log = [...(g[logKey]||[])];
-                                const entryStr = JSON.stringify(entry);
-                                const target = log.findIndex(l=>JSON.stringify(l)===entryStr);
-                                if(target>=0) log[target]={...log[target], fromInning:newInn, atBatSeq:-1};
-                                return {...g, [logKey]:log};
-                              });
-                            },
-                            style:{width:52,background:"#0a1628",border:"1px solid #2a4a7a",
-                              borderRadius:4,color:"#e2e8f0",padding:"3px 6px",fontSize:12}
-                          })
-                      )
-                      // 開始アウト数
-                      , React.createElement('label', {style:{fontSize:11,color:"#64748b",display:"flex",flexDirection:"column",gap:3}}
-                        , "開始アウト"
-                        , React.createElement('select', {
-                            value: entry.outsAtStart||0,
-                            onChange: e=>{
-                              const newOuts = Number(e.target.value);
-                              mutGame(g=>{
-                                const log = [...(g[logKey]||[])];
-                                const entryStr = JSON.stringify(entry);
-                                const target = log.findIndex(l=>JSON.stringify(l)===entryStr);
-                                if(target>=0) log[target]={...log[target], outsAtStart:newOuts, atBatSeq:-1};
-                                return {...g, [logKey]:log};
-                              });
-                            },
-                            style:{background:"#0a1628",border:"1px solid #2a4a7a",borderRadius:4,
-                              color:"#e2e8f0",padding:"3px 6px",fontSize:12}
-                          }
-                          , [0,1,2].map(o=>React.createElement('option',{key:o,value:o},o+"アウト"))
-                        )
-                      )
-                      // 削除ボタン（先発エントリは削除不可）
-                      , li > 0 && React.createElement('button', {
+                    ,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8,marginBottom:10}}
+                      ,React.createElement('span',{style:{
+                          background:li===0?"#1d4ed8":"#334155",borderRadius:4,
+                          fontSize:10,color:"#fff",padding:"2px 7px",fontWeight:700,flexShrink:0
+                        }},li===0?"先発":"交代"+li)
+                      ,React.createElement('span',{style:{fontWeight:700,color:"#e2e8f0",fontSize:13,flex:1}},
+                          pitcher.name||"投手"+(entry.pitcherIdx+1))
+                      ,li>0&&React.createElement('button',{
                           onClick:()=>{
                             if(!window.confirm("この登板記録を削除しますか？")) return;
                             mutGame(g=>{
-                              const entryStr = JSON.stringify(entry);
-                              let removed = false;
-                              const log = (g[logKey]||[]).filter(l=>{
-                                if(!removed && JSON.stringify(l)===entryStr){ removed=true; return false; }
+                              let removed=false;
+                              const newLog=(g[logKey]||[]).filter(l=>{
+                                if(!removed&&JSON.stringify(l)===entryKey){removed=true;return false;}
                                 return true;
                               });
-                              return {...g, [logKey]:log};
+                              return {...g,[logKey]:newLog};
                             });
                           },
-                          style:{alignSelf:"flex-end",background:"#7f1d1d33",border:"1px solid #dc2626",
-                            borderRadius:6,color:"#f87171",padding:"4px 10px",cursor:"pointer",fontSize:11}
-                        }, "削除")
+                          style:{fontSize:10,padding:"2px 8px",borderRadius:5,cursor:"pointer",
+                            background:"#7f1d1d33",border:"1px solid #dc2626",color:"#f87171"}
+                        },"削除")
+                    )
+                    ,React.createElement('div',{style:{marginBottom:8}}
+                      ,React.createElement('div',{style:{fontSize:11,color:"#64748b",marginBottom:4}},"投手を変更")
+                      ,React.createElement('select',{
+                          value:entry.pitcherIdx,
+                          onChange:e=>{
+                            const newIdx=Number(e.target.value);
+                            mutGame(g=>{
+                              const log=[...(g[logKey]||[])];
+                              const t=log.findIndex(l=>JSON.stringify(l)===entryKey);
+                              if(t>=0) log[t]={...log[t],pitcherIdx:newIdx};
+                              return {...g,[logKey]:log};
+                            });
+                          },
+                          style:{width:"100%",background:"#0a1628",border:"1px solid #2a4a7a",
+                            borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:12}
+                        }
+                        ,pitchers.map((p,pi)=>React.createElement('option',{key:pi,value:pi},
+                            (p.name||"投手"+(pi+1))+(pi===curPIdx?" ▶ 登板中":"")))
+                      )
+                    )
+                    ,React.createElement('div',{style:{display:"flex",gap:10,marginBottom:10}}
+                      ,React.createElement('label',{style:{flex:1,fontSize:11,color:"#64748b",display:"flex",flexDirection:"column",gap:4}}
+                        ,"登板開始回"
+                        ,React.createElement('input',{
+                            type:"number",min:1,max:15,value:entry.fromInning,
+                            disabled:li===0,
+                            onChange:e=>{
+                              const v=Number(e.target.value);
+                              if(isNaN(v)||v<1) return;
+                              mutGame(g=>{
+                                const log=[...(g[logKey]||[])];
+                                const t=log.findIndex(l=>JSON.stringify(l)===entryKey);
+                                if(t>=0) log[t]={...log[t],fromInning:v,atBatSeq:-1};
+                                return {...g,[logKey]:log};
+                              });
+                            },
+                            style:{background:"#0a1628",border:"1px solid #2a4a7a",
+                              borderRadius:6,color:li===0?"#475569":"#e2e8f0",
+                              padding:"6px 8px",fontSize:12,width:"100%"}
+                          })
+                      )
+                      ,React.createElement('label',{style:{flex:1,fontSize:11,color:"#64748b",display:"flex",flexDirection:"column",gap:4}}
+                        ,"開始アウト数"
+                        ,React.createElement('select',{
+                            value:entry.outsAtStart||0,disabled:li===0,
+                            onChange:e=>{
+                              const v=Number(e.target.value);
+                              mutGame(g=>{
+                                const log=[...(g[logKey]||[])];
+                                const t=log.findIndex(l=>JSON.stringify(l)===entryKey);
+                                if(t>=0) log[t]={...log[t],outsAtStart:v,atBatSeq:-1};
+                                return {...g,[logKey]:log};
+                              });
+                            },
+                            style:{background:"#0a1628",border:"1px solid #2a4a7a",
+                              borderRadius:6,color:li===0?"#475569":"#e2e8f0",
+                              padding:"6px 8px",fontSize:12,width:"100%"}
+                          }
+                          ,[0,1,2].map(o=>React.createElement('option',{key:o,value:o},o+"アウト"))
+                        )
+                      )
+                    )
+                    ,React.createElement('div',{style:{
+                        display:"flex",gap:6,flexWrap:"wrap",
+                        background:"#0a1628",borderRadius:6,padding:"8px 10px",marginBottom:8
+                      }}
+                      ,[["投球回",ipDisp],["被安打",auto.autoH||0],["四球",auto.autoBb||0],
+                        ["三振",auto.autoK||0],["死球",auto.autoHbp||0],["失点",auto.autoRuns||0]
+                       ].map(([label,val])=>React.createElement('div',{key:label,style:{textAlign:"center",minWidth:44}}
+                          ,React.createElement('div',{style:{fontSize:10,color:"#475569"}},label)
+                          ,React.createElement('div',{style:{fontSize:13,fontWeight:700,color:"#e2e8f0"}},val)
+                        ))
+                    )
+                    ,React.createElement('div',{style:{display:"flex",gap:10}}
+                      ,React.createElement('label',{style:{flex:1,fontSize:11,color:"#f87171",display:"flex",flexDirection:"column",gap:4}}
+                        ,"自責点（手動修正）"
+                        ,React.createElement('input',{
+                            type:"number",min:0,
+                            defaultValue:pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:"",
+                            placeholder:"自動: "+(auto.autoEr||0),
+                            key:"er_"+entry.pitcherIdx+"_"+er,
+                            onBlur:e=>{
+                              const v=e.target.value.trim();
+                              const pi=entry.pitcherIdx;
+                              mutGame(g=>{
+                                const ps=[...g[side+"Pitchers"]];
+                                if(!ps[pi]) return g;
+                                if(v==="") ps[pi]={...ps[pi],manualOverride:false,er:undefined};
+                                else{const n=parseInt(v);if(!isNaN(n))ps[pi]={...ps[pi],er:n,autoEr:n,manualOverride:true};}
+                                return {...g,[side+"Pitchers"]:ps};
+                              });
+                            },
+                            style:{background:"#0a1628",border:"1px solid #dc2626",
+                              borderRadius:6,color:"#f87171",padding:"6px 8px",fontSize:12,width:"100%"}
+                          })
+                        ,React.createElement('span',{style:{fontSize:9,color:"#475569"}},"空欄で自動計算に戻す")
+                      )
+                      ,React.createElement('label',{style:{flex:1,fontSize:11,color:"#a78bfa",display:"flex",flexDirection:"column",gap:4}}
+                        ,"投球回補正（+/−アウト）"
+                        ,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:6}}
+                          ,React.createElement('button',{
+                              style:{width:28,height:28,borderRadius:4,border:"1px solid #a78bfa",
+                                background:"#4c1d9522",color:"#a78bfa",cursor:"pointer",fontSize:16,fontWeight:900},
+                              onClick:()=>mutGame(g=>{
+                                const ps=[...g[side+"Pitchers"]];
+                                const pi=entry.pitcherIdx;
+                                if(!ps[pi]) return g;
+                                const cur=ps[pi].manualIp!==undefined?ps[pi].manualIp:autoIpOuts;
+                                ps[pi]={...ps[pi],manualIp:Math.max(0,cur-1)};
+                                return {...g,[side+"Pitchers"]:ps};
+                              })
+                            },"−")
+                          ,React.createElement('span',{style:{fontSize:12,color:"#e2e8f0",minWidth:40,textAlign:"center"}},ipDisp)
+                          ,React.createElement('button',{
+                              style:{width:28,height:28,borderRadius:4,border:"1px solid #a78bfa",
+                                background:"#4c1d9522",color:"#a78bfa",cursor:"pointer",fontSize:16,fontWeight:900},
+                              onClick:()=>mutGame(g=>{
+                                const ps=[...g[side+"Pitchers"]];
+                                const pi=entry.pitcherIdx;
+                                if(!ps[pi]) return g;
+                                const cur=ps[pi].manualIp!==undefined?ps[pi].manualIp:autoIpOuts;
+                                ps[pi]={...ps[pi],manualIp:Math.min(90,cur+1)};
+                                return {...g,[side+"Pitchers"]:ps};
+                              })
+                            },"+")
+                          ,pitcher.manualIp!==undefined&&React.createElement('button',{
+                              style:{fontSize:10,padding:"2px 6px",borderRadius:4,
+                                border:"1px solid #475569",background:"transparent",
+                                color:"#64748b",cursor:"pointer"},
+                              onClick:()=>mutGame(g=>{
+                                const ps=[...g[side+"Pitchers"]];
+                                const pi=entry.pitcherIdx;
+                                if(ps[pi]) ps[pi]={...ps[pi],manualIp:undefined};
+                                return {...g,[side+"Pitchers"]:ps};
+                              })
+                            },"リセット")
+                        )
+                      )
                     )
                   );
                 })
-
-              // 新規追加ボタン
-              , React.createElement('button', {
-                  onClick:()=>{
-                    // 最後の登板記録の次の回から追加
-                    const lastEntry = currentLog[currentLog.length-1];
-                    const newEntry = {
-                      pitcherIdx: 0,
-                      fromInning: lastEntry ? lastEntry.fromInning+1 : 1,
-                      fromHalf: pitchHalf,
-                      outsAtStart: 0,
-                      atBatSeq: -1,
-                    };
-                    mutGame(g=>({...g, [logKey]:[...(g[logKey]||[]), newEntry]}));
-                  },
-                  style:{width:"100%",background:"transparent",border:"1px dashed #3b82f6",
-                    borderRadius:8,color:"#60a5fa",padding:"10px",cursor:"pointer",
-                    fontSize:13,fontWeight:700,marginTop:4}
-                }, "＋ 登板記録を追加")
-
-              , React.createElement('button', {
+              ,React.createElement(AddPitcherForm,null)
+              ,React.createElement('button',{
                   onClick:()=>setModal(null),
-                  style:{...sBt("#334155"),width:"100%",padding:"10px",fontSize:13,marginTop:8}
-                }, "閉じる")
+                  style:{...sBt("#334155"),width:"100%",padding:"10px",fontSize:13}
+                },"閉じる")
             )
           );
         }
 
-        if(modal.step==="confirm_delete") return (
+                if(modal.step==="confirm_delete") return (
           React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
             , React.createElement('div', { style: {...S.mBox,maxWidth:300}, onClick: e=>e.stopPropagation(),}
               , React.createElement('div', { style: {...S.mt,marginBottom:8},}, "🗑 試合を削除" )

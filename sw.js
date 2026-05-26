@@ -1,5 +1,5 @@
-// v1039-auto-update
-const SW_VERSION = 'v1039';
+// v1040-auto-update
+const SW_VERSION = 'v1040';
 
 self.addEventListener('install', e => {
   self.skipWaiting();

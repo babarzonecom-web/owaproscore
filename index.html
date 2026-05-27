@@ -2169,6 +2169,7 @@ function App() {
   const [newSeason, setNewSeason] = useState(()=>new Date().getFullYear());
   const [newTournament, setNewTournament] = useState(null);
   const [pitEditMode, setPitEditMode] = useState(false);
+  const [scoreOpen, setScoreOpen] = useState(false); // 速報タブ スコア展開
   const [tournament, setTournament] = useState(null); // 現在参加中の大会データ
   const [tournamentCode, setTournamentCode] = useState(""); // 入力中のコード
   const [tournamentMsg, setTournamentMsg] = useState("");
@@ -3888,7 +3889,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v432")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v433")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3974,7 +3975,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v432")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v433")
         )
 
         // ===== 新規チーム作成 =====
@@ -4243,7 +4244,6 @@ function App() {
               ? (g.endReason==="cold"?`C(${g.endInning||g.inning}回)`:g.endReason==="weather"?"降雨C":g.endReason==="dark"?"日没C":"終了")
               : (g.inning||1)+"回"+(g.half==="top"?"表":"裏");
 
-            const [scoreOpen, setScoreOpen] = React.useState(false);
             const _innings = Array.from({length:g.innings||9},(_,i)=>i+1);
 
             return React.createElement('div',{style:{maxWidth:480,margin:"0 auto",display:"flex",flexDirection:"column",gap:8}}

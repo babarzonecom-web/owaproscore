@@ -3888,7 +3888,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v430")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v431")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3974,7 +3974,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v430")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v431")
         )
 
         // ===== 新規チーム作成 =====
@@ -4185,14 +4185,16 @@ function App() {
             const _pitIpDisp = Math.floor(_pitIpOuts/3)+"."+(_pitIpOuts%3);
             const _pitEr = _pitcher.manualOverride&&_pitcher.er!==undefined?_pitcher.er:(_pitAuto.autoEr||0);
 
-            // 現打者の全打席結果
-            const HIT_MARK = {"H1":"一","H2":"二","H3":"三","HR":"本","BB":"四","IBB":"四","HBP":"死","K":"振","KL":"振","KW":"振","GO":"ゴ","FO":"飛","LO":"直","DP":"DP","SAC":"犠","SF":"犠飛","FC":"FC","E":"失","OI":"打妨"};
+            // 現打者の全打席結果（イニング順）
             const batterAbList = [];
             if(_batter){
-              Object.values(_batter.atBats||{}).forEach(v=>{
+              const maxInn = Math.max(...Object.keys(_batter.atBats||{}).map(Number).filter(n=>!isNaN(n)), 0);
+              for(let inn=1; inn<=maxInn; inn++){
+                const v=(_batter.atBats||{})[inn];
+                if(!v) continue;
                 const arr=Array.isArray(v)?v:[v];
-                arr.forEach(e=>{ if(e&&e.code) batterAbList.push(e.code); });
-              });
+                arr.forEach(e=>{ if(e&&e.code) batterAbList.push({code:e.code, runs:e.runs||0, inn}); });
+              }
             }
 
             // 前打者の最後の結果
@@ -4291,20 +4293,24 @@ function App() {
                   ,_nextBatter&&React.createElement('div',{style:{fontSize:10,color:"#475569"}},
                     "NEXT: ",React.createElement('span',{style:{color:"#94a3b8",fontWeight:700}},_nextBatter.name))
                 )
-                // 打席結果アイコン列
+                // 打席結果バッジ（RESULTSと同一スタイル）
                 ,React.createElement('div',{style:{display:"flex",gap:4,flexWrap:"wrap"}}
                   ,batterAbList.length===0
                     ?React.createElement('span',{style:{fontSize:11,color:"#475569"}},"初打席")
-                    :batterAbList.map((code,ci)=>{
-                      const isHit=["H1","H2","H3","HR"].includes(code);
-                      const isOut=["K","KL","GO","FO","LO","DP"].includes(code);
-                      const isWalk=["BB","IBB","HBP"].includes(code);
-                      const bg=isHit?"#166534":isWalk?"#1e3a5f":isOut?"#3f1515":"#1e293b";
-                      const col=isHit?"#4ade80":isWalk?"#60a5fa":isOut?"#f87171":"#94a3b8";
+                    :batterAbList.map((ab,ci)=>{
+                      const r=rOf(ab.code);
+                      const col=r?r.color:"#94a3b8";
                       return React.createElement('div',{key:ci,style:{
-                        background:bg,borderRadius:4,padding:"2px 6px",
-                        fontSize:11,fontWeight:700,color:col
-                      }},HIT_MARK[code]||code);
+                        display:"flex",flexDirection:"column",alignItems:"center",
+                        background:"#0d1f35",border:"1px solid "+col+"66",
+                        borderRadius:6,padding:"3px 7px",minWidth:28
+                      }}
+                        ,React.createElement('span',{style:{fontSize:11,fontWeight:700,color:col}},
+                          r?r.short:ab.code)
+                        ,ab.runs>0&&React.createElement('span',{style:{
+                          fontSize:8,color:"#fbbf24",fontWeight:700
+                        }},"+"+ab.runs)
+                      );
                     })
                 )
               )
@@ -4354,16 +4360,18 @@ function App() {
                 ,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}
                   ,React.createElement('span',{style:{fontSize:11,color:"#64748b",flexShrink:0}},"投手")
                   ,React.createElement('span',{style:{fontSize:14,fontWeight:700,color:"#c4b5fd",flex:1}},_pitcher.name)
-                  ,React.createElement('div',{style:{display:"flex",gap:10,flexWrap:"wrap"}}
+                  ,React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}}
                     ,[
-                      ["IP", _pitIpDisp],
-                      ...(_isPitchMode?[["球", _pitcher.pitchCount||0]]:[]),
-                      ["H",  _pitAuto.autoH||0],
-                      ["K",  _pitAuto.autoK||0],
-                      ["失", _pitEr],
-                    ].map(([label,val])=>React.createElement('div',{key:label,style:{textAlign:"center"}}
+                      ["IP",  _pitIpDisp,           "#e2e8f0"],
+                      ...(_isPitchMode?[["球", _pitcher.pitchCount||0, "#e2e8f0"]]:[]),
+                      ["H",   _pitAuto.autoH||0,    "#94a3b8"],
+                      ["BB",  _pitAuto.autoBb||0,   "#60a5fa"],
+                      ["HBP", _pitAuto.autoHbp||0,  "#a78bfa"],
+                      ["K",   _pitAuto.autoK||0,    "#4ade80"],
+                      ["失",  _pitEr,               "#f87171"],
+                    ].map(([label,val,col])=>React.createElement('div',{key:label,style:{textAlign:"center"}}
                       ,React.createElement('div',{style:{fontSize:9,color:"#475569"}},label)
-                      ,React.createElement('div',{style:{fontSize:13,fontWeight:700,color:"#e2e8f0"}},val)
+                      ,React.createElement('div',{style:{fontSize:12,fontWeight:700,color:col}},val)
                     ))
                   )
                 )
@@ -4384,6 +4392,35 @@ function App() {
                         ["BB","IBB","HBP"].includes(_prevResult.code)?"#60a5fa":"#f87171"
                 }},HIT_MARK[_prevResult.code]||_prevResult.code)
                 ,_prevResult.inn&&React.createElement('span',{style:{fontSize:10,color:"#334155",marginLeft:"auto"}},_prevResult.inn+"回")
+              )
+
+              // ⑥ プレーログ全件（色分け付き）
+              ,React.createElement('div',{style:{
+                background:"#0a1628",border:"1px solid #1e3a5f",borderRadius:12,padding:"12px 14px"
+              }}
+                ,React.createElement('div',{style:{fontSize:11,fontWeight:700,color:"#64748b",marginBottom:8,letterSpacing:1}},
+                  "📝 プレーログ")
+                ,(g.log||[]).length===0
+                  ?React.createElement('div',{style:{fontSize:12,color:"#334155",textAlign:"center",padding:"8px 0"}},"まだ記録なし")
+                  :(g.log||[]).slice().reverse().map((e,i)=>{
+                    const isScore = e.runs>0||e.logType==="score";
+                    const isSub   = e.logType==="sub";
+                    const isRunner= e.logType==="runner";
+                    const bg = isScore?"rgba(251,191,36,0.10)":isSub?"rgba(167,139,250,0.10)":isRunner?"rgba(96,165,250,0.06)":"rgba(255,255,255,0.02)";
+                    const border = isScore?"1px solid rgba(251,191,36,0.35)":isSub?"1px solid rgba(167,139,250,0.35)":isRunner?"1px solid rgba(96,165,250,0.20)":"1px solid rgba(255,255,255,0.04)";
+                    const msgColor = isScore?"#fde047":isSub?"#c4b5fd":isRunner?"#7dd3fc":"#cbd5e1";
+                    return React.createElement('div',{key:i,style:{
+                      display:"flex",gap:8,padding:"6px 8px",borderRadius:7,marginBottom:3,
+                      background:bg,border
+                    }}
+                      ,React.createElement('span',{style:{fontSize:10,color:"#475569",flexShrink:0,paddingTop:1}},e.ts)
+                      ,React.createElement('span',{style:{fontSize:12,lineHeight:1.5,fontWeight:isScore||isSub?700:400,color:msgColor,flex:1}},e.msg)
+                      ,isScore&&e.runs>0&&React.createElement('span',{style:{
+                        fontSize:11,color:"#fff",fontWeight:900,flexShrink:0,
+                        background:"#b45309",borderRadius:6,padding:"1px 6px"
+                      }},"+"+e.runs+"点")
+                    );
+                  })
               )
 
             );

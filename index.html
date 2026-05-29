@@ -3448,8 +3448,12 @@ function App() {
   
   const editPlayer  = (t,i,f,v)=>mutGame(g=>{
     const updated = {...g,[t+"Lineup"]:g[t+"Lineup"].map((p,j)=>j===i?{...p,[f]:v}:p)};
-    
-    if(f==="name"||f==="pos") return syncPitcherFromLineup(updated, t);
+    if(f==="name"||f==="pos") {
+      // 試合開始前(pitcherLogが先発1件のみ)のときだけ投手を自動同期
+      // 試合中は changePitcher で明示的に交代する
+      const logLen = (g[t+"PitcherLog"]||[]).length;
+      if(logLen <= 1) return syncPitcherFromLineup(updated, t);
+    }
     return updated;
   });
   const editPitcher = (t,i,f,v)=>mutGame(g=>({...g,[t+"Pitchers"]:g[t+"Pitchers"].map((p,j)=>j===i?{...p,[f]:v}:p)}));
@@ -3915,7 +3919,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v440")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v441")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4001,7 +4005,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v440")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v441")
         )
 
         // ===== 新規チーム作成 =====

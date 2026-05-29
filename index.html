@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v451")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v452")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v451")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v452")
         )
 
         // ===== 新規チーム作成 =====
@@ -5644,10 +5644,8 @@ function App() {
                 if(members.length===0){ showToast("メンバーが見つかりません"); return; }
                 const oppObj = {id:Date.now().toString(36), name:oppName, members};
                 setStorage(s=>{
-                  const exists=(s.opponents||[]).some(t=>t.name===oppName);
-                  const next = {...s, opponents: exists
-                    ? (s.opponents||[]).map(t=>t.name===oppName?oppObj:t)
-                    : [...(s.opponents||[]),oppObj]};
+                  // 常に新規追加（同名チームでも別エントリとして追加）
+                  const next = {...s, opponents: [...(s.opponents||[]), oppObj]};
                   showToast("✅ 対戦相手「"+oppName+"」を登録しました");
                   return next;
                 });
@@ -5671,10 +5669,7 @@ function App() {
                     showToast("✅ 自チーム「"+myObj.name+"」を復元");
                   }
                   if(oppObj){
-                    const exists=(next.opponents||[]).some(t=>t.name===oppObj.name);
-                    next = {...next, opponents: exists
-                      ? (next.opponents||[]).map(t=>t.name===oppObj.name?oppObj:t)
-                      : [...(next.opponents||[]),oppObj]};
+                    next = {...next, opponents: [...(next.opponents||[]), oppObj]};
                     showToast("✅ 対戦相手「"+oppObj.name+"」を保存");
                   }
                   return next;
@@ -8686,7 +8681,10 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
                 return React.createElement('button', {key:idx,
                   onClick:()=>{
                     if(isMy){ onRestoreTeam(restoreTarget, myTeamSide); }
-                    else { onRestoreOpp(restoreTarget, myTeamSide==="away"?"home":"away"); }
+                    else {
+                      const oppSide = myTeamSide==="away"?"home":"away";
+                      onRestoreOpp(restoreTarget, restoreTarget[oppSide+"Team"]);
+                    }
                     setRestoreTarget(null);
                     showToast("✅ 復元しました");
                   },

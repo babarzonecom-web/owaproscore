@@ -3915,7 +3915,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v437")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v438")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4001,7 +4001,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v437")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v438")
         )
 
         // ===== 新規チーム作成 =====
@@ -6195,14 +6195,19 @@ function App() {
                   side==="away"?(game.awayTeam||"アウェイ"):(game.homeTeam||"ホーム"))
               // 未登板のデフォルト名投手を一括削除するボタン
               ,(()=>{
+                // 現在のcurrentPItcherIdx（実際に登板中）は除外
+                const activePIdx = game[side+"PitcherIdx"]||0;
                 const unusedDefaultPitchers = pitchers
                   .map((p,i)=>({p,i}))
                   .filter(({p,i})=>{
                     if(!p||!p.name) return false;
                     if(!/^投手\d+$/.test(p.name)) return false; // デフォルト名のみ
-                    // pitcherLogに登場していれば使用中
-                    const inLog = (game[logKey]||[]).some(l=>l.pitcherIdx===i);
-                    return !inLog;
+                    if(i===activePIdx) return false; // 現在登板中は除外
+                    // 打席記録がある（computePitcherStatsで被安打等がある）場合は除外
+                    const auto = autoArr[i]||{};
+                    const hasRecord = (auto._outsGot||0)>0||(auto.autoH||0)>0||(auto.autoBb||0)>0||(auto.autoK||0)>0;
+                    if(hasRecord) return false;
+                    return true; // デフォルト名で成績なし→削除対象
                   });
                 if(unusedDefaultPitchers.length===0) return null;
                 return React.createElement('div',{style:{

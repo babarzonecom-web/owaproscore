@@ -1634,12 +1634,15 @@ const computePitcherStats = (g) => {
         if(l.atBatSeq !== undefined && l.atBatSeq >= 0) {
           return {...l, fromSeq: l.atBatSeq};
         }
-        if(l.atBatSeq === -1) {
-          // 次のイニング頭から：logTime以降の最初の打席
+        if(l.atBatSeq === -1 || l.atBatSeq === -2) {
+          // イニング・アウト数ベースで担当打席を特定
           const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
+          const outs = l.outsAtStart||0;
           const nextAb = allAtBats.find(ab=>{
             const abTime = ab.inning*2+(ab.half==="top"?0:1);
-            return abTime >= logTime;
+            if(abTime < logTime) return false;
+            if(abTime === logTime) return (ab.outsAtAb||0) >= outs;
+            return true;
           });
           return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
         }
@@ -3920,7 +3923,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v445")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v446")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4006,7 +4009,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v445")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v446")
         )
 
         // ===== 新規チーム作成 =====
@@ -4201,7 +4204,7 @@ function App() {
             const _batter = _lineup[_batIdx];
             const _nextBatter = _lineup[(_batIdx+1)%Math.max(_lineup.length,1)];
             const _defPitchers = g[_dt+"Pitchers"]||[];
-            const _pitIdx = g[_dt+"PitcherIdx"]||0;
+            const _pitIdx = g.finished ? -1 : (g[_dt+"PitcherIdx"]||0);
             const _pitcher = _defPitchers[_pitIdx]||{};
             const _bases = g.bases||[null,null,null];
             const _outs = g.outs||0;
@@ -5214,7 +5217,7 @@ function App() {
 
           , ["away","home"].map(side => {
               const pitchers = game[side+"Pitchers"]||[];
-              const curPIdx = game[side+"PitcherIdx"]||0;
+              const curPIdx = game.finished ? -1 : (game[side+"PitcherIdx"]||0);
               const teamName = game[side+"Team"];
               const color = side==="away"?"#fbbf24":"#7dd3fc";
               // チームのメンバー候補（登録チームから）
@@ -6186,7 +6189,7 @@ function App() {
               a.fromInning!==b.fromInning?a.fromInning-b.fromInning:
               (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||(a.outsAtStart||0)-(b.outsAtStart||0)
             );
-          const curPIdx = game[side+"PitcherIdx"]||0;
+          const curPIdx = game.finished ? -1 : (game[side+"PitcherIdx"]||0);
           const pStats = computePitcherStats(game);
           const autoArr = pStats[side]||[];
           // AddPitcherFormはグローバルコンポーネントとして定義済み
@@ -6695,7 +6698,7 @@ function App() {
           const pcTeam = modal.team;
           const pcLineup = game[pcTeam+"Lineup"]||[];
           const pcPitchers = (game[pcTeam+"Pitchers"]||[]);
-          const curPIdx = game[pcTeam+"PitcherIdx"]||0;
+          const curPIdx = game.finished ? -1 : (game[pcTeam+"PitcherIdx"]||0);
           // opponents は storage から直接取得（クロージャの問題を避ける）
           const _allTeams = [...(myTeam?[myTeam]:[]), ...(teams||[]),...(storage.opponents||[])];
           const regT = _allTeams.find(t=>t.name===game[pcTeam+"Team"]);

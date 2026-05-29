@@ -2252,12 +2252,24 @@ function App() {
     fbLoadHistory(code).then(fbHist=>{
       if(!fbHist||fbHist.length===0) return;
       setStorage(s=>{
-        const localIds = new Set((s.history||[]).map(g=>g.id));
         const deletedIds = new Set(s.deletedIds||[]);
-        const merged = [...(s.history||[])];
-        fbHist.forEach(g=>{ if(g&&g.id&&!localIds.has(g.id)&&!deletedIds.has(g.id)) merged.push(g); });
-        // 日付順（新しい順）でソート
-        merged.sort((a,b)=>{
+        const localMap = {};
+        (s.history||[]).forEach(g=>{ if(g&&g.id) localMap[g.id]=g; });
+        // FirebaseのデータでlocalMapを更新（savedAtが新しい方を優先）
+        fbHist.forEach(g=>{
+          if(!g||!g.id||deletedIds.has(g.id)) return;
+          const local = localMap[g.id];
+          if(!local){
+            // localにないものは追加
+            localMap[g.id] = g;
+          } else {
+            // 同じIDがある場合：_tsまたはsavedAtで新しい方を使う
+            const fbTs = g._ts||0;
+            const localTs = local._ts||0;
+            if(fbTs > localTs) localMap[g.id] = g;
+          }
+        });
+        const merged = Object.values(localMap).sort((a,b)=>{
           const ta=a.savedAt||a.date||""; const tb=b.savedAt||b.date||"";
           return tb.localeCompare(ta)||(b._ts||0)-(a._ts||0);
         });
@@ -3433,7 +3445,7 @@ function App() {
   
   const saveGame=(silent)=>{
     setStorage(s=>{
-      const saved = {...s.currentGame, savedAt:new Date().toLocaleString("ja-JP")};
+      const saved = {...s.currentGame, savedAt:new Date().toLocaleString("ja-JP"), _ts:Date.now()};
       // チームコード管理者なら必ずFirebaseにアップロード
       if(window.__teamShareRole==="admin" && window.__teamShareCode){
         fbSaveGameToCode(window.__teamShareCode, saved);
@@ -3889,7 +3901,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v433")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v435")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3975,7 +3987,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v433")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v435")
         )
 
         // ===== 新規チーム作成 =====
@@ -6149,10 +6161,12 @@ function App() {
           const regTeam = teams.find(t=>t.name===(side==="away"?game.awayTeam:game.homeTeam));
           const memberCands = (regTeam&&regTeam.members||[])
             .map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean);
-          const sortedLog = [...(game[logKey]||[])].sort((a,b)=>
-            a.fromInning!==b.fromInning?a.fromInning-b.fromInning:
-            (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||(a.outsAtStart||0)-(b.outsAtStart||0)
-          );
+          const sortedLog = [...(game[logKey]||[])]
+            .filter(l=>l&&l.pitcherIdx!==undefined&&l.pitcherIdx<pitchers.length) // 無効なindexを除外
+            .sort((a,b)=>
+              a.fromInning!==b.fromInning?a.fromInning-b.fromInning:
+              (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||(a.outsAtStart||0)-(b.outsAtStart||0)
+            );
           const curPIdx = game[side+"PitcherIdx"]||0;
           const pStats = computePitcherStats(game);
           const autoArr = pStats[side]||[];
@@ -6188,9 +6202,16 @@ function App() {
                           onClick:()=>{
                             if(!window.confirm("この登板記録を削除しますか？")) return;
                             mutGame(g=>{
+                              const origLog = g[logKey]||[];
+                              // pitcherIdx + fromInning + fromHalf + outsAtStartで特定
                               let removed=false;
-                              const newLog=(g[logKey]||[]).filter(l=>{
-                                if(!removed&&JSON.stringify(l)===entryKey){removed=true;return false;}
+                              const newLog=origLog.filter(l=>{
+                                if(!removed &&
+                                  l.pitcherIdx===entry.pitcherIdx &&
+                                  l.fromInning===entry.fromInning &&
+                                  l.fromHalf===entry.fromHalf &&
+                                  (l.outsAtStart||0)===(entry.outsAtStart||0)
+                                ){ removed=true; return false; }
                                 return true;
                               });
                               return {...g,[logKey]:newLog};
@@ -6208,7 +6229,11 @@ function App() {
                             const newIdx=Number(e.target.value);
                             mutGame(g=>{
                               const log=[...(g[logKey]||[])];
-                              const t=log.findIndex(l=>JSON.stringify(l)===entryKey);
+                              const t=log.findIndex(l=>
+                                l.pitcherIdx===entry.pitcherIdx&&
+                                l.fromInning===entry.fromInning&&
+                                l.fromHalf===entry.fromHalf&&
+                                (l.outsAtStart||0)===(entry.outsAtStart||0));
                               if(t>=0) log[t]={...log[t],pitcherIdx:newIdx};
                               return {...g,[logKey]:log};
                             });
@@ -6231,7 +6256,11 @@ function App() {
                               if(isNaN(v)||v<1) return;
                               mutGame(g=>{
                                 const log=[...(g[logKey]||[])];
-                                const t=log.findIndex(l=>JSON.stringify(l)===entryKey);
+                                const t=log.findIndex(l=>
+                                  l.pitcherIdx===entry.pitcherIdx&&
+                                  l.fromInning===entry.fromInning&&
+                                  l.fromHalf===entry.fromHalf&&
+                                  (l.outsAtStart||0)===(entry.outsAtStart||0));
                                 if(t>=0) log[t]={...log[t],fromInning:v,atBatSeq:-1};
                                 return {...g,[logKey]:log};
                               });
@@ -6249,7 +6278,11 @@ function App() {
                               const v=Number(e.target.value);
                               mutGame(g=>{
                                 const log=[...(g[logKey]||[])];
-                                const t=log.findIndex(l=>JSON.stringify(l)===entryKey);
+                                const t=log.findIndex(l=>
+                                  l.pitcherIdx===entry.pitcherIdx&&
+                                  l.fromInning===entry.fromInning&&
+                                  l.fromHalf===entry.fromHalf&&
+                                  (l.outsAtStart||0)===(entry.outsAtStart||0));
                                 if(t>=0) log[t]={...log[t],outsAtStart:v,atBatSeq:-1};
                                 return {...g,[logKey]:log};
                               });

@@ -3042,11 +3042,6 @@ function App() {
     const currentPIdx = g[side+"PitcherIdx"]||0;
     const currentPitcher = pitchers[currentPIdx];
 
-    // 既に投手交代記録が複数ある（試合が進行中）場合はオーダー変更で投手を追加しない
-    // 投手交代は changePitcher で明示的に行う
-    const logLen = (g[side+"PitcherLog"]||[]).length;
-    if(logLen > 1) return g;
-
     if(_optionalChain([currentPitcher, 'optionalAccess', _20 => _20.name]) === pitcher.name) return g;
 
     // away投手は表(top)を守る、home投手は裏(bottom)を守る
@@ -3920,7 +3915,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v439")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v440")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4006,7 +4001,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v439")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v440")
         )
 
         // ===== 新規チーム作成 =====

@@ -3924,7 +3924,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v449")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v450")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4010,7 +4010,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v449")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v450")
         )
 
         // ===== 新規チーム作成 =====
@@ -8350,40 +8350,49 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             ) // overflowX wrapper閉じ
             , React.createElement('div', {style:{fontSize:11,color:"#475569"}}, "※ フィルター中の試合の合計")
 
-            // チーム通算投手成績
+            // チーム通算投手成績（チーム全体の合計）
             , React.createElement('div', {style:{...S.ct,marginBottom:10,marginTop:16}}, "⚾ チーム通算投手成績")
-            , React.createElement('div', {style:{overflowX:"auto"}}
-              , React.createElement('table', {style:{...S.table,minWidth:480}}
-                , React.createElement('thead', null
-                  , React.createElement('tr', null
-                    , ["投手名","試合","投球回","被安打","四球","三振","死球","失点","自責","防御率","WHIP"].map(h=>
-                        React.createElement('th',{key:h,style:{...thS,whiteSpace:"nowrap",fontSize:10}},h))
+            , (()=>{
+                const pitStats = aggregatePitcherStats(selectedTeam);
+                if(!pitStats||pitStats.length===0) return React.createElement('div',{style:{fontSize:12,color:"#475569"}},"投手データなし");
+                // 全投手を合計
+                const totalOuts = pitStats.reduce((s,p)=>s+p.outs,0);
+                const totalH    = pitStats.reduce((s,p)=>s+p.h,0);
+                const totalBb   = pitStats.reduce((s,p)=>s+p.bb,0);
+                const totalK    = pitStats.reduce((s,p)=>s+p.k,0);
+                const totalHbp  = pitStats.reduce((s,p)=>s+p.hbp,0);
+                const totalRuns = pitStats.reduce((s,p)=>s+p.runs,0);
+                const totalEr   = pitStats.reduce((s,p)=>s+p.er,0);
+                const totalGames= filteredGames.length;
+                const ipNum = Math.floor(totalOuts/3)+(totalOuts%3)/3;
+                const ipDisp = Math.floor(totalOuts/3)+"."+(totalOuts%3);
+                const era = ipNum>0?(totalEr*9/ipNum).toFixed(2):"—";
+                const whip = ipNum>0?((totalBb+totalH)/ipNum).toFixed(2):"—";
+                return React.createElement('div', {style:{overflowX:"auto"}}
+                  , React.createElement('table', {style:{...S.table,minWidth:400}}
+                    , React.createElement('thead', null
+                      , React.createElement('tr', null
+                        , ["試合","投球回","被安打","四球","三振","死球","失点","自責","防御率","WHIP"].map(h=>
+                            React.createElement('th',{key:h,style:{...thS,whiteSpace:"nowrap",fontSize:10}},h))
+                      )
+                    )
+                    , React.createElement('tbody', null
+                      , React.createElement('tr',{style:{background:"#0d1f35"}}
+                        ,React.createElement('td',{style:tdS},totalGames)
+                        ,React.createElement('td',{style:tdS},ipDisp)
+                        ,React.createElement('td',{style:tdS},totalH)
+                        ,React.createElement('td',{style:{...tdS,color:"#60a5fa"}},totalBb)
+                        ,React.createElement('td',{style:{...tdS,color:"#4ade80"}},totalK)
+                        ,React.createElement('td',{style:{...tdS,color:"#a78bfa"}},totalHbp)
+                        ,React.createElement('td',{style:{...tdS,color:"#fb923c"}},totalRuns)
+                        ,React.createElement('td',{style:{...tdS,color:"#f87171"}},totalEr)
+                        ,React.createElement('td',{style:{...tdS,color:parseFloat(era)<3?"#4ade80":parseFloat(era)<5?"#fbbf24":"#f87171",fontWeight:700}},era)
+                        ,React.createElement('td',{style:tdS},whip)
+                      )
+                    )
                   )
-                )
-                , React.createElement('tbody', null
-                  , (()=>{
-                      const pitStats = aggregatePitcherStats(selectedTeam);
-                      if(!pitStats||pitStats.length===0) return React.createElement('tr',null,
-                        React.createElement('td',{colSpan:11,style:{...tdS,color:"#475569",textAlign:"center"}},"投手データなし"));
-                      return pitStats.map((p,i)=>
-                        React.createElement('tr',{key:i,style:{background:i%2===0?"#0d1f35":"transparent"}}
-                          ,React.createElement('td',{style:{...tdN,color:"#c4b5fd",fontWeight:700,whiteSpace:"nowrap"}},p.name)
-                          ,React.createElement('td',{style:tdS},p.games)
-                          ,React.createElement('td',{style:tdS},p.ipDisp)
-                          ,React.createElement('td',{style:tdS},p.h)
-                          ,React.createElement('td',{style:{...tdS,color:"#60a5fa"}},p.bb)
-                          ,React.createElement('td',{style:{...tdS,color:"#4ade80"}},p.k)
-                          ,React.createElement('td',{style:{...tdS,color:"#a78bfa"}},p.hbp)
-                          ,React.createElement('td',{style:{...tdS,color:"#fb923c"}},p.runs)
-                          ,React.createElement('td',{style:{...tdS,color:"#f87171"}},p.er)
-                          ,React.createElement('td',{style:{...tdS,color:parseFloat(p.era)<3?"#4ade80":parseFloat(p.era)<5?"#fbbf24":"#f87171",fontWeight:700}},p.era)
-                          ,React.createElement('td',{style:tdS},p.whip)
-                        )
-                      );
-                    })()
-                )
-              )
-            )
+                );
+              })()
           )
         )
 

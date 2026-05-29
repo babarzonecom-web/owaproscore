@@ -3919,7 +3919,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v441")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v442")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4005,7 +4005,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v441")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v442")
         )
 
         // ===== 新規チーム作成 =====
@@ -6225,29 +6225,37 @@ function App() {
                   ,React.createElement('button',{
                     onClick:()=>{
                       if(!window.confirm("未登板の「投手N」を削除し、pitcherLogのインデックスを修正します。よろしいですか？")) return;
-                      mutGame(g=>{
+                      // setStorageを直接使用（mutGameのroleチェックを回避）
+                      setStorage(s=>{
+                        const g = s.currentGame;
+                        if(!g) return s;
                         const removeIndices = new Set(unusedDefaultPitchers.map(({i})=>i));
                         const oldPitchers = g[side+"Pitchers"]||[];
-                        // 新しいindexのマッピングを作成
                         const indexMap = {};
                         let newIdx = 0;
                         oldPitchers.forEach((p,i)=>{
                           if(!removeIndices.has(i)){ indexMap[i]=newIdx; newIdx++; }
                         });
                         const newPitchers = oldPitchers.filter((_,i)=>!removeIndices.has(i));
-                        // pitcherLogのindexを更新
                         const newLog = (g[logKey]||[])
                           .filter(l=>!removeIndices.has(l.pitcherIdx))
                           .map(l=>({...l, pitcherIdx:indexMap[l.pitcherIdx]??l.pitcherIdx}));
-                        // currentPitcherIdxも更新
                         const curIdx = g[side+"PitcherIdx"]||0;
                         const newCurIdx = indexMap[curIdx]??0;
-                        return {...g,
+                        const newGame = {...g,
                           [side+"Pitchers"]:newPitchers,
                           [logKey]:newLog,
                           [side+"PitcherIdx"]:newCurIdx
                         };
+                        // Firebaseにも反映
+                        if(window.__teamShareRole==="admin"&&window.__teamShareCode){
+                          fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json",
+                            {method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...newGame,_ts:Date.now()})})
+                            .catch(e=>console.error("FB push error",e));
+                        }
+                        return {...s, currentGame:newGame};
                       });
+                      showToast("✅ 削除しました");
                     },
                     style:{...sBt("#dc2626"),width:"100%",padding:"8px",fontSize:12,fontWeight:700}
                   },"🗑 デフォルト名の未登板投手を削除する")

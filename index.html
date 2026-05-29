@@ -1635,13 +1635,15 @@ const computePitcherStats = (g) => {
           return {...l, fromSeq: l.atBatSeq};
         }
         if(l.atBatSeq === -1 || l.atBatSeq === -2) {
-          // イニング・アウト数ベースで担当打席を特定
-          const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
+          // allAtBatsは攻撃チーム(offTeam)の打席のみ含む
+          // defTeam="home"→offTeam="away"→allAtBatsはtop(表)のみ
+          // defTeam="away"→offTeam="home"→allAtBatsはbottom(裏)のみ
+          // pitcherLogのfromHalfはdefTeamの守備ハーフ（away=top, home=bottom）
+          // 従ってallAtBatsのhalfとpitcherLogのfromHalfは常に一致する
           const outs = l.outsAtStart||0;
           const nextAb = allAtBats.find(ab=>{
-            const abTime = ab.inning*2+(ab.half==="top"?0:1);
-            if(abTime < logTime) return false;
-            if(abTime === logTime) return (ab.outsAtAb||0) >= outs;
+            if(ab.inning < l.fromInning) return false;
+            if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
             return true;
           });
           return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
@@ -1652,9 +1654,8 @@ const computePitcherStats = (g) => {
         const outs = l.outsAtStart||0;
         const prevFromSeq = log[li-1].atBatSeq !== undefined ? log[li-1].atBatSeq : 0;
         const nextAb = allAtBats.find(ab=>{
-          const abTime = ab.inning*2+(ab.half==="top"?0:1);
-          if(abTime < logTime) return false;
-          if(abTime === logTime) return (ab.outsAtAb||0) >= outs;
+          if(ab.inning < l.fromInning) return false;
+          if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
           return true;
         });
         return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
@@ -3923,7 +3924,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v446")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v447")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4009,7 +4010,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v446")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v447")
         )
 
         // ===== 新規チーム作成 =====

@@ -2282,15 +2282,44 @@ function App() {
     });
   },[]);
 
+  // チームデータ（自チーム・対戦相手）をFirebaseから読み込む
+  const _loadFbTeamData = useCallback((code)=>{
+    if(!code) return;
+    fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+code+".json",{cache:"no-store"})
+      .then(r=>r.json())
+      .then(data=>{
+        if(!data||typeof data!=="object") return;
+        setStorage(s=>{
+          const next = {...s};
+          // 自チーム：localになければFirebaseのを使う
+          if(data.myTeam && !s.myTeam) next.myTeam = data.myTeam;
+          // チーム一覧：マージ（同名は既存優先）
+          if(data.teams && Array.isArray(data.teams)) {
+            const existNames = new Set((s.teams||[]).map(t=>t.name));
+            const merged = [...(s.teams||[]), ...data.teams.filter(t=>!existNames.has(t.name))];
+            next.teams = merged;
+          }
+          // 対戦相手：マージ
+          if(data.opponents && Array.isArray(data.opponents)) {
+            const existNames = new Set((s.opponents||[]).map(t=>t.name));
+            const merged = [...(s.opponents||[]), ...data.opponents.filter(t=>!existNames.has(t.name))];
+            next.opponents = merged;
+          }
+          return next;
+        });
+      })
+      .catch(e=>console.log("[FB] teamData load error", e));
+  },[]);
+
   // ページ初回マウント時（リロード後のlocalStorage復元時）
   useEffect(()=>{
     const code = localStorage.getItem("tsCode");
-    if(code) _loadFbHistory(code);
+    if(code) { _loadFbHistory(code); _loadFbTeamData(code); }
   },[]);
 
   // チームコードが変わったとき（新規ログイン時）
   useEffect(()=>{
-    if(teamShareCode) _loadFbHistory(teamShareCode);
+    if(teamShareCode) { _loadFbHistory(teamShareCode); _loadFbTeamData(teamShareCode); }
   },[teamShareCode]);
 
   const disconnectTeam = () => {
@@ -3924,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v450")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v451")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4010,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v450")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v451")
         )
 
         // ===== 新規チーム作成 =====
@@ -5510,6 +5539,7 @@ function App() {
               history:history,
               teamShareCode:teamShareCode,
               showToast:showToast,
+              tournaments:tournaments,
               onLoad:loadGame,
               onDelete:delHistory,
               onExcel:(g)=>{ showToast("📊 出力処理を開始します..."); exportExcel(g); },
@@ -6562,7 +6592,7 @@ function App() {
               )
 
               , React.createElement('div', {style:{fontSize:13,color:"#f0a500",marginBottom:8,fontWeight:700}}, "🏆 大会")
-              , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}},
+              , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}},
                   React.createElement('button', {
                     onClick:()=>setNewTournament(null),
                     style:{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",
@@ -6579,6 +6609,27 @@ function App() {
                         color:newTournament===t.name?"#fcd34d":"#64748b"}
                     }, t.name)
                   )
+              )
+              // 新規大会追加
+              , React.createElement('div', {style:{display:"flex",gap:6,marginBottom:8}}
+                , React.createElement('input', {
+                    id:"modal-new-tour",
+                    placeholder:"新しい大会名を追加...",
+                    style:{...S.inp,flex:1,fontSize:12,padding:"5px 10px"}
+                  })
+                , React.createElement('button', {
+                    onClick:()=>{
+                      const v=document.getElementById("modal-new-tour").value.trim();
+                      if(!v) return;
+                      const t={id:Date.now().toString(36),name:v};
+                      setStorage(s=>({...s,tournaments:[...(s.tournaments||[]),t]}));
+                      setNewTournament(v);
+                      document.getElementById("modal-new-tour").value="";
+                    },
+                    style:{...sBt("#f0a500"),fontSize:11,padding:"5px 10px",whiteSpace:"nowrap"}
+                  },"＋追加")
+              )
+              , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}
                 )
               , (tournaments||[]).length===0 && React.createElement('div',{style:{fontSize:11,color:"#475569",marginBottom:8}},"チームタブで大会を登録できます")
               , React.createElement('div', {style:{fontSize:13,color:"#7dd3fc",marginBottom:8,fontWeight:700}}, "シーズン")
@@ -8559,7 +8610,7 @@ function PasswordChangeCard({ teamCode, showToast }) {
   );
 }
 
-function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam, onRestoreOpp, showToast, onRecompute }) {
+function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam, onRestoreOpp, showToast, onRecompute, tournaments }) {
   const [restoreTarget, setRestoreTarget] = React.useState(null);
   const [fbTeamId, setFbTeamId] = useState(teamShareCode||"");
   const [fbLoading, setFbLoading] = useState(false);
@@ -8789,8 +8840,43 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
                   style:{...sBt("#dc2626",true),fontSize:11,padding:"4px 10px",marginLeft:"auto"}
                 }, "🗑")
             )
+            // 大会を後から設定
+            , React.createElement('div', {style:{display:"flex",gap:6,alignItems:"center",marginTop:6}}
+              , React.createElement('span', {style:{fontSize:10,color:"#64748b",flexShrink:0}}, "🏆 大会:")
+              , g.tournament
+                ? React.createElement('div', {style:{display:"flex",alignItems:"center",gap:6,flex:1}}
+                    , React.createElement('span', {style:{fontSize:11,color:"#fbbf24",fontWeight:700}}, g.tournament)
+                    , React.createElement('button', {
+                        onClick:()=>{ onImport&&onImport([{...g,tournament:null}]); showToast("大会を解除しました"); },
+                        style:{fontSize:9,color:"#475569",background:"transparent",border:"none",cursor:"pointer",padding:"1px 4px"}
+                      }, "×")
+                  )
+                : React.createElement(TournamentSelector, {
+                    tournaments: tournaments||[],
+                    onSelect:(name)=>{ onImport&&onImport([{...g,tournament:name}]); showToast("🏆 大会を設定しました"); }
+                  })
+            )
           );
         })
+  );
+}
+
+function TournamentSelector({ tournaments, onSelect }) {
+  const [val, setVal] = useState("");
+  return React.createElement('div', {style:{display:"flex",gap:4,flex:1}}
+    , React.createElement('select', {
+        value:val, onChange:e=>setVal(e.target.value),
+        style:{flex:1,background:"#0a1628",border:"1px solid #2a4a7a",borderRadius:4,
+          color:"#94a3b8",fontSize:10,padding:"2px 4px"}
+      }
+      , React.createElement('option',{value:""},"大会を設定...")
+      ,(tournaments||[]).map(t=>React.createElement('option',{key:t.id,value:t.name},t.name))
+    )
+    , val && React.createElement('button', {
+        onClick:()=>{ onSelect(val); setVal(""); },
+        style:{fontSize:10,padding:"2px 8px",borderRadius:4,background:"#92400e",
+          border:"1px solid #f0a500",color:"#fcd34d",cursor:"pointer",whiteSpace:"nowrap"}
+      }, "設定")
   );
 }
 

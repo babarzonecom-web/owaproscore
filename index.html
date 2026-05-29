@@ -2463,11 +2463,9 @@ function App() {
   };
 
   const mutGame = useCallback((fn)=>{
-    // admin以外は記録操作不可（member・未ログイン・閲覧者すべてブロック）
-    if(window.__teamShareRole !== "admin") {
-      if(window.__teamShareRole === "member") {
-        showToast("👥 メンバーモードでは記録できません。管理者でログインしてください。");
-      }
+    // memberは操作不可、未ログイン・adminはOK
+    if(window.__teamShareRole === "member") {
+      showToast("👥 メンバーモードでは記録できません。管理者でログインしてください。");
       return;
     }
     setStorage(s=>{
@@ -3917,7 +3915,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v436")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v437")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4003,7 +4001,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v436")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v437")
         )
 
         // ===== 新規チーム作成 =====

@@ -3065,7 +3065,23 @@ function App() {
       }];
       return {...g, [side+"PitcherIdx"]: existIdx, [logKey]: newLog};
     }
-    
+
+    // 現在の投手（curPIdx）がデフォルト名（投手N）かつ打席記録がない場合は上書き
+    const curP = pitchers[currentPIdx];
+    const isDefaultName = curP && /^投手\d+$/.test(curP.name||"");
+    // 打席記録があるか確認（攻撃側のlineupにその投手indexへの帰属打席があるか）
+    const hasRecord = (g[side==="away"?"homeLineup":"awayLineup"]||[]).some(p=>
+      Object.values(p.atBats||{}).flat().length > 0
+    );
+    // デフォルト名かつpitcherLogが1エントリ（先発のみ）かつ打席が少ない場合は上書き
+    const logLen = (g[side+"PitcherLog"]||[]).length;
+    if(isDefaultName && logLen <= 1){
+      // 上書き：既存のpitcherIdx(currentPIdx)の名前だけ変更
+      const updatedPitchers = pitchers.map((p,i)=>i===currentPIdx?{...p,name:pitcher.name}:p);
+      // pitcherLogのpitcherIdxはそのまま（currentPIdxを指しているので問題なし）
+      return {...g, [side+"Pitchers"]: updatedPitchers};
+    }
+
     const newPitcher = {...makePitcher(pitchers.length+1), name: pitcher.name};
     const newPitchers = [...pitchers, newPitcher];
     const newPIdx = newPitchers.length-1;
@@ -3901,7 +3917,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v435")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v436")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3987,7 +4003,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v435")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v436")
         )
 
         // ===== 新規チーム作成 =====
@@ -6179,6 +6195,58 @@ function App() {
               ,React.createElement('div',{style:{...S.mt,marginBottom:4}},"✏️ 投手・登板記録を修正")
               ,React.createElement('div',{style:{fontSize:11,color:"#64748b",marginBottom:14}},
                   side==="away"?(game.awayTeam||"アウェイ"):(game.homeTeam||"ホーム"))
+              // 未登板のデフォルト名投手を一括削除するボタン
+              ,(()=>{
+                const unusedDefaultPitchers = pitchers
+                  .map((p,i)=>({p,i}))
+                  .filter(({p,i})=>{
+                    if(!p||!p.name) return false;
+                    if(!/^投手\d+$/.test(p.name)) return false; // デフォルト名のみ
+                    // pitcherLogに登場していれば使用中
+                    const inLog = (game[logKey]||[]).some(l=>l.pitcherIdx===i);
+                    return !inLog;
+                  });
+                if(unusedDefaultPitchers.length===0) return null;
+                return React.createElement('div',{style:{
+                  background:"#3f1515",border:"1px solid #dc2626",
+                  borderRadius:8,padding:"10px 12px",marginBottom:10
+                }}
+                  ,React.createElement('div',{style:{fontSize:11,color:"#f87171",marginBottom:6,fontWeight:700}},
+                    "⚠️ 未登板のデフォルト名投手が"+unusedDefaultPitchers.length+"人います")
+                  ,React.createElement('div',{style:{fontSize:10,color:"#94a3b8",marginBottom:8}},
+                    unusedDefaultPitchers.map(({p})=>p.name).join("、"))
+                  ,React.createElement('button',{
+                    onClick:()=>{
+                      if(!window.confirm("未登板の「投手N」を削除し、pitcherLogのインデックスを修正します。よろしいですか？")) return;
+                      mutGame(g=>{
+                        const removeIndices = new Set(unusedDefaultPitchers.map(({i})=>i));
+                        const oldPitchers = g[side+"Pitchers"]||[];
+                        // 新しいindexのマッピングを作成
+                        const indexMap = {};
+                        let newIdx = 0;
+                        oldPitchers.forEach((p,i)=>{
+                          if(!removeIndices.has(i)){ indexMap[i]=newIdx; newIdx++; }
+                        });
+                        const newPitchers = oldPitchers.filter((_,i)=>!removeIndices.has(i));
+                        // pitcherLogのindexを更新
+                        const newLog = (g[logKey]||[])
+                          .filter(l=>!removeIndices.has(l.pitcherIdx))
+                          .map(l=>({...l, pitcherIdx:indexMap[l.pitcherIdx]??l.pitcherIdx}));
+                        // currentPitcherIdxも更新
+                        const curIdx = g[side+"PitcherIdx"]||0;
+                        const newCurIdx = indexMap[curIdx]??0;
+                        return {...g,
+                          [side+"Pitchers"]:newPitchers,
+                          [logKey]:newLog,
+                          [side+"PitcherIdx"]:newCurIdx
+                        };
+                      });
+                    },
+                    style:{...sBt("#dc2626"),width:"100%",padding:"8px",fontSize:12,fontWeight:700}
+                  },"🗑 デフォルト名の未登板投手を削除する")
+                );
+              })()
+
               ,sortedLog.map((entry,li)=>{
                   const pitcher=pitchers[entry.pitcherIdx]||{};
                   const auto=autoArr[entry.pitcherIdx]||{};

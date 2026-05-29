@@ -3493,7 +3493,8 @@ function App() {
         pitcherResults:pr,
         awayPitchers: applyRunsToSide("away"),
         homePitchers: applyRunsToSide("home"),
-        finalOuts: g.outs, finalInning: g.inning, finalHalf: g.half};
+        finalOuts: g.outs, finalInning: g.inning, finalHalf: g.half,
+        awayPitcherIdx: -1, homePitcherIdx: -1};
     });
     
     setStorage(s=>{
@@ -3919,7 +3920,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v442")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v445")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4005,7 +4006,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v442")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v445")
         )
 
         // ===== 新規チーム作成 =====
@@ -6206,12 +6207,9 @@ function App() {
                   .filter(({p,i})=>{
                     if(!p||!p.name) return false;
                     if(!/^投手\d+$/.test(p.name)) return false; // デフォルト名のみ
-                    if(i===activePIdx) return false; // 現在登板中は除外
-                    // 打席記録がある（computePitcherStatsで被安打等がある）場合は除外
-                    const auto = autoArr[i]||{};
-                    const hasRecord = (auto._outsGot||0)>0||(auto.autoH||0)>0||(auto.autoBb||0)>0||(auto.autoK||0)>0;
-                    if(hasRecord) return false;
-                    return true; // デフォルト名で成績なし→削除対象
+                    // 試合中のみ現在登板中を除外（試合終了後は全デフォルト名を削除対象に）
+                    if(!game.finished && i===activePIdx) return false;
+                    return true;
                   });
                 if(unusedDefaultPitchers.length===0) return null;
                 return React.createElement('div',{style:{

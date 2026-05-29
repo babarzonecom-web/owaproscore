@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v452")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v453")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v452")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v453")
         )
 
         // ===== 新規チーム作成 =====
@@ -8665,7 +8665,7 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
     // チーム復元モーダル
     , restoreTarget && React.createElement('div', {style:S.overlay, onClick:()=>setRestoreTarget(null)}
         , React.createElement('div', {style:{...S.mBox,maxWidth:320}, onClick:e=>e.stopPropagation()}
-          , React.createElement('div', {style:{...S.mt,marginBottom:12}}, "👥 チーム復元")
+          , React.createElement('div', {style:{...S.mt,marginBottom:12}}, "👥 チームを登録")
           , React.createElement('div', {style:{fontSize:12,color:"#94a3b8",marginBottom:16}},
               restoreTarget.awayTeam+" vs "+restoreTarget.homeTeam+" のチームを登録します")
           , (()=>{
@@ -8677,20 +8677,17 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
               ];
               return teams2.map((t,idx)=>{
                 const isMy = t.role==="my";
-                const myTeamSide = t.name===restoreTarget.awayTeam ? "away" : "home";
+                const teamSide = t.name===restoreTarget.awayTeam ? "away" : "home";
                 return React.createElement('button', {key:idx,
                   onClick:()=>{
-                    if(isMy){ onRestoreTeam(restoreTarget, myTeamSide); }
-                    else {
-                      const oppSide = myTeamSide==="away"?"home":"away";
-                      onRestoreOpp(restoreTarget, restoreTarget[oppSide+"Team"]);
-                    }
+                    if(isMy){ onRestoreTeam(restoreTarget, teamSide); }
+                    else { onRestoreOpp(restoreTarget, t.name); } // t.nameをそのまま渡す
                     setRestoreTarget(null);
-                    showToast("✅ 復元しました");
+                    showToast("✅ 登録しました");
                   },
                   style:{...sBt(isMy?"#fbbf24":"#7dd3fc"),width:"100%",padding:"10px",
                     marginBottom:6,fontSize:12,fontWeight:700}
-                }, isMy ? "🏟 "+t.name+" を自チームに" : "⚔️ "+t.name+" を対戦相手に");
+                }, isMy ? "🏟 "+t.name+" を自チームに" : "⚔️ "+t.name+" を対戦相手に登録");
               });
             })()
           , React.createElement('button', {
@@ -8828,7 +8825,7 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
               , React.createElement('button', {
                   onClick:()=>setRestoreTarget(g),
                   style:{...sBt("#475569",true),fontSize:11,padding:"4px 10px"}
-                }, "👥 チーム復元")
+                }, "👥 チームを登録")
               , onUpload && React.createElement('button', {
                   onClick:()=>onUpload(g),
                   style:{...sBt("#475569",true),fontSize:11,padding:"4px 10px"}

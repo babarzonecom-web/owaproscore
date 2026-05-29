@@ -3924,7 +3924,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v447")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v448")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4010,7 +4010,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v447")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v448")
         )
 
         // ===== 新規チーム作成 =====
@@ -8311,11 +8311,12 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           , React.createElement('div', {style:{...S.card}}
             , React.createElement('div', {style:{...S.ct,marginBottom:12}}, "🏆 チーム通算成績")
             , React.createElement('div', {style:{fontSize:12,color:"#7db8e8",marginBottom:10}}, "集計試合数: ", filteredGames.length, "試合")
-            , React.createElement('table', {style:{...S.table,marginBottom:16}}
+            , React.createElement('div', {style:{overflowX:"auto",marginBottom:16}}
+            , React.createElement('table', {style:{...S.table,minWidth:400}}
               , React.createElement('thead', null
                 , React.createElement('tr', null
                   , ["チーム","試合","総得点","総安打","打率","本塁打","盗塁","失策"].map(h=>
-                      React.createElement('th',{key:h,style:thS},h))
+                      React.createElement('th',{key:h,style:{...thS,whiteSpace:"nowrap"}},h))
                 )
               )
               , React.createElement('tbody', null
@@ -8346,6 +8347,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                   })()
               )
             )
+            ) // overflowX wrapper閉じ
             , React.createElement('div', {style:{fontSize:11,color:"#475569"}}, "※ フィルター中の試合の合計")
           )
         )

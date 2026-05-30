@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v453")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v454")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v453")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v454")
         )
 
         // ===== 新規チーム作成 =====
@@ -7787,13 +7787,15 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       , React.createElement('div', {style:{fontSize:14,fontWeight:700,color,marginBottom:8,
           borderLeft:`4px solid ${color}`,paddingLeft:10}}, teamName+" 打撃成績")
       , React.createElement('div', {style:{overflowX:"auto"}}
-        , React.createElement('table', {style:{...S.table,minWidth:560}}
+        , React.createElement('table', {style:{...S.table,minWidth:700}}
           , React.createElement('thead', null
             , React.createElement('tr', null
               , [
-                  ["選手",null],["試","games"],["打席","pa"],["打数","ab"],["安打","h"],["二","h2"],["三","h3"],
-                  ["打率","avg"],["得点圏","spAvg"],["長打率","slg"],["出塁率","obp"],["OPS","ops"],
-                  ["本塁","hr"],["打点","rbi"],["得点","run"],["四球","bb"],["三振","k"],["盗塁","sb"],["失策","e"]
+                  ["選手",null],["試","games"],["打席","pa"],["打数","ab"],["安打","h"],
+                  ["本塁","hr"],["打率","avg"],["得点圏","spAvg"],["打点","rbi"],
+                  ["長打率","slg"],["出塁率","obp"],["OPS","ops"],
+                  ["得点","run"],["盗塁","sb"],["四球","bb"],["死球","hbp"],
+                  ["二","h2"],["三","h3"],["三振","k"],["失策","e"]
                 ].map(([label,key])=>
                   React.createElement('th', {key:label, style:{...thS,
                     cursor:key?"pointer":"default",
@@ -7828,8 +7830,6 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                       const editable = [
                         ["ab",p.ab,tdS],
                         ["h",p.h,{...tdS,color:"#4ade80",fontWeight:700}],
-                        ["h2",p.h2||0,{...tdS,color:"#4ade80"}],
-                        ["h3",p.h3||0,{...tdS,color:"#4ade80"}],
                       ];
                       // 自動再計算される派生指標
                       const effectiveAb = getV("ab", p.ab);
@@ -7853,21 +7853,25 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                         const sum = slgNum + obpNum;
                         return sum>0 ? sum.toFixed(3).replace(/^0/,"") : ".---";
                       })();
+                      // 列順: 本塁打・打率・得点圏・打点・長打率・出塁率・OPS・得点・盗塁・四球・死球・二塁打・三塁打・三振・失策
                       const readonly = [
-                        ["avg", recalcAvg, {...tdS,color:"#fbbf24",fontWeight:900}],
-                        ["spAvg", p.spAvg||"---", {...tdS,color:"#fb923c",fontSize:10}],
-                        ["slg", recalcSlg, tdS],
-                        ["obp", recalcObp, tdS],
-                        ["ops", recalcOps, {...tdS,color:"#f59e0b",fontWeight:700}],
+                        ["avg",  recalcAvg,       {...tdS,color:"#fbbf24",fontWeight:900}],
+                        ["spAvg",p.spAvg||"---",  {...tdS,color:"#fb923c",fontSize:10}],
+                        ["slg",  recalcSlg,        tdS],
+                        ["obp",  recalcObp,        tdS],
+                        ["ops",  recalcOps,        {...tdS,color:"#f59e0b",fontWeight:700}],
                       ];
                       const editable2 = [
-                        ["hr",p.hr,{...tdS,color:"#f87171"}],
-                        ["rbi",p.rbi,{...tdS,color:"#fb923c"}],
-                        ["run",p.run,tdS],
-                        ["bb",p.bb,{...tdS,color:"#60a5fa"}],
-                        ["k",p.k,{...tdS,color:"#94a3b8"}],
-                        ["sb",p.sb,{...tdS,color:"#4ade80"}],
-                        ["e",p.e||0,{...tdS,color:p.e>0?"#f87171":"#475569"}],
+                        ["hr",   p.hr,             {...tdS,color:"#f87171"}],
+                        ["rbi",  p.rbi,            {...tdS,color:"#fb923c"}],
+                        ["run",  p.run,            tdS],
+                        ["sb",   p.sb,             {...tdS,color:"#4ade80"}],
+                        ["bb",   p.bb,             {...tdS,color:"#60a5fa"}],
+                        ["hbp",  p._hbp||0,        {...tdS,color:"#a78bfa"}],
+                        ["h2",   p.h2||0,          {...tdS,color:"#4ade80"}],
+                        ["h3",   p.h3||0,          {...tdS,color:"#4ade80"}],
+                        ["k",    p.k,              {...tdS,color:"#94a3b8"}],
+                        ["e",    p.e||0,           {...tdS,color:p.e>0?"#f87171":"#475569"}],
                       ];
                       const renderEditableCell = ([k,v,s]) => {
                         if(!editMode) return React.createElement('td',{key:k,style:s},ov[k]!==undefined?ov[k]:v);
@@ -7887,10 +7891,14 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                         );
                       };
                       const renderReadonlyCell = ([k,v,s]) => React.createElement('td',{key:k,style:{...s,opacity:editMode?0.6:1}},v);
+                      // 列順に合わせてレンダリング
+                      // ab, h → hr → avg/spAvg/slg/obp/ops(readonly) → rbi,run,sb,bb,hbp,h2,h3,k,e
                       return [
-                        ...editable.map(renderEditableCell),
-                        ...readonly.map(renderReadonlyCell),
-                        ...editable2.map(renderEditableCell),
+                        ...editable.map(renderEditableCell),           // ab, h
+                        renderEditableCell(editable2[0]),               // hr
+                        ...readonly.map(renderReadonlyCell),            // avg,spAvg,slg,obp,ops
+                        renderEditableCell(editable2[1]),               // rbi
+                        ...editable2.slice(2).map(renderEditableCell),  // run,sb,bb,hbp,h2,h3,k,e
                       ];
                     })()
                 )
@@ -7902,15 +7910,20 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
               , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.ab,0))
               , React.createElement('td', {style:{...tdS,color:"#4ade80",fontWeight:700}}, players.reduce((s,p)=>s+p.h,0))
               , (()=>{const ab=players.reduce((s,p)=>s+p.ab,0);const h=players.reduce((s,p)=>s+p.h,0);return React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---");})()
-              , React.createElement('td', {style:tdS}, "—")
-              , React.createElement('td', {style:tdS}, "—")
-              , React.createElement('td', {style:tdS}, "—")
               , React.createElement('td', {style:{...tdS,color:"#f87171"}}, players.reduce((s,p)=>s+p.hr,0))
+              , React.createElement('td', {style:{...tdS,color:"#fbbf24",fontWeight:900}}, "—")
+              , React.createElement('td', {style:tdS}, "—")
               , React.createElement('td', {style:{...tdS,color:"#fb923c"}}, players.reduce((s,p)=>s+p.rbi,0))
+              , React.createElement('td', {style:tdS}, "—")
+              , React.createElement('td', {style:tdS}, "—")
+              , React.createElement('td', {style:{...tdS,color:"#f59e0b",fontWeight:700}}, "—")
               , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.run,0))
-              , React.createElement('td', {style:{...tdS,color:"#60a5fa"}}, players.reduce((s,p)=>s+p.bb,0))
-              , React.createElement('td', {style:{...tdS,color:"#94a3b8"}}, players.reduce((s,p)=>s+p.k,0))
               , React.createElement('td', {style:{...tdS,color:"#4ade80"}}, players.reduce((s,p)=>s+p.sb,0))
+              , React.createElement('td', {style:{...tdS,color:"#60a5fa"}}, players.reduce((s,p)=>s+p.bb,0))
+              , React.createElement('td', {style:{...tdS,color:"#a78bfa"}}, players.reduce((s,p)=>s+(p._hbp||0),0))
+              , React.createElement('td', {style:{...tdS,color:"#4ade80"}}, players.reduce((s,p)=>s+(p.h2||0),0))
+              , React.createElement('td', {style:{...tdS,color:"#4ade80"}}, players.reduce((s,p)=>s+(p.h3||0),0))
+              , React.createElement('td', {style:{...tdS,color:"#94a3b8"}}, players.reduce((s,p)=>s+p.k,0))
               , React.createElement('td', {style:{...tdS,color:"#f87171"}}, players.reduce((s,p)=>s+(p.e||0),0))
             )
           )
@@ -8268,7 +8281,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
 
   // 種別タブ切替
       , React.createElement('div', {style:{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}
-        , [["batting","⚾ 打撃"],["pitching","🎯 投手"],["defense","🧤 守備"],["team","🏆 チーム通算"],["recent","📅 直近5試合"]].map(([id,label])=>
+        , [["batting","⚾ 打撃"],["pitching","🎯 投手"],["team","🏆 チーム通算"],["recent","📅 直近5試合"]].map(([id,label])=>
             React.createElement('button', {key:id, onClick:()=>setStatsView(id),
               style:{padding:"7px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
                 background:statsView===id?"#1d4ed8":"#0d1f35",

@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v454")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v455")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v454")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v455")
         )
 
         // ===== 新規チーム作成 =====
@@ -7795,7 +7795,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                   ["本塁","hr"],["打率","avg"],["得点圏","spAvg"],["打点","rbi"],
                   ["長打率","slg"],["出塁率","obp"],["OPS","ops"],
                   ["得点","run"],["盗塁","sb"],["四球","bb"],["死球","hbp"],
-                  ["二","h2"],["三","h3"],["三振","k"],["失策","e"]
+                  ["二","h2"],["三","h3"],["犠打","sac"],["犠飛","sf"],["三振","k"],["失策","e"]
                 ].map(([label,key])=>
                   React.createElement('th', {key:label, style:{...thS,
                     cursor:key?"pointer":"default",
@@ -7870,6 +7870,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                         ["hbp",  p._hbp||0,        {...tdS,color:"#a78bfa"}],
                         ["h2",   p.h2||0,          {...tdS,color:"#4ade80"}],
                         ["h3",   p.h3||0,          {...tdS,color:"#4ade80"}],
+                        ["sac",  p._sac||0,         {...tdS,color:"#94a3b8"}],
+                        ["sf",   p._sf||0,          {...tdS,color:"#94a3b8"}],
                         ["k",    p.k,              {...tdS,color:"#94a3b8"}],
                         ["e",    p.e||0,           {...tdS,color:p.e>0?"#f87171":"#475569"}],
                       ];
@@ -7923,6 +7925,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
               , React.createElement('td', {style:{...tdS,color:"#a78bfa"}}, players.reduce((s,p)=>s+(p._hbp||0),0))
               , React.createElement('td', {style:{...tdS,color:"#4ade80"}}, players.reduce((s,p)=>s+(p.h2||0),0))
               , React.createElement('td', {style:{...tdS,color:"#4ade80"}}, players.reduce((s,p)=>s+(p.h3||0),0))
+              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+(p._sac||0),0))
+              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+(p._sf||0),0))
               , React.createElement('td', {style:{...tdS,color:"#94a3b8"}}, players.reduce((s,p)=>s+p.k,0))
               , React.createElement('td', {style:{...tdS,color:"#f87171"}}, players.reduce((s,p)=>s+(p.e||0),0))
             )

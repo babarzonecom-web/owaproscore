@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v455")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v456")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v455")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v456")
         )
 
         // ===== 新規チーム作成 =====
@@ -7782,7 +7782,9 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const tdS = {...S.td, textAlign:"center", fontSize:12, padding:"5px 3px"};
   const tdN = {...tdS, textAlign:"left", paddingLeft:8, fontWeight:700};
 
-  const BattingTable = ({players, teamName, color, editMode, statOverrides, saveOverride, clearOverride}) => (
+  const BattingTable = ({players, teamName, color, editMode, statOverrides, saveOverride, clearOverride}) => {
+    const [highlightRow, setHighlightRow] = React.useState(null);
+    return (
     React.createElement('div', {style:{marginBottom:24}}
       , React.createElement('div', {style:{fontSize:14,fontWeight:700,color,marginBottom:8,
           borderLeft:`4px solid ${color}`,paddingLeft:10}}, teamName+" 打撃成績")
@@ -7811,8 +7813,14 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           )
           , React.createElement('tbody', null
             , players.map((p,i)=>
-                React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0a1628":"#0d1f35"}}
-                  , React.createElement('td', {style:{...tdN,color:"#e2e8f0",whiteSpace:"nowrap"}}
+                React.createElement('tr', {key:p.name,style:{
+                  background:highlightRow===p.name?"#1e3a5f":i%2===0?"#0a1628":"#0d1f35",
+                  outline:highlightRow===p.name?"2px solid #3b82f6":"none"
+                }}
+                  , React.createElement('td', {
+                    style:{...tdN,color:"#e2e8f0",whiteSpace:"nowrap",cursor:"pointer"},
+                    onClick:()=>setHighlightRow(r=>r===p.name?null:p.name)
+                  }
                     , p.name
                     , editMode && (statOverrides||{})[p.name] && React.createElement('button',{
                         onClick:()=>clearOverride&&clearOverride(p.name),
@@ -7893,14 +7901,30 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                         );
                       };
                       const renderReadonlyCell = ([k,v,s]) => React.createElement('td',{key:k,style:{...s,opacity:editMode?0.6:1}},v);
-                      // 列順に合わせてレンダリング
-                      // ab, h → hr → avg/spAvg/slg/obp/ops(readonly) → rbi,run,sb,bb,hbp,h2,h3,k,e
+                      // 列順: 打数・安打・本塁打・打率・得点圏・打点・長打率・出塁率・OPS・得点・盗塁・四球・死球・二塁打・三塁打・犠打・犠飛・三振・失策
+                      const [_ab,_h] = editable;
+                      const [_hr,_rbi,_run,_sb,_bb,_hbp,_h2,_h3,_sac,_sf,_k,_e] = editable2;
+                      const [_avg,_spAvg,_slg,_obp,_ops] = readonly.map(renderReadonlyCell);
                       return [
-                        ...editable.map(renderEditableCell),           // ab, h
-                        renderEditableCell(editable2[0]),               // hr
-                        ...readonly.map(renderReadonlyCell),            // avg,spAvg,slg,obp,ops
-                        renderEditableCell(editable2[1]),               // rbi
-                        ...editable2.slice(2).map(renderEditableCell),  // run,sb,bb,hbp,h2,h3,k,e
+                        renderEditableCell(_ab),   // 打数
+                        renderEditableCell(_h),    // 安打
+                        renderEditableCell(_hr),   // 本塁打
+                        _avg,                      // 打率
+                        _spAvg,                    // 得点圏打率
+                        renderEditableCell(_rbi),  // 打点
+                        _slg,                      // 長打率
+                        _obp,                      // 出塁率
+                        _ops,                      // OPS
+                        renderEditableCell(_run),  // 得点
+                        renderEditableCell(_sb),   // 盗塁
+                        renderEditableCell(_bb),   // 四球
+                        renderEditableCell(_hbp),  // 死球
+                        renderEditableCell(_h2),   // 二塁打
+                        renderEditableCell(_h3),   // 三塁打
+                        renderEditableCell(_sac),  // 犠打
+                        renderEditableCell(_sf),   // 犠飛
+                        renderEditableCell(_k),    // 三振
+                        renderEditableCell(_e),    // 失策
                       ];
                     })()
                 )
@@ -7935,6 +7959,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       )
     )
   );
+  };
 
   const PitchingTable = ({pitchers, teamName, color, editMode, pitchOverrides, savePitchOverride, innings}) => (
     React.createElement('div', {style:{marginBottom:24}}

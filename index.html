@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v456")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v457")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v456")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v457")
         )
 
         // ===== 新規チーム作成 =====
@@ -4235,16 +4235,16 @@ function App() {
             const _nextBatter = _lineup[(_batIdx+1)%Math.max(_lineup.length,1)];
             const _defPitchers = g[_dt+"Pitchers"]||[];
             const _pitIdx = g.finished ? -1 : (g[_dt+"PitcherIdx"]||0);
-            const _pitcher = _defPitchers[_pitIdx]||{};
+            const _pitcher = (_pitIdx>=0 ? _defPitchers[_pitIdx] : null)||{};
             const _bases = g.bases||[null,null,null];
             const _outs = g.outs||0;
             const _bso_b = g._bso_b||0;
             const _bso_s = g._bso_s||0;
             const _isPitchMode = g.pitchMode==="pitch";
 
-            // 投手成績（computePitcherStatsから）
+            // 投手成績（computePitcherStatsから）- 1回だけ呼ぶ
             const _pStats = computePitcherStats(g);
-            const _pitAuto = (_pStats[_dt]||[])[_pitIdx]||{};
+            const _pitAuto = (_pitIdx>=0 ? (_pStats[_dt]||[])[_pitIdx] : null)||{};
             const _pitAutoIpOuts = Math.floor((_pitAuto.autoIp||0)/10)*3+((_pitAuto.autoIp||0)%10);
             const _pitIpOuts = _pitcher.manualIp!==undefined?_pitcher.manualIp:_pitAutoIpOuts;
             const _pitIpDisp = Math.floor(_pitIpOuts/3)+"."+(_pitIpOuts%3);
@@ -4253,7 +4253,8 @@ function App() {
             // 現打者の全打席結果（イニング順）
             const batterAbList = [];
             if(_batter){
-              const maxInn = Math.max(...Object.keys(_batter.atBats||{}).map(Number).filter(n=>!isNaN(n)), 0);
+              const _abKeys = Object.keys(_batter.atBats||{}).map(Number).filter(n=>!isNaN(n));
+              const maxInn = _abKeys.length>0 ? Math.max(..._abKeys) : 0;
               for(let inn=1; inn<=maxInn; inn++){
                 const v=(_batter.atBats||{})[inn];
                 if(!v) continue;
@@ -4396,8 +4397,7 @@ function App() {
                       if(!pLog.length&&pitchers.length>0){
                         pLog.push({pitcherIdx:0,fromInning:1,fromHalf:side==="away"?"top":"bottom",outsAtStart:0});
                       }
-                      const pStats=computePitcherStats(g);
-                      const autoArr=pStats[side]||[];
+                      const autoArr=_pStats[side]||[];
                       return React.createElement('div',{key:side,style:{marginBottom:6}}
                         ,React.createElement('div',{style:{fontSize:10,color,fontWeight:700,marginBottom:3}},label)
                         ,React.createElement('div',{style:{display:"flex",gap:4,flexWrap:"wrap"}}

@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v458")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v460")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v458")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v460")
         )
 
         // ===== 新規チーム作成 =====
@@ -4311,7 +4311,32 @@ function App() {
 
             const _innings = Array.from({length:g.innings||9},(_,i)=>i+1);
 
+            // 履歴を読み込んでいる場合（Firebaseのライブ速報から外れている）を検出
+            const _isLiveMode = !g.finished || (window.__teamShareRef && typeof window.__teamShareRef === "string");
+            const _showReturnLive = isReadOnly && window.__teamShareCode && window.__loadedFromHistory;
+
             return React.createElement('div',{style:{maxWidth:480,margin:"0 auto",display:"flex",flexDirection:"column",gap:8,paddingTop:8}}
+
+              // 「LIVEに戻る」ボタン（履歴を読み込んでいるとき表示）
+              ,_showReturnLive && React.createElement('button',{
+                onClick:()=>{
+                  const restUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json";
+                  fetch(restUrl,{cache:"no-store"}).then(r=>r.json()).then(data=>{
+                    if(!data||!data.id) return;
+                    setStorage(s=>({...s, currentGame:{...s.currentGame,...data}}));
+                    window.__loadedFromHistory=false; showToast("🔴 速報に戻りました");
+                  }).catch(()=>showToast("接続できません"));
+                },
+                style:{
+                  background:"#dc2626",border:"none",borderRadius:10,
+                  color:"#fff",padding:"12px",width:"100%",
+                  fontSize:14,fontWeight:900,cursor:"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:8
+                }
+              }
+                ,React.createElement('span',{style:{fontSize:16}},"🔴")
+                ,"LIVE に戻る"
+              )
 
               // ① スコア行（タップでアコーディオン展開）
               ,React.createElement('div',{style:{
@@ -5540,7 +5565,8 @@ function App() {
               teamShareCode:teamShareCode,
               showToast:showToast,
               tournaments:tournaments,
-              onLoad:loadGame,
+              isReadOnly:isReadOnly,
+              onLoad:isReadOnly?null:loadGame,
               onDelete:delHistory,
               onExcel:(g)=>{ showToast("📊 出力処理を開始します..."); exportExcel(g); },
               onRecompute:()=>{
@@ -6190,7 +6216,8 @@ function App() {
               )
               , React.createElement('button', { onClick: ()=>{
                 setStorage(s=>({...s,currentGame:{...modal.targetGame},undoStack:[]}));
-                setTab("score");
+                window.__loadedFromHistory = true;
+                setTab(isReadOnly?"live":"score");
                 setModal(null);
                 showToast("読み込みました");
               }, style: {...sBt("#1d4ed8"),width:"100%",padding:"12px",fontSize:14,fontWeight:700,marginBottom:8},}, "📂 読み込む"
@@ -8649,7 +8676,7 @@ function PasswordChangeCard({ teamCode, showToast }) {
   );
 }
 
-function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam, onRestoreOpp, showToast, onRecompute, tournaments }) {
+function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImport, onUpload, onRestoreTeam, onRestoreOpp, showToast, onRecompute, tournaments, isReadOnly }) {
   const [restoreTarget, setRestoreTarget] = React.useState(null);
   const [fbTeamId, setFbTeamId] = useState(teamShareCode||"");
   const [fbLoading, setFbLoading] = useState(false);
@@ -8858,7 +8885,7 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
 
             // アクションボタン
             , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
-              , React.createElement('button', {
+              , !isReadOnly && onLoad && React.createElement('button', {
                   onClick:()=>onLoad(g),
                   style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}
                 }, "📂 読み込む")
@@ -8874,7 +8901,7 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
                   onClick:()=>onUpload(g),
                   style:{...sBt("#475569",true),fontSize:11,padding:"4px 10px"}
                 }, "☁️ UP")
-              , React.createElement('button', {
+              , !isReadOnly && React.createElement('button', {
                   onClick:()=>onDelete(g.id),
                   style:{...sBt("#dc2626",true),fontSize:11,padding:"4px 10px",marginLeft:"auto"}
                 }, "🗑")

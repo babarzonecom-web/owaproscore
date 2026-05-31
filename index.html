@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v457")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v458")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v457")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v458")
         )
 
         // ===== 新規チーム作成 =====
@@ -5794,7 +5794,7 @@ function App() {
                       style:{...sBt("#475569",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
                     }, "✏️ 編集")
                 )
-                , React.createElement('div', {style:{display:"flex",gap:8,flexWrap:"wrap"}}
+                , !game.started && React.createElement('div', {style:{display:"flex",gap:8,flexWrap:"wrap"}}
                   , React.createElement('button', {
                       onClick:()=>{ setModal({step:"team_lineup",side:"away",preselect:myTeam}); setTab("lineup"); },
                       style:{...sBt("#1d4ed8"),fontSize:12,padding:"5px 14px"}
@@ -5804,6 +5804,8 @@ function App() {
                       style:{...sBt("#0369a1"),fontSize:12,padding:"5px 14px"}
                     }, "🏠 ホームで使う")
                 )
+                , game.started && React.createElement('div', {style:{fontSize:11,color:"#475569",marginTop:4}},
+                    "試合中はスタメン変更できません（オーダータブで交代してください）")
               )
             : React.createElement('div', {style:{color:"#475569",fontSize:12}},
                 "まだ自チームが登録されていません。「登録」から追加してください。")
@@ -5833,11 +5835,11 @@ function App() {
                             (t.members||[]).length+"名")
                       )
                       , React.createElement('div', {style:{display:"flex",gap:4}}
-                        , React.createElement('button', {
+                        , !game.started && React.createElement('button', {
                             onClick:()=>{ setModal({step:"team_lineup",side:"away",preselect:t}); setTab("lineup"); },
                             style:{...sBt("#1d4ed8",true),fontSize:11,padding:"3px 8px"}
                           }, "V")
-                        , React.createElement('button', {
+                        , !game.started && React.createElement('button', {
                             onClick:()=>{ setModal({step:"team_lineup",side:"home",preselect:t}); setTab("lineup"); },
                             style:{...sBt("#0369a1",true),fontSize:11,padding:"3px 8px"}
                           }, "H")

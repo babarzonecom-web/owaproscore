@@ -3117,7 +3117,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.27")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.28")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3203,7 +3203,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.27")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.28")
         )
 
         // ===== 新規チーム作成 =====
@@ -7143,13 +7143,13 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           )
           , React.createElement('tbody', null
             , pitchers.map((p,i)=>{
-                // aggregatePitcherStatsの値をそのまま使用（pitchOverrides廃止）
-                // erのみ手動修正を尊重（aggregateが既に反映済みなのでp.erを直接使う）
+                const ov = (pitchOverrides||{})[p.name]||{};
+                const ipDispVal = ov.ipDisp !== undefined ? ov.ipDisp : p.ipDisp;
                 const displayFields = [
-                  {k:"ipDisp", v:p.ipDisp, s:tdS, editable:false},
+                  {k:"ipDisp", v:ipDispVal, s:tdS, editable:true},
                   {k:"h",      v:p.h,      s:tdS, editable:false},
                   {k:"runs",   v:p.runs,   s:{...tdS,color:"#fb923c"}, editable:false},
-                  {k:"er",     v:p.er,     s:{...tdS,color:"#f87171"}, editable:false},
+                  {k:"er",     v:p.er,     s:{...tdS,color:"#f87171"}, editable:true},
                   {k:"era",    v:p.era,    s:{...tdS,color:parseFloat(p.era)<3?"#4ade80":parseFloat(p.era)<5?"#fbbf24":"#f87171",fontWeight:900}, editable:false},
                   {k:"whip",   v:p.whip,   s:tdS, editable:false},
                   {k:"bb",     v:p.bb,     s:{...tdS,color:"#60a5fa"}, editable:false},

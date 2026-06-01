@@ -787,13 +787,19 @@ const computePitcherStats = (g) => {
     // 先発投手エントリを補完する
     const starterHalf = defTeam==="away" ? "top" : "bottom";
     const rawLog = pitcherLog.length>0 ? pitcherLog : [];
-    // 先発エントリが既にあるか確認
-    const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf===starterHalf && (l.outsAtStart||0)===0);
-    // 先発インデックス：pitcherLogの中で最も古い（fromInningが最小）エントリのidx、なければ0
-    const sortedLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1));
+    // pitcherLogが空なら先発補完が必要
+    // pitcherLogに既にエントリがある場合は補完しない（最初のエントリを先発扱い）
+    const sortedLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||(a.outsAtStart||0)-(b.outsAtStart||0));
     const starterIdx = sortedLog.length>0 ? sortedLog[0].pitcherIdx : 0;
-    const starterEntry = {pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0};
-    const log = hasStarter ? rawLog : [starterEntry, ...rawLog];
+    let log;
+    if(rawLog.length === 0){
+      // pitcherLogが空→先発補完エントリを追加
+      const starterEntry = {pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0};
+      log = [starterEntry];
+    } else {
+      // pitcherLogに既にエントリがある→そのまま使用（先発補完不要）
+      log = rawLog;
+    }
 
     // 打席の通し番号(seq)ベースで担当投手を特定するヘルパー
     // 各交代エントリにfromSeq（何番目の打席から担当か）を紐づけて判定
@@ -4573,7 +4579,9 @@ function App() {
                             const auto = app;
                             const rawIp = auto.autoIp||0;
                             const autoIpOuts = Math.floor(rawIp/10)*3 + (rawIp%10);
-                            const effectiveIp = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
+                            // manualIpは投手単位のため再登板がある場合は使わない（autoのみ使用）
+                            const hasReappear = byApp.filter(a=>a.pitcherIdx===i).length > 1;
+                            const effectiveIp = (!hasReappear && p.manualIp !== undefined) ? p.manualIp : autoIpOuts;
                             const ipDisp = Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?(effectiveIp%3)+"/3":"");
                             const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
                             const er    = p.manualOverride && p.er!==undefined ? p.er : (auto.autoEr||0);

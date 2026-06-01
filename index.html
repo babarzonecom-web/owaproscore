@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v463")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v461")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v463")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v461")
         )
 
         // ===== 新規チーム作成 =====
@@ -5317,12 +5317,13 @@ function App() {
                     )
                     , React.createElement('tbody', null
                       , pitchers.map((p,i)=>({p,i})).filter(({p,i})=>{
-                          if(!p||!p.name) return false;
+                          if(!p||!p.name) return false; // nameなしは非表示
                           const isDefault = /^投手\d+$/.test(p.name);
                           const inLog = (game[side+"PitcherLog"]||[]).some(l=>l.pitcherIdx===i);
                           if(isDefault) return inLog || i===curPIdx;
                           return true;
                         }).map(({p,i}) => {
+                          // iは元のpitchers配列のindex（正確）
                           const isCur = !game.finished && i===curPIdx;
                           const auto = (pitcherStats[side]||[])[i]||{};
                           const rawIp = auto.autoIp||0;
@@ -7957,43 +7958,31 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                     })()
                 )
               )
-            , (()=>{
-                const _tab = players.reduce((s,p)=>s+p.ab,0);
-                const _th  = players.reduce((s,p)=>s+p.h,0);
-                const _tpa = players.reduce((s,p)=>s+p.pa,0);
-                const _tbb = players.reduce((s,p)=>s+p.bb,0);
-                const _thbp= players.reduce((s,p)=>s+(p._hbp||0),0);
-                const _tsf = players.reduce((s,p)=>s+(p._sf||0),0);
-                const _tb2 = players.reduce((s,p)=>s+(p.tb||0),0);
-                const _avg = _tab>0?(_th/_tab).toFixed(3).replace(/^0/,""):".---";
-                const _slg = _tab>0?(_tb2/_tab).toFixed(3).replace(/^0/,""):".---";
-                const _obpD= _tab+_tbb+_thbp+_tsf;
-                const _obp = _obpD>0?((_th+_tbb+_thbp)/_obpD).toFixed(3).replace(/^0/,""):".---";
-                return React.createElement('tr',{style:{background:"#1e3a5f",fontWeight:700}}
-                  ,React.createElement('td',{style:{...tdN,color:"#7dd3fc"}},"チーム計") // 選手
-                  ,React.createElement('td',{style:tdS},"—")                              // 試
-                  ,React.createElement('td',{style:tdS},_tpa)                             // 打席
-                  ,React.createElement('td',{style:tdS},_tab)                             // 打数
-                  ,React.createElement('td',{style:{...tdS,color:"#4ade80",fontWeight:700}},_th)  // 安打
-                  ,React.createElement('td',{style:{...tdS,color:"#f87171"}},players.reduce((s,p)=>s+p.hr,0)) // 本塁打
-                  ,React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},_avg) // 打率
-                  ,React.createElement('td',{style:{...tdS,color:"#fb923c",fontSize:10}},"—")    // 得点圏
-                  ,React.createElement('td',{style:{...tdS,color:"#fb923c"}},players.reduce((s,p)=>s+p.rbi,0)) // 打点
-                  ,React.createElement('td',{style:tdS},_slg)                             // 長打率
-                  ,React.createElement('td',{style:tdS},_obp)                             // 出塁率
-                  ,React.createElement('td',{style:{...tdS,color:"#f59e0b",fontWeight:700}},"—") // OPS
-                  ,React.createElement('td',{style:tdS},players.reduce((s,p)=>s+p.run,0)) // 得点
-                  ,React.createElement('td',{style:{...tdS,color:"#4ade80"}},players.reduce((s,p)=>s+p.sb,0)) // 盗塁
-                  ,React.createElement('td',{style:{...tdS,color:"#60a5fa"}},_tbb)        // 四球
-                  ,React.createElement('td',{style:{...tdS,color:"#a78bfa"}},_thbp)       // 死球
-                  ,React.createElement('td',{style:{...tdS,color:"#4ade80"}},players.reduce((s,p)=>s+(p.h2||0),0)) // 二塁打
-                  ,React.createElement('td',{style:{...tdS,color:"#4ade80"}},players.reduce((s,p)=>s+(p.h3||0),0)) // 三塁打
-                  ,React.createElement('td',{style:tdS},players.reduce((s,p)=>s+(p._sac||0),0)) // 犠打
-                  ,React.createElement('td',{style:tdS},_tsf)                             // 犠飛
-                  ,React.createElement('td',{style:{...tdS,color:"#94a3b8"}},players.reduce((s,p)=>s+p.k,0)) // 三振
-                  ,React.createElement('td',{style:{...tdS,color:"#f87171"}},players.reduce((s,p)=>s+(p.e||0),0)) // 失策
-                );
-              })()            )
+            , React.createElement('tr', {style:{background:"#1e3a5f",fontWeight:700}}
+              , React.createElement('td', {style:{...tdN,color:"#7dd3fc"}}, "チーム計")
+              , React.createElement('td', {style:tdS}, "—")
+              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.pa,0))
+              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.ab,0))
+              , React.createElement('td', {style:{...tdS,color:"#4ade80",fontWeight:700}}, players.reduce((s,p)=>s+p.h,0))
+              , (()=>{const ab=players.reduce((s,p)=>s+p.ab,0);const h=players.reduce((s,p)=>s+p.h,0);return React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---");})()
+              , React.createElement('td', {style:{...tdS,color:"#f87171"}}, players.reduce((s,p)=>s+p.hr,0))
+              , React.createElement('td', {style:{...tdS,color:"#fbbf24",fontWeight:900}}, "—")
+              , React.createElement('td', {style:tdS}, "—")
+              , React.createElement('td', {style:{...tdS,color:"#fb923c"}}, players.reduce((s,p)=>s+p.rbi,0))
+              , React.createElement('td', {style:tdS}, "—")
+              , React.createElement('td', {style:tdS}, "—")
+              , React.createElement('td', {style:{...tdS,color:"#f59e0b",fontWeight:700}}, "—")
+              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.run,0))
+              , React.createElement('td', {style:{...tdS,color:"#4ade80"}}, players.reduce((s,p)=>s+p.sb,0))
+              , React.createElement('td', {style:{...tdS,color:"#60a5fa"}}, players.reduce((s,p)=>s+p.bb,0))
+              , React.createElement('td', {style:{...tdS,color:"#a78bfa"}}, players.reduce((s,p)=>s+(p._hbp||0),0))
+              , React.createElement('td', {style:{...tdS,color:"#4ade80"}}, players.reduce((s,p)=>s+(p.h2||0),0))
+              , React.createElement('td', {style:{...tdS,color:"#4ade80"}}, players.reduce((s,p)=>s+(p.h3||0),0))
+              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+(p._sac||0),0))
+              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+(p._sf||0),0))
+              , React.createElement('td', {style:{...tdS,color:"#94a3b8"}}, players.reduce((s,p)=>s+p.k,0))
+              , React.createElement('td', {style:{...tdS,color:"#f87171"}}, players.reduce((s,p)=>s+(p.e||0),0))
+            )
           )
         )
       )

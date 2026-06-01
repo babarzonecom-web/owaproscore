@@ -3119,7 +3119,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.24")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.25")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3205,7 +3205,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.24")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.25")
         )
 
         // ===== 新規チーム作成 =====
@@ -6851,17 +6851,24 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set(),outsXinnings:0,win:0,lose:0,save:0,hold:0,bs:0};
             const m = map[p.name];
             m.games.add(g.id);
-            const a = app;
-            const autoIpOuts = Math.floor((a.autoIp||0)/10)*3 + ((a.autoIp||0)%10);
-            const outsGot = autoIpOuts;
+            // 投球回はautoArr（投手単位の合算）から取得（再登板でない場合はより正確）
+            // 再登板がある場合のみbyAppのipを使う
+            const hasReappear = autoByApp.filter(a=>a.pitcherIdx===app.pitcherIdx).length > 1;
+            let outsGot;
+            if(hasReappear){
+              outsGot = Math.floor((app.autoIp||0)/10)*3 + ((app.autoIp||0)%10);
+            } else {
+              const arrEntry = autoArr[app.pitcherIdx]||{};
+              outsGot = Math.floor((arrEntry.autoIp||0)/10)*3 + ((arrEntry.autoIp||0)%10);
+            }
             m.outs += outsGot;
-            m.h    += a.autoH||0;
-            m.er   += (p.manualOverride && p.er!==undefined) ? p.er : (a.autoEr||0);
-            m.bb   += a.autoBb||0;
-            m.k    += a.autoK||0;
-            m.hbp  += a.autoHbp||0;
-            m.hr   += a.autoHr||0;
-            m.runs += a.autoRuns||0;
+            m.h    += app.autoH||0;
+            m.er   += (p.manualOverride && p.er!==undefined) ? p.er : (app.autoEr||0);
+            m.bb   += app.autoBb||0;
+            m.k    += app.autoK||0;
+            m.hbp  += app.autoHbp||0;
+            m.hr   += app.autoHr||0;
+            m.runs += app.autoRuns||0;
             const pr = (g.pitcherResults||{})[p.name]||{};
             if(pr.win)  m.win++;
             if(pr.lose) m.lose++;

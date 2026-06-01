@@ -902,7 +902,13 @@ const computePitcherStats = (g) => {
     appStats.forEach(as=>{as.autoIp=Math.floor(as._outsGot/3)*10+(as._outsGot%3);});
 
     result[defTeam]=stats;
-    result[defTeam+"_byAppearance"]=appStats;
+    // byAppearanceはfromInning順でソート（pLog/sortedLogと順番を一致させる）
+    result[defTeam+"_byAppearance"]=appStats.slice().sort((a,b)=>
+      (a.logEntry.fromInning-b.logEntry.fromInning)||
+      ((a.logEntry.fromHalf==="top"?0:1)-(b.logEntry.fromHalf==="top"?0:1))||
+      ((a.logEntry.outsAtStart||0)-(b.logEntry.outsAtStart||0))||
+      ((a.logEntry._li||0)-(b.logEntry._li||0))
+    );
   });
   return result;
 };
@@ -3093,7 +3099,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.10")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.11")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3179,7 +3185,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.10")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.11")
         )
 
         // ===== 新規チーム作成 =====
@@ -3569,12 +3575,7 @@ function App() {
                         ,React.createElement('div',{style:{display:"flex",gap:4,flexWrap:"wrap"}}
                           ,pLog.map((entry,ei)=>{
                             const p=pitchers[entry.pitcherIdx]||{};
-                            const a=(autoByApp.find(ap=>
-                              ap.pitcherIdx===entry.pitcherIdx &&
-                              ap.logEntry&&ap.logEntry.fromInning===entry.fromInning &&
-                              ap.logEntry.fromHalf===entry.fromHalf &&
-                              (ap.logEntry.outsAtStart||0)===(entry.outsAtStart||0)
-                            ))||autoArr[entry.pitcherIdx]||{};
+                            const a=autoByApp[ei]||autoArr[entry.pitcherIdx]||{};
                             const ipOuts=Math.floor((a.autoIp||0)/10)*3+((a.autoIp||0)%10);
                             const ipDisp=Math.floor(ipOuts/3)+"."+(ipOuts%3);
                             const isCur=entry.pitcherIdx===(g[side+"PitcherIdx"]||0)&&ei===pLog.length-1;
@@ -5400,12 +5401,7 @@ function App() {
 
               ,sortedLog.map((entry,li)=>{
                   const pitcher=pitchers[entry.pitcherIdx]||{};
-                  const auto=(autoByApp.find(a=>
-                    a.pitcherIdx===entry.pitcherIdx &&
-                    a.logEntry&&a.logEntry.fromInning===entry.fromInning &&
-                    a.logEntry.fromHalf===entry.fromHalf &&
-                    (a.logEntry.outsAtStart||0)===(entry.outsAtStart||0)
-                  ))||autoArr[entry.pitcherIdx]||{};
+                  const auto=autoByApp[li]||autoArr[entry.pitcherIdx]||{};
                   const autoIpOuts=Math.floor((auto.autoIp||0)/10)*3+((auto.autoIp||0)%10);
                   const effectiveIp=pitcher.manualIp!==undefined?pitcher.manualIp:autoIpOuts;
                   const ipDisp=Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?effectiveIp%3+"/3":"");

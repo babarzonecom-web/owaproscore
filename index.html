@@ -785,10 +785,10 @@ const computePitcherStats = (g) => {
     
     
     // 先発投手エントリを補完する
-    const starterHalf = defTeam==="home" ? "top" : "bottom";
+    const starterHalf = defTeam==="away" ? "top" : "bottom";
     const rawLog = pitcherLog.length>0 ? pitcherLog : [];
     // 先発エントリが既にあるか確認
-    const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf===starterHalf && l.outsAtStart===0);
+    const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf===starterHalf && (l.outsAtStart||0)===0);
     // 先発インデックス：pitcherLogの中で最も古い（fromInningが最小）エントリのidx、なければ0
     const sortedLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1));
     const starterIdx = sortedLog.length>0 ? sortedLog[0].pitcherIdx : 0;
@@ -834,18 +834,14 @@ const computePitcherStats = (g) => {
         const seqLog = buildSeqLog().sort((a,b)=>a.fromSeq-b.fromSeq);
 
     const findActivePitcher = (abSeq) => {
-      // seqがundefined（旧データ）の場合は現在の投手インデックスを返す
       if(abSeq === undefined || abSeq === null) return seqLog[seqLog.length-1]?.pitcherIdx ?? log[0].pitcherIdx;
-      // seqLog中でfromSeq <= abSeqを満たす最後（最新）のエントリ
       let bestIdx = seqLog[0] ? seqLog[0].pitcherIdx : 0;
       for(let i=0; i<seqLog.length; i++){
-        if(seqLog[i].fromSeq <= abSeq){
-          bestIdx = seqLog[i].pitcherIdx;
-        }
+        if(seqLog[i].fromSeq <= abSeq) bestIdx = seqLog[i].pitcherIdx;
       }
       return bestIdx;
     };
-    // 登板単位（seqLogのエントリインデックス）を返すヘルパー（再登板対応）
+    // 登板単位のインデックス（seqLog順）を返す
     const findActiveAppearanceIdx = (abSeq) => {
       if(abSeq === undefined || abSeq === null) return seqLog.length-1;
       let bestAi = 0;
@@ -855,7 +851,7 @@ const computePitcherStats = (g) => {
       return bestAi;
     };
 
-    // 登板単位の成績配列（seqLogの順番に対応）
+    // 登板単位の成績配列（seqLog順）
     const appStats = seqLog.map(l=>{
       const p = safePitchers[l.pitcherIdx]||{};
       return {
@@ -926,7 +922,7 @@ const computePitcherStats = (g) => {
       let activeAi;
       if(bo.pitcherIdx !== undefined) {
         activePIdx = bo.pitcherIdx;
-        // pitcherIdxが一致する最後の登板エントリを使う
+        // pitcherIdxが一致する最後の登板エントリをseqLogから探す
         activeAi = seqLog.reduce((best,l,i)=>l.pitcherIdx===bo.pitcherIdx?i:best, 0);
       } else {
         // 旧データ：seqで逆引き
@@ -3649,7 +3645,12 @@ function App() {
                         ,React.createElement('div',{style:{display:"flex",gap:4,flexWrap:"wrap"}}
                           ,pLog.map((entry,ei)=>{
                             const p=pitchers[entry.pitcherIdx]||{};
-                            const a=autoByApp[ei]||autoArr[entry.pitcherIdx]||{};
+                            const a=(autoByApp.find(ap=>
+                              ap.pitcherIdx===entry.pitcherIdx &&
+                              ap.logEntry&&ap.logEntry.fromInning===entry.fromInning &&
+                              ap.logEntry.fromHalf===entry.fromHalf &&
+                              (ap.logEntry.outsAtStart||0)===(entry.outsAtStart||0)
+                            ))||autoArr[entry.pitcherIdx]||{};
                             const ipOuts=Math.floor((a.autoIp||0)/10)*3+((a.autoIp||0)%10);
                             const ipDisp=Math.floor(ipOuts/3)+"."+(ipOuts%3);
                             const isCur=entry.pitcherIdx===(g[side+"PitcherIdx"]||0)&&ei===pLog.length-1;
@@ -5186,7 +5187,7 @@ function App() {
                         autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0,manualOverride:false});
                       pitIdx = ps.length-1;
                     }
-                    const starterHalf = side==="away" ? "bottom" : "top";
+                    const starterHalf = side==="away" ? "top" : "bottom";
                     const starterLog = [{pitcherIdx:pitIdx,fromInning:1,fromHalf:starterHalf,outsAtStart:0,atBatSeq:0}];
                     updated = {...updated, [pitKey]:ps, [side+"PitcherIdx"]:pitIdx, [logKey]:starterLog};
                   }
@@ -5467,7 +5468,12 @@ function App() {
 
               ,sortedLog.map((entry,li)=>{
                   const pitcher=pitchers[entry.pitcherIdx]||{};
-                  const auto=autoByApp[li]||autoArr[entry.pitcherIdx]||{};
+                  const auto=(autoByApp.find(a=>
+                    a.pitcherIdx===entry.pitcherIdx &&
+                    a.logEntry&&a.logEntry.fromInning===entry.fromInning &&
+                    a.logEntry.fromHalf===entry.fromHalf &&
+                    (a.logEntry.outsAtStart||0)===(entry.outsAtStart||0)
+                  ))||autoArr[entry.pitcherIdx]||{};
                   const autoIpOuts=Math.floor((auto.autoIp||0)/10)*3+((auto.autoIp||0)%10);
                   const effectiveIp=pitcher.manualIp!==undefined?pitcher.manualIp:autoIpOuts;
                   const ipDisp=Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?effectiveIp%3+"/3":"");
@@ -6915,7 +6921,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
         // フォールバック：旧データ（byAppearanceなし）
         // 実際に登板した投手のインデックスを取得（computePitcherStatsと同じ先発補完ロジック）
         const rawLog = g[side+"PitcherLog"]||[];
-        const starterHalfForSide = side==="home" ? "top" : "bottom";
+        const starterHalfForSide = side==="away" ? "top" : "bottom";
         const sortedRawLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1));
         const starterIdxForSide = sortedRawLog.length>0 ? sortedRawLog[0].pitcherIdx : 0;
         // pitcherLogが空でも先発(index=0またはstarterIdx)は登板扱い

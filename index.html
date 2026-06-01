@@ -877,20 +877,16 @@ const computePitcherStats = (g) => {
     // baserunnerOuts
     (g.baserunnerOuts||[]).forEach(bo=>{
       if(bo.defTeam!==defTeam) return;
-      let pi, ai;
-      if(bo.pitcherIdx!==undefined){
-        pi=bo.pitcherIdx;
-        ai=seqLog.reduce((best,l,i)=>l.pitcherIdx===bo.pitcherIdx?i:best,0);
-      } else {
-        const boTime=(bo.inning||0)*2+((bo.half==="top")?0:1);
-        const boOuts=bo.outsAtTime||0;
-        let brSeq=0;
-        for(const ab of allAtBats){
-          const at=ab.inning*2+(ab.half==="top"?0:1);
-          if(at<boTime||(at===boTime&&(ab.outsAtAb||0)<boOuts)) brSeq=ab.seq;
-        }
-        pi=findActivePitcher(brSeq); ai=findActiveAppearance(brSeq);
+      // 牽制死等が起きた時点のseqを特定してfindActiveAppearanceで登板を決める
+      const boTime=(bo.inning||0)*2+((bo.half==="top")?0:1);
+      const boOuts=bo.outsAtTime||0;
+      let brSeq=0;
+      for(const ab of allAtBats){
+        const at=ab.inning*2+(ab.half==="top"?0:1);
+        if(at<boTime||(at===boTime&&(ab.outsAtAb||0)<boOuts)) brSeq=ab.seq;
       }
+      const pi=bo.pitcherIdx!==undefined ? bo.pitcherIdx : findActivePitcher(brSeq);
+      const ai=findActiveAppearance(brSeq);
       if(stats[pi]){stats[pi]._outsGot++;stats[pi]._brOutsCount++;}
       if(appStats[ai]) appStats[ai]._outsGot++;
     });
@@ -3111,7 +3107,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.16")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.18")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3197,7 +3193,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.16")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.18")
         )
 
         // ===== 新規チーム作成 =====
@@ -4471,6 +4467,10 @@ function App() {
                   +React.createElement('br')
                   ,"【inn6-7 abs】"+JSON.stringify(
                     (pitcherStats[side+"_debugAbs"]||[]).filter(ab=>ab.inning>=6).map(ab=>({inn:ab.inning,seq:ab.seq,code:ab.entry?.code,outs:ab.outsAtAb}))
+                  )
+                  +React.createElement('br')
+                  ,"【outCodes 1-6】"+JSON.stringify(
+                    (pitcherStats[side+"_debugAbs"]||[]).filter(ab=>ab.inning<=6&&["K","KL","KW","GO","FO","LO","FF","SAC","SF","DP","TP","OI"].includes(ab.entry?.code)&&!ab.hasError).map(ab=>({inn:ab.inning,seq:ab.seq,code:ab.entry?.code}))
                   )
                 )
                 , React.createElement('div', {style:{overflowX:"auto"}}

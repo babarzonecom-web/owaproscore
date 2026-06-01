@@ -892,15 +892,27 @@ const computePitcherStats = (g) => {
     });
 
     // 試合終了アウト補正
-    if(g.finished&&g.finalOuts!==undefined&&g.finalHalf!==undefined){
-      const finalHalfOuts=allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&OUT_CODES_FOR_IP.has(ab.entry.code)&&!ab.hasError).length
-        +allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&ab.entry.code==="DP"&&!ab.hasError).length
-        +allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&ab.entry.code==="TP"&&!ab.hasError).length*2;
-      const brFinal=(g.baserunnerOuts||[]).filter(bo=>bo.defTeam===defTeam&&bo.inning===g.finalInning&&bo.half===g.finalHalf).length;
-      const diff=g.finalOuts-(finalHalfOuts+brFinal);
-      if(diff>0){
-        const lp=stats[stats.length-1]; if(lp) lp._outsGot+=diff;
-        const la=appStats[appStats.length-1]; if(la) la._outsGot+=diff;
+    if(g.finished){
+      if(g.finalOuts!==undefined&&g.finalHalf!==undefined){
+        // 新方式：finalOutsが記録されている
+        const finalHalfOuts=allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&OUT_CODES_FOR_IP.has(ab.entry.code)&&!ab.hasError).length
+          +allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&ab.entry.code==="DP"&&!ab.hasError).length
+          +allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&ab.entry.code==="TP"&&!ab.hasError).length*2;
+        const brFinal=(g.baserunnerOuts||[]).filter(bo=>bo.defTeam===defTeam&&bo.inning===g.finalInning&&bo.half===g.finalHalf).length;
+        const diff=g.finalOuts-(finalHalfOuts+brFinal);
+        if(diff>0){
+          const lp=stats[stats.length-1]; if(lp) lp._outsGot+=diff;
+          const la=appStats[appStats.length-1]; if(la) la._outsGot+=diff;
+        }
+      } else {
+        // 旧方式：finalOutsなし → 試合イニング数×3アウトが期待値
+        const expectedTotal=(g.innings||7)*3;
+        const totalGot=stats.reduce((s,ps)=>s+ps._outsGot,0);
+        const diff=expectedTotal-totalGot;
+        if(diff>0){
+          const lp=stats[stats.length-1]; if(lp) lp._outsGot+=diff;
+          const la=appStats[appStats.length-1]; if(la) la._outsGot+=diff;
+        }
       }
     }
 
@@ -3107,7 +3119,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.23")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.24")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3193,7 +3205,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.23")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.24")
         )
 
         // ===== 新規チーム作成 =====

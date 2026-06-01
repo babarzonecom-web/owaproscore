@@ -913,6 +913,7 @@ const computePitcherStats = (g) => {
 
     result[defTeam]=stats;
     result[defTeam+"_seqLog"]=seqLog;
+    result[defTeam+"_debugAbs"]=allAtBats;
     // byAppearanceはfromInning順でソート（pLog/sortedLogと順番を一致させる）
     result[defTeam+"_byAppearance"]=appStats.slice().sort((a,b)=>
       (a.logEntry.fromInning-b.logEntry.fromInning)||
@@ -3110,7 +3111,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.14")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.15")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3196,7 +3197,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.14")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.15")
         )
 
         // ===== 新規チーム作成 =====
@@ -4469,23 +4470,7 @@ function App() {
                   ,"【seqLog】"+JSON.stringify((pitcherStats[side+"_seqLog"]||[]).map(l=>({pi:l.pitcherIdx,fromSeq:l.fromSeq,li:l._li})))
                   +React.createElement('br')
                   ,"【inn6-7 abs】"+JSON.stringify(
-                    (()=>{
-                      const defTeam=side==="away"?"home":"away";
-                      // offTeamの6-7回の打席を表示
-                      const offHalf=side==="away"?"bottom":"top";
-                      const allAbs=[];
-                      const lineup=game[(side==="away"?"home":"away")+"Lineup"]||[];
-                      lineup.forEach((p,bi)=>{
-                        Object.entries(p.atBats||{}).forEach(([inn,abs])=>{
-                          if(parseInt(inn)<6) return;
-                          (Array.isArray(abs)?abs:[abs]).forEach((e,ai)=>{
-                            if(!e||!e.code) return;
-                            allAbs.push({inn:parseInt(inn),bi,code:e.code,seq:e.seq});
-                          });
-                        });
-                      });
-                      return allAbs.sort((a,b)=>a.seq-b.seq).slice(0,15);
-                    })()
+                    (pitcherStats[side+"_debugAbs"]||[]).filter(ab=>ab.inning>=6).map(ab=>({inn:ab.inning,seq:ab.seq,code:ab.entry?.code,outs:ab.outsAtAb}))
                   )
                 )
                 , React.createElement('div', {style:{overflowX:"auto"}}

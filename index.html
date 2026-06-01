@@ -774,151 +774,86 @@ const computePitcherStats = (g) => {
       });
     });
 
-    
-    // pitchersが配列でない場合の防御
+    // pitcherLogを配列インデックス順（登録順）のまま使う。ソートしない。
     const rawPitchers = Array.isArray(pitchers) ? pitchers : (pitchers ? Object.values(pitchers) : []);
-    // nullエントリはindexを保持するため空オブジェクトに変換（nameなしはスキップ）
     const safePitchers = rawPitchers.map(p=>(p&&p.name)?p:{});
     if(!safePitchers.length || safePitchers.every(p=>!p.name)) { result[defTeam]=[]; return; }
     const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, autoHbp:0, autoHr:0, autoRuns:0, _outsGot:0, _brOutsCount:0}));
 
-    
-    
-    // 先発投手エントリを補完する
-    const starterHalf = defTeam==="away" ? "top" : "bottom";
     const rawLog = pitcherLog.length>0 ? pitcherLog : [];
-    // pitcherLogが空なら先発補完が必要
-    // pitcherLogに既にエントリがある場合は補完しない（最初のエントリを先発扱い）
-    const sortedLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||(a.outsAtStart||0)-(b.outsAtStart||0));
-    const starterIdx = sortedLog.length>0 ? sortedLog[0].pitcherIdx : 0;
-    let log;
-    if(rawLog.length === 0){
-      // pitcherLogが空→先発補完エントリを追加
-      const starterEntry = {pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0};
-      log = [starterEntry];
-    } else {
-      // pitcherLogをfromInning/fromHalf/outsAtStart順にソートして使用
-      log = [...rawLog].sort((a,b)=>
-        a.fromInning!==b.fromInning ? a.fromInning-b.fromInning :
-        (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1) ||
-        (a.outsAtStart||0)-(b.outsAtStart||0) ||
-        (a.atBatSeq||0)-(b.atBatSeq||0)
-      );
-    }
+    // pitcherLogが空なら先発(idx:0)を補完
+    const starterHalf = defTeam==="away" ? "top" : "bottom";
+    const log = rawLog.length>0 ? rawLog : [{pitcherIdx:0, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0}];
 
-    // 打席の通し番号(seq)ベースで担当投手を特定するヘルパー
-    // 各交代エントリにfromSeq（何番目の打席から担当か）を紐づけて判定
-    // fromSeq以上のseqを持つ打席が新投手の担当
-    const buildSeqLog = () => {
-      // まずlogをfromInning/fromHalf/outsAtStart順にソートして処理順を決める
-      const logWithOrder = log.map((l,li)=>({...l,_logOrder:li}));
-      // 前のエントリのfromSeqを追跡して重複を防ぐ
-      let prevFromSeq = -1;
-      return logWithOrder.map((l, li) => {
-        // atBatSeqが記録されている場合はそれをfromSeqとして直接使用
-        if(l.atBatSeq !== undefined && l.atBatSeq >= 0) {
-          prevFromSeq = l.atBatSeq;
-          return {...l, fromSeq: l.atBatSeq};
-        }
-        if(l.atBatSeq === -1) {
-          // -1 = 次のイニング頭から（イニング間交代）
-          const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
-          // prevFromSeq以降で、かつlogTimeより後のハーフの最初の打席を探す
-          const startSeq = prevFromSeq + 1;
-          const nextAb = allAtBats.find(ab=>{
-            const abTime = ab.inning*2+(ab.half==="top"?0:1);
-            return abTime > logTime && ab.seq >= startSeq;
-          });
-          const fromSeq = nextAb ? nextAb.seq : allAtBats.length;
-          prevFromSeq = fromSeq;
-          return {...l, fromSeq};
-        }
-        if(l.atBatSeq === -2) {
-          // -2 = 同イニング中の交代（outsAtStartアウトから）
-          const outs = l.outsAtStart||0;
-          const startSeq = prevFromSeq + 1;
-          const nextAb = allAtBats.find(ab=>{
-            if(ab.seq < startSeq) return false;
-            if(ab.inning < l.fromInning) return false;
-            if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
-            return true;
-          });
-          const fromSeq = nextAb ? nextAb.seq : allAtBats.length;
-          prevFromSeq = fromSeq;
-          return {...l, fromSeq};
-        }
-        // 旧データ（atBatSeqなし）：inning/half/outsAtStartから推定
-        if(li === 0) { prevFromSeq = 0; return {...l, fromSeq: 0}; }
+    // 各登板エントリの「担当開始seq」を決定する
+    // ルール：前のエントリのfromSeqより必ず大きい値にする
+    let prevSeq = -1;
+    const seqLog = log.map((l, li)=>{
+      let fromSeq;
+      if(l.atBatSeq !== undefined && l.atBatSeq >= 0){
+        // 正確な打席数が記録されている → そのまま使用（ただし前より小さければ前+1）
+        fromSeq = Math.max(l.atBatSeq, prevSeq+1);
+      } else if(l.atBatSeq === -2){
+        // 同イニング中の交代：outsAtStart以降の最初の打席（前エントリより後）
         const outs = l.outsAtStart||0;
-        const startSeq = prevFromSeq + 1;
-        const nextAb = allAtBats.find(ab=>{
-          if(ab.seq < startSeq) return false;
-          if(ab.inning < l.fromInning) return false;
-          if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
-          return true;
+        const ab = allAtBats.find(ab=>
+          ab.seq > prevSeq &&
+          ab.inning >= l.fromInning &&
+          (ab.inning > l.fromInning || (ab.outsAtAb||0) >= outs)
+        );
+        fromSeq = ab ? ab.seq : allAtBats.length;
+      } else {
+        // -1 またはundefined：そのイニング・ハーフより後の最初の打席（前エントリより後）
+        const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
+        const ab = allAtBats.find(ab=>{
+          if(ab.seq <= prevSeq) return false;
+          const abTime = ab.inning*2+(ab.half==="top"?0:1);
+          return abTime >= logTime;
         });
-        const fromSeq = nextAb ? nextAb.seq : allAtBats.length;
-        prevFromSeq = fromSeq;
-        return {...l, fromSeq};
-      });
-    };
-    // fromSeqが同じ場合はlog内の登板順(_logOrder)で安定ソート
-        const seqLog = buildSeqLog().sort((a,b)=>a.fromSeq!==b.fromSeq ? a.fromSeq-b.fromSeq : a._logOrder-b._logOrder);
-    // fromSeqが重複している場合、後のエントリのfromSeqを前+1にして境界を明確化
-    for(let i=1; i<seqLog.length; i++){
-      if(seqLog[i].fromSeq <= seqLog[i-1].fromSeq){
-        seqLog[i] = {...seqLog[i], fromSeq: seqLog[i-1].fromSeq + 1};
+        fromSeq = ab ? ab.seq : allAtBats.length;
       }
-    }
-
-    const findActivePitcher = (abSeq) => {
-      if(abSeq === undefined || abSeq === null) return seqLog[seqLog.length-1]?.pitcherIdx ?? log[0].pitcherIdx;
-      let bestIdx = seqLog[0] ? seqLog[0].pitcherIdx : 0;
-      for(let i=0; i<seqLog.length; i++){
-        if(seqLog[i].fromSeq <= abSeq) bestIdx = seqLog[i].pitcherIdx;
-      }
-      return bestIdx;
-    };
-    // 登板単位のインデックス（seqLog順）を返す
-    const findActiveAppearanceIdx = (abSeq) => {
-      if(abSeq === undefined || abSeq === null) return seqLog.length-1;
-      let bestAi = 0;
-      for(let i=0; i<seqLog.length; i++){
-        if(seqLog[i].fromSeq <= abSeq) bestAi = i;
-      }
-      return bestAi;
-    };
-
-    // 登板単位の成績配列（seqLog順）
-    const appStats = seqLog.map(l=>{
-      const p = safePitchers[l.pitcherIdx]||{};
-      return {
-        pitcherIdx: l.pitcherIdx,
-        name: p.name||("投手"+(l.pitcherIdx+1)),
-        logEntry: l,
-        autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0,
-        autoHbp:0, autoHr:0, autoRuns:0, _outsGot:0, _brOutsCount:0,
-      };
+      prevSeq = fromSeq;
+      return {...l, fromSeq, _li:li};
     });
 
-    allAtBats.forEach(ab=>{
-      let activePIdx = findActivePitcher(ab.seq);
-      const activeAi = findActiveAppearanceIdx(ab.seq);
+    const findActivePitcher = (abSeq) => {
+      if(abSeq===undefined||abSeq===null) return seqLog[seqLog.length-1]?.pitcherIdx??0;
+      let best = seqLog[0]?.pitcherIdx??0;
+      for(const l of seqLog){ if(l.fromSeq<=abSeq) best=l.pitcherIdx; }
+      return best;
+    };
+    const findActiveAppearance = (abSeq) => {
+      if(abSeq===undefined||abSeq===null) return seqLog.length-1;
+      let best = 0;
+      for(let i=0;i<seqLog.length;i++){ if(seqLog[i].fromSeq<=abSeq) best=i; }
+      return best;
+    };
 
-      const ps = stats[activePIdx];
-      const as = appStats[activeAi];
+    // 登板単位の成績配列（seqLog順 = pitcherLog登録順）
+    const appStats = seqLog.map(l=>({
+      pitcherIdx: l.pitcherIdx,
+      name: (safePitchers[l.pitcherIdx]||{}).name||("投手"+(l.pitcherIdx+1)),
+      logEntry: l,
+      autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0,
+      autoHbp:0, autoHr:0, autoRuns:0, _outsGot:0,
+    }));
+
+    allAtBats.forEach(ab=>{
+      const pi = findActivePitcher(ab.seq);
+      const ai = findActiveAppearance(ab.seq);
+      const ps = stats[pi], as = appStats[ai];
       const code = ab.entry.code;
+      const runs = ab.entry.runs||0;
       if(ps){
         if(HIT_CODES.has(code)) ps.autoH++;
         if(code==="BB"||code==="IBB") ps.autoBb++;
         if(code==="K"||code==="KL"||code==="KW") ps.autoK++;
-        if(code==="HBP") ps.autoHbp = (ps.autoHbp||0)+1;
-        if(code==="HR") ps.autoHr = (ps.autoHr||0)+1;
-        const runsScored = ab.entry.runs||0;
-        if(runsScored > 0) {
-          ps.autoEr = (ps.autoEr||0) + runsScored;
-          ps.autoRuns = (ps.autoRuns||0) + runsScored;
-        }
+        if(code==="HBP") ps.autoHbp++;
+        if(code==="HR") ps.autoHr++;
+        if(runs>0){ ps.autoEr+=runs; ps.autoRuns+=runs; }
+        if(OUT_CODES.has(code)&&!ab.hasError) ps._outsGot++;
+        if(code==="DP"&&!ab.hasError) ps._outsGot++;
+        if(code==="TP"&&!ab.hasError) ps._outsGot+=2;
       }
       if(as){
         if(HIT_CODES.has(code)) as.autoH++;
@@ -926,97 +861,55 @@ const computePitcherStats = (g) => {
         if(code==="K"||code==="KL"||code==="KW") as.autoK++;
         if(code==="HBP") as.autoHbp++;
         if(code==="HR") as.autoHr++;
-        const runsScored = ab.entry.runs||0;
-        if(runsScored > 0) {
-          as.autoEr += runsScored;
-          as.autoRuns += runsScored;
-        }
+        if(runs>0){ as.autoEr+=runs; as.autoRuns+=runs; }
+        if(OUT_CODES.has(code)&&!ab.hasError) as._outsGot++;
+        if(code==="DP"&&!ab.hasError) as._outsGot++;
+        if(code==="TP"&&!ab.hasError) as._outsGot+=2;
       }
     });
 
-    allAtBats.forEach(ab=>{
-      const activePIdx = findActivePitcher(ab.seq);
-      const activeAi = findActiveAppearanceIdx(ab.seq);
-      const ps = stats[activePIdx];
-      const as = appStats[activeAi];
-      const code = ab.entry.code;
-      if(ps){
-        if(OUT_CODES.has(code) && !ab.hasError) ps._outsGot += 1;
-        if(code==="DP" && !ab.hasError) ps._outsGot += 1;
-        if(code==="TP" && !ab.hasError) ps._outsGot += 2;
-      }
-      if(as){
-        if(OUT_CODES.has(code) && !ab.hasError) as._outsGot += 1;
-        if(code==="DP" && !ab.hasError) as._outsGot += 1;
-        if(code==="TP" && !ab.hasError) as._outsGot += 2;
-      }
-    });
-
-    // baserunnerOuts（走塁アウト）も投球回に加算
-    const bOuts = g.baserunnerOuts || [];
-    bOuts.forEach(bo=>{
-      if(bo.defTeam !== defTeam) return;
-      let activePIdx;
-      let activeAi;
-      if(bo.pitcherIdx !== undefined) {
-        activePIdx = bo.pitcherIdx;
-        // pitcherIdxが一致する最後の登板エントリをseqLogから探す
-        activeAi = seqLog.reduce((best,l,i)=>l.pitcherIdx===bo.pitcherIdx?i:best, 0);
+    // baserunnerOuts
+    (g.baserunnerOuts||[]).forEach(bo=>{
+      if(bo.defTeam!==defTeam) return;
+      let pi, ai;
+      if(bo.pitcherIdx!==undefined){
+        pi = bo.pitcherIdx;
+        // 同pitcherIdxの最後の登板
+        ai = seqLog.reduce((best,l,i)=>l.pitcherIdx===bo.pitcherIdx?i:best, 0);
       } else {
-        // 旧データ：seqで逆引き
-        const boTime = (bo.inning||0)*2+((bo.half==="top")?0:1);
-        const boOutsN = bo.outsAtTime||0;
-        let brSeq = 0;
-        for(let k=0;k<allAtBats.length;k++){
-          const ab=allAtBats[k];
+        const boTime=(bo.inning||0)*2+((bo.half==="top")?0:1);
+        const boOuts=bo.outsAtTime||0;
+        let brSeq=0;
+        for(const ab of allAtBats){
           const at=ab.inning*2+(ab.half==="top"?0:1);
-          if(at < boTime) brSeq = ab.seq;
-          else if(at === boTime && (ab.outsAtAb||0) < boOutsN) brSeq = ab.seq;
+          if(at<boTime||(at===boTime&&(ab.outsAtAb||0)<boOuts)) brSeq=ab.seq;
         }
-        activePIdx = findActivePitcher(brSeq);
-        activeAi = findActiveAppearanceIdx(brSeq);
+        pi=findActivePitcher(brSeq); ai=findActiveAppearance(brSeq);
       }
-      const ps = stats[activePIdx];
-      const as = appStats[activeAi];
-      if(ps) { ps._outsGot++; ps._brOutsCount++; }
-      if(as) { as._outsGot++; as._brOutsCount++; }
+      if(stats[pi]){ stats[pi]._outsGot++; }
+      if(appStats[ai]){ appStats[ai]._outsGot++; }
     });
 
-    // 試合終了時のアウト補正
-    // 最終投手にfinalOutsまでのアウトを補完（試合終了ボタンで記録漏れを防ぐ）
-    if(g.finished && g.finalOuts !== undefined && g.finalHalf !== undefined) {
-      // 最終ハーフの総アウト数を計算（allAtBatsから）
-      const finalHalfOuts = allAtBats.filter(ab =>
-        ab.inning === g.finalInning && ab.half === g.finalHalf && OUT_CODES_FOR_IP.has(ab.entry.code) && !ab.hasError
-      ).length + allAtBats.filter(ab =>
-        ab.inning === g.finalInning && ab.half === g.finalHalf && ab.entry.code === "DP" && !ab.hasError
-      ).length + allAtBats.filter(ab =>
-        ab.inning === g.finalInning && ab.half === g.finalHalf && ab.entry.code === "TP" && !ab.hasError
-      ).length * 2;
-      const brOutsInFinalHalf = (g.baserunnerOuts||[]).filter(bo =>
-        bo.defTeam === defTeam && bo.inning === g.finalInning && bo.half === g.finalHalf
-      ).length;
-      const totalFinalOuts = finalHalfOuts + brOutsInFinalHalf;
-      const expectedOuts = g.finalOuts;
-      if(totalFinalOuts < expectedOuts) {
-        const diff = expectedOuts - totalFinalOuts;
-        // stats（pitcherIdx配列）の最終投手に補完
-        const lastPitcher = stats.length > 0 ? stats[stats.length - 1] : null;
-        if(lastPitcher) lastPitcher._outsGot += diff;
-        // appStats（登板順配列）の最終登板にも補完
-        const lastApp = appStats.length > 0 ? appStats[appStats.length - 1] : null;
-        if(lastApp) lastApp._outsGot += diff;
+    // 試合終了アウト補正
+    if(g.finished&&g.finalOuts!==undefined){
+      const finalHalfOuts=allAtBats.filter(ab=>
+        ab.inning===g.finalInning&&ab.half===g.finalHalf&&OUT_CODES_FOR_IP.has(ab.entry.code)&&!ab.hasError
+      ).length
+      +allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&ab.entry.code==="DP"&&!ab.hasError).length
+      +allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&ab.entry.code==="TP"&&!ab.hasError).length*2;
+      const brFinal=(g.baserunnerOuts||[]).filter(bo=>bo.defTeam===defTeam&&bo.inning===g.finalInning&&bo.half===g.finalHalf).length;
+      const diff=g.finalOuts-(finalHalfOuts+brFinal);
+      if(diff>0){
+        if(stats[stats.length-1]) stats[stats.length-1]._outsGot+=diff;
+        if(appStats[appStats.length-1]) appStats[appStats.length-1]._outsGot+=diff;
       }
     }
-    stats.forEach(ps=>{
-      ps.autoIp = Math.floor(ps._outsGot/3)*10 + (ps._outsGot%3); 
-    });
-    appStats.forEach(as=>{
-      as.autoIp = Math.floor(as._outsGot/3)*10 + (as._outsGot%3);
-    });
 
-    result[defTeam] = stats;
-    result[defTeam+"_byAppearance"] = appStats;
+    stats.forEach(ps=>{ ps.autoIp=Math.floor(ps._outsGot/3)*10+(ps._outsGot%3); });
+    appStats.forEach(as=>{ as.autoIp=Math.floor(as._outsGot/3)*10+(as._outsGot%3); });
+
+    result[defTeam]=stats;
+    result[defTeam+"_byAppearance"]=appStats;
   });
   return result;
 };
@@ -3207,7 +3100,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.7")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.8")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3293,7 +3186,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.7")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.8")
         )
 
         // ===== 新規チーム作成 =====

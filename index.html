@@ -793,28 +793,23 @@ const computePitcherStats = (g) => {
     const buildSeqLog = () => {
       return log.map((l, li) => {
         if(l.atBatSeq !== undefined && l.atBatSeq >= 0) {
-          return {...l, fromSeq: l.atBatSeq};
+          return {...l, fromSeq: l.atBatSeq, _li:li};
         }
-        if(l.atBatSeq === -1 || l.atBatSeq === -2) {
-          const outs = l.outsAtStart||0;
-          const nextAb = allAtBats.find(ab=>{
-            if(ab.inning < l.fromInning) return false;
-            if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
-            return true;
-          });
-          return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
-        }
-        if(li === 0) return {...l, fromSeq: 0};
+        if(li === 0) return {...l, fromSeq: 0, _li:li};
         const outs = l.outsAtStart||0;
         const nextAb = allAtBats.find(ab=>{
           if(ab.inning < l.fromInning) return false;
           if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
           return true;
         });
-        return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
+        return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length, _li:li};
       });
     };
-    const seqLog = buildSeqLog().sort((a,b)=>a.fromSeq-b.fromSeq);
+    // fromSeq同じ場合はlog内順番(_li)で安定ソート、重複は+1で解消
+    const seqLog = buildSeqLog().sort((a,b)=>a.fromSeq!==b.fromSeq?a.fromSeq-b.fromSeq:a._li-b._li);
+    for(let i=1;i<seqLog.length;i++){
+      if(seqLog[i].fromSeq<=seqLog[i-1].fromSeq) seqLog[i]={...seqLog[i],fromSeq:seqLog[i-1].fromSeq+1};
+    }
 
     const findActivePitcher = (abSeq) => {
       if(abSeq===undefined||abSeq===null) return seqLog[seqLog.length-1]?.pitcherIdx??log[0].pitcherIdx;
@@ -3098,7 +3093,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.9")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.10")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3184,7 +3179,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.9")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.10")
         )
 
         // ===== 新規チーム作成 =====

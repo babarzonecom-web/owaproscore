@@ -3107,7 +3107,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.20")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.22")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3193,7 +3193,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.20")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.22")
         )
 
         // ===== 新規チーム作成 =====
@@ -4457,21 +4457,10 @@ function App() {
                       style:{...sBt("#475569",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
                     }, "＋ 投手追加")
                 )
-                // ★デバッグ表示（確認後削除）
                 , React.createElement('div',{style:{background:"#1a0a00",border:"1px solid #f97316",borderRadius:6,padding:"8px",marginBottom:8,fontSize:9,color:"#fbbf24",wordBreak:"break-all"}}
-                  ,"【pitcherLog】"+JSON.stringify((game[side+"PitcherLog"]||[]).map(l=>({pi:l.pitcherIdx,inn:l.fromInning,half:l.fromHalf,outs:l.outsAtStart,seq:l.atBatSeq})))
+                  ,"【brOuts raw】"+JSON.stringify((game.baserunnerOuts||[]))
                   +React.createElement('br')
-                  ,"【byApp】"+JSON.stringify((pitcherStats[side+"_byAppearance"]||[]).map(a=>({pi:a.pitcherIdx,name:a.name,ip:a.autoIp,outsGot:a._outsGot,h:a.autoH,k:a.autoK,bb:a.autoBb,logSeq:a.logEntry&&a.logEntry.fromSeq})))
-                  +React.createElement('br')
-                  ,"【seqLog】"+JSON.stringify((pitcherStats[side+"_seqLog"]||[]).map(l=>({pi:l.pitcherIdx,fromSeq:l.fromSeq,li:l._li})))
-                  +React.createElement('br')
-                  ,"【inn6-7 abs】"+JSON.stringify(
-                    (pitcherStats[side+"_debugAbs"]||[]).filter(ab=>ab.inning>=6).map(ab=>({inn:ab.inning,seq:ab.seq,code:ab.entry?.code,outs:ab.outsAtAb}))
-                  )
-                  +React.createElement('br')
-                  ,"【brOuts】"+JSON.stringify(
-                    (game.baserunnerOuts||[]).filter(bo=>bo.defTeam===side).map(bo=>({inn:bo.inning,half:bo.half,outs:bo.outsAtTime,pi:bo.pitcherIdx}))
-                  )
+                  ,"【byApp outsGot】"+JSON.stringify((pitcherStats[side+"_byAppearance"]||[]).map(a=>({name:a.name,outsGot:a._outsGot,ip:a.autoIp})))
                 )
                 , React.createElement('div', {style:{overflowX:"auto"}}
                   , React.createElement('table', {style:{...S.table, minWidth:520}}

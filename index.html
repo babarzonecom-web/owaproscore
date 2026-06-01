@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v461")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v464")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v461")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v464")
         )
 
         // ===== 新規チーム作成 =====
@@ -5317,13 +5317,12 @@ function App() {
                     )
                     , React.createElement('tbody', null
                       , pitchers.map((p,i)=>({p,i})).filter(({p,i})=>{
-                          if(!p||!p.name) return false; // nameなしは非表示
+                          if(!p||!p.name) return false;
                           const isDefault = /^投手\d+$/.test(p.name);
                           const inLog = (game[side+"PitcherLog"]||[]).some(l=>l.pitcherIdx===i);
                           if(isDefault) return inLog || i===curPIdx;
                           return true;
                         }).map(({p,i}) => {
-                          // iは元のpitchers配列のindex（正確）
                           const isCur = !game.finished && i===curPIdx;
                           const auto = (pitcherStats[side]||[])[i]||{};
                           const rawIp = auto.autoIp||0;
@@ -7935,6 +7934,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                       const [_hr,_rbi,_run,_sb,_bb,_hbp,_h2,_h3,_sac,_sf,_k,_e] = editable2;
                       const [_avg,_spAvg,_slg,_obp,_ops] = readonly.map(renderReadonlyCell);
                       return [
+                        React.createElement('td',{style:tdS},p.games||0), // 試
+                        React.createElement('td',{style:tdS},p.pa||0),    // 打席
                         renderEditableCell(_ab),   // 打数
                         renderEditableCell(_h),    // 安打
                         renderEditableCell(_hr),   // 本塁打
@@ -7964,10 +7965,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
               , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.pa,0))
               , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.ab,0))
               , React.createElement('td', {style:{...tdS,color:"#4ade80",fontWeight:700}}, players.reduce((s,p)=>s+p.h,0))
-              , (()=>{const ab=players.reduce((s,p)=>s+p.ab,0);const h=players.reduce((s,p)=>s+p.h,0);return React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---");})()
               , React.createElement('td', {style:{...tdS,color:"#f87171"}}, players.reduce((s,p)=>s+p.hr,0))
-              , React.createElement('td', {style:{...tdS,color:"#fbbf24",fontWeight:900}}, "—")
-              , React.createElement('td', {style:tdS}, "—")
+              , (()=>{const ab=players.reduce((s,p)=>s+p.ab,0);const h=players.reduce((s,p)=>s+p.h,0);return React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---");})()              , React.createElement('td', {style:{...tdS,color:"#fb923c",fontSize:10}}, "—")
               , React.createElement('td', {style:{...tdS,color:"#fb923c"}}, players.reduce((s,p)=>s+p.rbi,0))
               , React.createElement('td', {style:tdS}, "—")
               , React.createElement('td', {style:tdS}, "—")
@@ -7982,7 +7981,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
               , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+(p._sf||0),0))
               , React.createElement('td', {style:{...tdS,color:"#94a3b8"}}, players.reduce((s,p)=>s+p.k,0))
               , React.createElement('td', {style:{...tdS,color:"#f87171"}}, players.reduce((s,p)=>s+(p.e||0),0))
-            )
+            )            )
           )
         )
       )

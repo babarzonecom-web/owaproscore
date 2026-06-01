@@ -810,7 +810,18 @@ const computePitcherStats = (g) => {
         if(l.atBatSeq !== undefined && l.atBatSeq >= 0) {
           return {...l, fromSeq: l.atBatSeq, _logOrder: li};
         }
-        if(l.atBatSeq === -1 || l.atBatSeq === -2) {
+        if(l.atBatSeq === -1) {
+          // -1 = 次のイニング頭から（イニング間交代）
+          // fromInningの次のハーフ以降の最初の打席を探す
+          const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
+          const nextAb = allAtBats.find(ab=>{
+            const abTime = ab.inning*2+(ab.half==="top"?0:1);
+            return abTime > logTime;
+          });
+          return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length, _logOrder: li};
+        }
+        if(l.atBatSeq === -2) {
+          // -2 = 同イニング中の交代（outsAtStartアウトから）
           const outs = l.outsAtStart||0;
           const nextAb = allAtBats.find(ab=>{
             if(ab.inning < l.fromInning) return false;

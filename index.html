@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v464")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v468")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v464")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v468")
         )
 
         // ===== 新規チーム作成 =====
@@ -7963,8 +7963,10 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
               , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.pa,0))
               , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.ab,0))
               , React.createElement('td', {style:{...tdS,color:"#4ade80",fontWeight:700}}, players.reduce((s,p)=>s+p.h,0))
+              , (()=>{const ab=players.reduce((s,p)=>s+p.ab,0);const h=players.reduce((s,p)=>s+p.h,0);return React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---");})()
               , React.createElement('td', {style:{...tdS,color:"#f87171"}}, players.reduce((s,p)=>s+p.hr,0))
-              , (()=>{const ab=players.reduce((s,p)=>s+p.ab,0);const h=players.reduce((s,p)=>s+p.h,0);return React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---");})()              , React.createElement('td', {style:{...tdS,color:"#fb923c",fontSize:10}}, "—")
+              , React.createElement('td', {style:{...tdS,color:"#fbbf24",fontWeight:900}}, "—")
+              , React.createElement('td', {style:tdS}, "—")
               , React.createElement('td', {style:{...tdS,color:"#fb923c"}}, players.reduce((s,p)=>s+p.rbi,0))
               , React.createElement('td', {style:tdS}, "—")
               , React.createElement('td', {style:tdS}, "—")
@@ -7979,7 +7981,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
               , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+(p._sf||0),0))
               , React.createElement('td', {style:{...tdS,color:"#94a3b8"}}, players.reduce((s,p)=>s+p.k,0))
               , React.createElement('td', {style:{...tdS,color:"#f87171"}}, players.reduce((s,p)=>s+(p.e||0),0))
-            )            )
+            )
           )
         )
       )

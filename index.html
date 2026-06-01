@@ -802,36 +802,36 @@ const computePitcherStats = (g) => {
       return log.map((l, li) => {
         // atBatSeqが記録されている場合はそれをfromSeqとして直接使用
         if(l.atBatSeq !== undefined && l.atBatSeq >= 0) {
-          return {...l, fromSeq: l.atBatSeq};
+          return {...l, fromSeq: l.atBatSeq, _logOrder: li};
         }
         if(l.atBatSeq === -1 || l.atBatSeq === -2) {
-          // allAtBatsは攻撃チーム(offTeam)の打席のみ含む
-          // defTeam="home"→offTeam="away"→allAtBatsはtop(表)のみ
-          // defTeam="away"→offTeam="home"→allAtBatsはbottom(裏)のみ
-          // pitcherLogのfromHalfはdefTeamの守備ハーフ（away=top, home=bottom）
-          // 従ってallAtBatsのhalfとpitcherLogのfromHalfは常に一致する
           const outs = l.outsAtStart||0;
           const nextAb = allAtBats.find(ab=>{
             if(ab.inning < l.fromInning) return false;
             if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
             return true;
           });
-          return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
+          return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length, _logOrder: li};
         }
         // 旧データ（atBatSeqなし）：inning/half/outsAtStartから推定
-        if(li === 0) return {...l, fromSeq: 0};
-        const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
+        if(li === 0) return {...l, fromSeq: 0, _logOrder: li};
         const outs = l.outsAtStart||0;
-        const prevFromSeq = log[li-1].atBatSeq !== undefined ? log[li-1].atBatSeq : 0;
         const nextAb = allAtBats.find(ab=>{
           if(ab.inning < l.fromInning) return false;
           if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
           return true;
         });
-        return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
+        return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length, _logOrder: li};
       });
     };
-        const seqLog = buildSeqLog().sort((a,b)=>a.fromSeq-b.fromSeq);
+    // fromSeqが同じ場合はlog内の登板順(_logOrder)で安定ソート
+        const seqLog = buildSeqLog().sort((a,b)=>a.fromSeq!==b.fromSeq ? a.fromSeq-b.fromSeq : a._logOrder-b._logOrder);
+    // fromSeqが重複している場合、後のエントリのfromSeqを前+1にして境界を明確化
+    for(let i=1; i<seqLog.length; i++){
+      if(seqLog[i].fromSeq <= seqLog[i-1].fromSeq){
+        seqLog[i] = {...seqLog[i], fromSeq: seqLog[i-1].fromSeq + 1};
+      }
+    }
 
     const findActivePitcher = (abSeq) => {
       if(abSeq === undefined || abSeq === null) return seqLog[seqLog.length-1]?.pitcherIdx ?? log[0].pitcherIdx;

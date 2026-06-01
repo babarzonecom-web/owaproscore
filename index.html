@@ -3953,7 +3953,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v460")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v461")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -4039,7 +4039,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v460")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v461")
         )
 
         // ===== 新規チーム作成 =====
@@ -4565,7 +4565,7 @@ function App() {
                   fontSize:12,fontWeight:700,
                   color:["H1","H2","H3","HR"].includes(_prevResult.code)?"#4ade80":
                         ["BB","IBB","HBP"].includes(_prevResult.code)?"#60a5fa":"#f87171"
-                }},HIT_MARK[_prevResult.code]||_prevResult.code)
+                }}, (rOf(_prevResult.code)||{}).short||_prevResult.code)
                 ,_prevResult.inn&&React.createElement('span',{style:{fontSize:10,color:"#334155",marginLeft:"auto"}},_prevResult.inn+"回")
               )
 

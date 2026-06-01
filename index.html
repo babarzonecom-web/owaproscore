@@ -797,48 +797,69 @@ const computePitcherStats = (g) => {
       const starterEntry = {pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0};
       log = [starterEntry];
     } else {
-      // pitcherLogに既にエントリがある→そのまま使用（先発補完不要）
-      log = rawLog;
+      // pitcherLogをfromInning/fromHalf/outsAtStart順にソートして使用
+      log = [...rawLog].sort((a,b)=>
+        a.fromInning!==b.fromInning ? a.fromInning-b.fromInning :
+        (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1) ||
+        (a.outsAtStart||0)-(b.outsAtStart||0) ||
+        (a.atBatSeq||0)-(b.atBatSeq||0)
+      );
     }
 
     // 打席の通し番号(seq)ベースで担当投手を特定するヘルパー
     // 各交代エントリにfromSeq（何番目の打席から担当か）を紐づけて判定
     // fromSeq以上のseqを持つ打席が新投手の担当
     const buildSeqLog = () => {
-      return log.map((l, li) => {
+      // まずlogをfromInning/fromHalf/outsAtStart順にソートして処理順を決める
+      const logWithOrder = log.map((l,li)=>({...l,_logOrder:li}));
+      // 前のエントリのfromSeqを追跡して重複を防ぐ
+      let prevFromSeq = -1;
+      return logWithOrder.map((l, li) => {
         // atBatSeqが記録されている場合はそれをfromSeqとして直接使用
         if(l.atBatSeq !== undefined && l.atBatSeq >= 0) {
-          return {...l, fromSeq: l.atBatSeq, _logOrder: li};
+          prevFromSeq = l.atBatSeq;
+          return {...l, fromSeq: l.atBatSeq};
         }
         if(l.atBatSeq === -1) {
           // -1 = 次のイニング頭から（イニング間交代）
-          // fromInningの次のハーフ以降の最初の打席を探す
           const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
+          // prevFromSeq以降で、かつlogTimeより後のハーフの最初の打席を探す
+          const startSeq = prevFromSeq + 1;
           const nextAb = allAtBats.find(ab=>{
             const abTime = ab.inning*2+(ab.half==="top"?0:1);
-            return abTime > logTime;
+            return abTime > logTime && ab.seq >= startSeq;
           });
-          return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length, _logOrder: li};
+          const fromSeq = nextAb ? nextAb.seq : allAtBats.length;
+          prevFromSeq = fromSeq;
+          return {...l, fromSeq};
         }
         if(l.atBatSeq === -2) {
           // -2 = 同イニング中の交代（outsAtStartアウトから）
           const outs = l.outsAtStart||0;
+          const startSeq = prevFromSeq + 1;
           const nextAb = allAtBats.find(ab=>{
+            if(ab.seq < startSeq) return false;
             if(ab.inning < l.fromInning) return false;
             if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
             return true;
           });
-          return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length, _logOrder: li};
+          const fromSeq = nextAb ? nextAb.seq : allAtBats.length;
+          prevFromSeq = fromSeq;
+          return {...l, fromSeq};
         }
         // 旧データ（atBatSeqなし）：inning/half/outsAtStartから推定
-        if(li === 0) return {...l, fromSeq: 0, _logOrder: li};
+        if(li === 0) { prevFromSeq = 0; return {...l, fromSeq: 0}; }
         const outs = l.outsAtStart||0;
+        const startSeq = prevFromSeq + 1;
         const nextAb = allAtBats.find(ab=>{
+          if(ab.seq < startSeq) return false;
           if(ab.inning < l.fromInning) return false;
           if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
           return true;
         });
-        return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length, _logOrder: li};
+        const fromSeq = nextAb ? nextAb.seq : allAtBats.length;
+        prevFromSeq = fromSeq;
+        return {...l, fromSeq};
       });
     };
     // fromSeqが同じ場合はlog内の登板順(_logOrder)で安定ソート
@@ -3186,7 +3207,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.6")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.7")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3272,7 +3293,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.6")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.7")
         )
 
         // ===== 新規チーム作成 =====

@@ -7934,8 +7934,6 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                       const [_hr,_rbi,_run,_sb,_bb,_hbp,_h2,_h3,_sac,_sf,_k,_e] = editable2;
                       const [_avg,_spAvg,_slg,_obp,_ops] = readonly.map(renderReadonlyCell);
                       return [
-                        React.createElement('td',{style:tdS},p.games||0), // 試
-                        React.createElement('td',{style:tdS},p.pa||0),    // 打席
                         renderEditableCell(_ab),   // 打数
                         renderEditableCell(_h),    // 安打
                         renderEditableCell(_hr),   // 本塁打

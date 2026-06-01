@@ -4522,6 +4522,12 @@ function App() {
                       style:{...sBt("#475569",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
                     }, "＋ 投手追加")
                 )
+                // ★デバッグ表示（確認後削除）
+                , React.createElement('div',{style:{background:"#1a0a00",border:"1px solid #f97316",borderRadius:6,padding:"8px",marginBottom:8,fontSize:9,color:"#fbbf24",wordBreak:"break-all"}}
+                  ,"【pitcherLog】"+JSON.stringify((game[side+"PitcherLog"]||[]).map(l=>({pi:l.pitcherIdx,inn:l.fromInning,half:l.fromHalf,outs:l.outsAtStart,seq:l.atBatSeq})))
+                  +React.createElement('br')
+                  ,"【byApp】"+JSON.stringify((pitcherStats[side+"_byAppearance"]||[]).map(a=>({pi:a.pitcherIdx,name:a.name,ip:a.autoIp,h:a.autoH,k:a.autoK,bb:a.autoBb,logSeq:a.logEntry&&a.logEntry.fromSeq})))
+                )
                 , React.createElement('div', {style:{overflowX:"auto"}}
                   , React.createElement('table', {style:{...S.table, minWidth:520}}
                     , React.createElement('thead', null

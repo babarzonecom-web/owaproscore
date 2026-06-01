@@ -3099,7 +3099,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.11")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.12")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3185,7 +3185,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.11")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.12")
         )
 
         // ===== 新規チーム作成 =====
@@ -3561,9 +3561,11 @@ function App() {
                       {side:"home",label:g.homeTeam||"Home",color:"#7dd3fc"},
                     ].map(({side,label,color})=>{
                       const pitchers=g[side+"Pitchers"]||[];
-                      const pLog=[...(g[side+"PitcherLog"]||[])].sort((a,b)=>
+                      const pLog=[...(g[side+"PitcherLog"]||[])].map((l,i)=>({...l,_i:i})).sort((a,b)=>
                         a.fromInning!==b.fromInning?a.fromInning-b.fromInning:
-                        (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)
+                        (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||
+                        (a.outsAtStart||0)-(b.outsAtStart||0)||
+                        a._i-b._i
                       );
                       if(!pLog.length&&pitchers.length>0){
                         pLog.push({pitcherIdx:0,fromInning:1,fromHalf:side==="away"?"top":"bottom",outsAtStart:0});
@@ -5319,10 +5321,13 @@ function App() {
           const memberCands = (regTeam&&regTeam.members||[])
             .map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean);
           const sortedLog = [...(game[logKey]||[])]
-            .filter(l=>l&&l.pitcherIdx!==undefined&&l.pitcherIdx<pitchers.length) // 無効なindexを除外
+            .filter(l=>l&&l.pitcherIdx!==undefined&&l.pitcherIdx<pitchers.length)
+            .map((l,i)=>({...l,_i:i}))
             .sort((a,b)=>
               a.fromInning!==b.fromInning?a.fromInning-b.fromInning:
-              (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||(a.outsAtStart||0)-(b.outsAtStart||0)
+              (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||
+              (a.outsAtStart||0)-(b.outsAtStart||0)||
+              a._i-b._i
             );
           const curPIdx = game.finished ? -1 : (game[side+"PitcherIdx"]||0);
           const pStats = computePitcherStats(game);

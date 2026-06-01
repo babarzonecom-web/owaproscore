@@ -2496,7 +2496,7 @@ function App() {
         fromInning,
         fromHalf,
         outsAtStart: sameHalf ? g.outs : 0,
-        atBatSeq: sameHalf ? atBatSeqNow : -1, // -1=次のイニング頭から
+        atBatSeq: atBatSeqNow, // 常に現時点の打席数を記録（イニング間交代も含む）
       };
       const newLog = [...(g[logKey]||[]), entry];
       const log=[{
@@ -3186,7 +3186,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.6")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3272,7 +3272,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.6")
         )
 
         // ===== 新規チーム作成 =====

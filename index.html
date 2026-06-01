@@ -905,26 +905,13 @@ const computePitcherStats = (g) => {
           const la=appStats[appStats.length-1]; if(la) la._outsGot+=diff;
         }
       } else {
-        // 旧方式：finalOutsなし → イニングごとに3アウトとの差を担当投手に補完
-        const innings = g.innings||7;
-        const defHalf = defTeam==="away" ? "top" : "bottom";
-        for(let inn=1; inn<=innings; inn++){
-          const innOuts = allAtBats.filter(ab=>
-            ab.inning===inn && ab.half===defHalf &&
-            (OUT_CODES.has(ab.entry.code)||ab.entry.code==="TP") && !ab.hasError
-          ).reduce((s,ab)=>s+(ab.entry.code==="TP"?2:1),0);
-          const brInnOuts = (g.baserunnerOuts||[]).filter(bo=>
-            bo.defTeam===defTeam && bo.inning===inn
-          ).length;
-          const diff = 3 - (innOuts + brInnOuts);
-          if(diff > 0){
-            const innAb = allAtBats.find(ab=>ab.inning===inn);
-            const repSeq = innAb ? innAb.seq : 0;
-            const pi = findActivePitcher(repSeq);
-            const ai = findActiveAppearance(repSeq);
-            if(stats[pi]) stats[pi]._outsGot += diff;
-            if(appStats[ai]) appStats[ai]._outsGot += diff;
-          }
+        // 旧方式：finalOutsなし → 最終投手に補完（v468互換）
+        const expectedTotal=(g.innings||7)*3;
+        const totalGot=stats.reduce((s,ps)=>s+ps._outsGot,0);
+        const diff=expectedTotal-totalGot;
+        if(diff>0){
+          const lp=stats[stats.length-1]; if(lp) lp._outsGot+=diff;
+          const la=appStats[appStats.length-1]; if(la) la._outsGot+=diff;
         }
       }
     }
@@ -933,8 +920,6 @@ const computePitcherStats = (g) => {
     appStats.forEach(as=>{as.autoIp=Math.floor(as._outsGot/3)*10+(as._outsGot%3);});
 
     result[defTeam]=stats;
-    result[defTeam+"_seqLog"]=seqLog;
-    result[defTeam+"_debugAbs"]=allAtBats;
     // byAppearanceはfromInning順でソート（pLog/sortedLogと順番を一致させる）
     result[defTeam+"_byAppearance"]=appStats.slice().sort((a,b)=>
       (a.logEntry.fromInning-b.logEntry.fromInning)||
@@ -3132,7 +3117,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.26")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.27")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3218,7 +3203,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.26")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.27")
         )
 
         // ===== 新規チーム作成 =====
@@ -4481,13 +4466,6 @@ function App() {
                       },
                       style:{...sBt("#475569",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
                     }, "＋ 投手追加")
-                )
-                , React.createElement('div',{style:{background:"#1a0a00",border:"1px solid #f97316",borderRadius:6,padding:"8px",marginBottom:8,fontSize:9,color:"#fbbf24",wordBreak:"break-all"}}
-                  ,"【brOuts raw】"+JSON.stringify((game.baserunnerOuts||[]))
-                  +React.createElement('br')
-                  ,"【byApp outsGot】"+JSON.stringify((pitcherStats[side+"_byAppearance"]||[]).map(a=>({name:a.name,outsGot:a._outsGot,ip:a.autoIp})))
-                  +React.createElement('br')
-                  ,"【finished】"+game.finished+" finalOuts:"+game.finalOuts+" finalInning:"+game.finalInning+" finalHalf:"+game.finalHalf
                 )
                 , React.createElement('div', {style:{overflowX:"auto"}}
                   , React.createElement('table', {style:{...S.table, minWidth:520}}

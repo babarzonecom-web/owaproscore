@@ -784,16 +784,13 @@ const computePitcherStats = (g) => {
 
     
     
-    // 先発投手エントリを補完する
-    const starterHalf = defTeam==="home" ? "top" : "bottom";
+    // 先発投手エントリを補完する（pitcherLogが空の場合のみ）
+    const starterHalf = defTeam==="away" ? "top" : "bottom";
     const rawLog = pitcherLog.length>0 ? pitcherLog : [];
-    // 先発エントリが既にあるか確認
-    const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf===starterHalf && l.outsAtStart===0);
-    // 先発インデックス：pitcherLogの中で最も古い（fromInningが最小）エントリのidx、なければ0
     const sortedLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1));
     const starterIdx = sortedLog.length>0 ? sortedLog[0].pitcherIdx : 0;
-    const starterEntry = {pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0};
-    const log = hasStarter ? rawLog : [starterEntry, ...rawLog];
+    // pitcherLogが空の場合のみ先発補完エントリを追加
+    const log = rawLog.length>0 ? rawLog : [{pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0}];
 
     // 打席の通し番号(seq)ベースで担当投手を特定するヘルパー
     // 各交代エントリにfromSeq（何番目の打席から担当か）を紐づけて判定
@@ -3123,7 +3120,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.37")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.38")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3209,7 +3206,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.37")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.38")
         )
 
         // ===== 新規チーム作成 =====

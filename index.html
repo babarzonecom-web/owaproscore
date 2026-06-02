@@ -3117,7 +3117,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.29")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.30")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3203,7 +3203,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.29")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.30")
         )
 
         // ===== 新規チーム作成 =====
@@ -5440,17 +5440,30 @@ function App() {
                             if(!window.confirm("この登板記録を削除しますか？")) return;
                             mutGame(g=>{
                               const origLog = g[logKey]||[];
-                              // pitcherIdx + fromInning + fromHalf + outsAtStartで特定
                               let removed=false;
                               const newLog=origLog.filter(l=>{
                                 if(!removed &&
                                   l.pitcherIdx===entry.pitcherIdx &&
                                   l.fromInning===entry.fromInning &&
                                   l.fromHalf===entry.fromHalf &&
-                                  (l.outsAtStart||0)===(entry.outsAtStart||0)
+                                  (l.outsAtStart||0)===(entry.outsAtStart||0) &&
+                                  (l.atBatSeq===entry.atBatSeq)
                                 ){ removed=true; return false; }
                                 return true;
                               });
+                              // atBatSeqで特定できなかった場合はフォールバック
+                              if(!removed){
+                                let removed2=false;
+                                return {...g,[logKey]:origLog.filter(l=>{
+                                  if(!removed2 &&
+                                    l.pitcherIdx===entry.pitcherIdx &&
+                                    l.fromInning===entry.fromInning &&
+                                    l.fromHalf===entry.fromHalf &&
+                                    (l.outsAtStart||0)===(entry.outsAtStart||0)
+                                  ){ removed2=true; return false; }
+                                  return true;
+                                })};
+                              }
                               return {...g,[logKey]:newLog};
                             });
                           },

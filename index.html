@@ -3116,7 +3116,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.34")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.35")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3202,7 +3202,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.34")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.35")
         )
 
         // ===== 新規チーム作成 =====
@@ -6858,13 +6858,18 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
               outsGot = Math.floor((arrEntry.autoIp||0)/10)*3 + ((arrEntry.autoIp||0)%10);
             }
             m.outs += outsGot;
-            m.h    += app.autoH||0;
-            m.er   += (p.manualOverride && p.er!==undefined) ? p.er : (app.autoEr||0);
-            m.bb   += app.autoBb||0;
-            m.k    += app.autoK||0;
-            m.hbp  += app.autoHbp||0;
-            m.hr   += app.autoHr||0;
-            m.runs += app.autoRuns||0;
+            const arrStat = autoArr[app.pitcherIdx]||{};
+            m.h    += hasReappear ? (app.autoH||0) : (arrStat.autoH||0);
+            // erの集計：再登板なしはautoArr合算、再登板ありはapp.autoEr（登板別）
+            const erVal = p.manualOverride && p.er!==undefined ? p.er
+              : hasReappear ? (app.autoEr||0)
+              : (arrStat.autoEr||0);
+            m.er   += erVal;
+            m.bb   += hasReappear ? (app.autoBb||0) : (arrStat.autoBb||0);
+            m.k    += hasReappear ? (app.autoK||0) : (arrStat.autoK||0);
+            m.hbp  += hasReappear ? (app.autoHbp||0) : (arrStat.autoHbp||0);
+            m.hr   += hasReappear ? (app.autoHr||0) : (arrStat.autoHr||0);
+            m.runs += hasReappear ? (app.autoRuns||0) : (arrStat.autoRuns||0);
             const pr = (g.pitcherResults||{})[p.name]||{};
             if(pr.win)  m.win++;
             if(pr.lose) m.lose++;

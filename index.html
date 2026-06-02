@@ -780,14 +780,13 @@ const computePitcherStats = (g) => {
     if(!safePitchers.length || safePitchers.every(p=>!p.name)) { result[defTeam]=[]; return; }
     const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, autoHbp:0, autoHr:0, autoRuns:0, _outsGot:0, _brOutsCount:0}));
 
-    // 先発投手エントリを補完する（v468方式そのまま）
-    const starterHalf = defTeam==="away" ? "top" : "bottom";
+    // 先発投手エントリを補完する
+    // pitcherLogが空の場合のみ先発エントリを補完（既にエントリがある場合は最初のエントリを先発扱い）
     const rawLog = pitcherLog.length>0 ? pitcherLog : [];
-    const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf===starterHalf && (l.outsAtStart||0)===0);
-    const sortedLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1));
-    const starterIdx = sortedLog.length>0 ? sortedLog[0].pitcherIdx : 0;
-    const starterEntry = {pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0};
-    const log = hasStarter ? rawLog : [starterEntry, ...rawLog];
+    const starterHalf = defTeam==="away" ? "top" : "bottom";
+    const sortedRaw = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||(a.outsAtStart||0)-(b.outsAtStart||0));
+    const starterIdx = sortedRaw.length>0 ? sortedRaw[0].pitcherIdx : 0;
+    const log = rawLog.length>0 ? rawLog : [{pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0}];
 
     // fromSeq計算（v468方式）
     const buildSeqLog = () => {
@@ -3117,7 +3116,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.32")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.34")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3203,7 +3202,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.32")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.34")
         )
 
         // ===== 新規チーム作成 =====
@@ -5423,7 +5422,6 @@ function App() {
                   const effectiveIp=pitcher.manualIp!==undefined?pitcher.manualIp:autoIpOuts;
                   const ipDisp=Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?effectiveIp%3+"/3":"");
                   const er=pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:(auto.autoEr||0);
-                  const entryDebug = `[${li}] _i:${entry._i} pi:${entry.pitcherIdx} inn:${entry.fromInning} seq:${entry.atBatSeq}`;
                   const entryKey=JSON.stringify(entry);
                   return React.createElement('div',{key:li,style:{
                     background:"#0d1f35",border:"1px solid #1e3a5f",borderRadius:10,
@@ -5436,7 +5434,6 @@ function App() {
                         }},li===0?"先発":"交代"+li)
                       ,React.createElement('span',{style:{fontWeight:700,color:"#e2e8f0",fontSize:13,flex:1}},
                           pitcher.name||"投手"+(entry.pitcherIdx+1))
-                      ,React.createElement('span',{style:{fontSize:8,color:"#475569"}}, entryDebug)
                       ,li>0&&React.createElement('button',{
                           onClick:()=>{
                             if(!window.confirm("この登板記録を削除しますか？")) return;

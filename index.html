@@ -2237,6 +2237,27 @@ function App() {
   
   const syncPitcherFromLineup = (g, side) => {
     const pitcher = g[side+"Lineup"].find(p=>p.pos==="投");
+    // 現時点の打席通し番号を計算（changePitcherと同じロジック）
+    const _calcAtBatSeq = (g, defSide) => {
+      const _offS = defSide==="away"?"home":"away";
+      const _offL = g[defSide==="away"?"homeLineup":"awayLineup"]||[];
+      const _maxI = Math.max(g.inning||1,..._offL.flatMap(p=>[...Object.keys(p.atBats||{}),...((p._subOuts||[]).flatMap(so=>Object.keys(so.atBats||{})))].map(Number).filter(n=>!isNaN(n))));
+      let _seq=0;
+      for(let _i=1;_i<=_maxI;_i++){
+        for(const _h of ["top","bottom"]){
+          if((_h==="top"?"away":"home")!==_offS) continue;
+          const _ha=[];
+          _offL.forEach((p,pi)=>{
+            const _lg=(p._subOut&&!p._subOuts)?[p._subOut]:[];
+            [..._lg,...(p._subOuts||[])].forEach(so=>{const _e=so.atBats&&so.atBats[_i];if(!_e)return;const _a=Array.isArray(_e)?_e:Object.values(_e||{});_a.forEach((_,ei)=>_ha.push({pi,ei:ei-1000}));});
+            const _e2=p.atBats&&p.atBats[_i];if(_e2){const _a2=Array.isArray(_e2)?_e2:Object.values(_e2||{});_a2.forEach((_,ei)=>_ha.push({pi,ei}));}
+          });
+          _ha.sort((a,b)=>a.pi!==b.pi?a.pi-b.pi:a.ei-b.ei);
+          _seq+=_ha.length;
+        }
+      }
+      return _seq;
+    };
     if(!pitcher) return g;
     const pitchers = [...g[side+"Pitchers"]];
     const currentPIdx = g[side+"PitcherIdx"]||0;
@@ -2259,7 +2280,7 @@ function App() {
       const newLog = [...(g[logKey]||[]), {
         pitcherIdx: existIdx,
         fromInning, fromHalf, outsAtStart,
-        atBatSeq: sameHalf ? -2 : -1,
+        atBatSeq: _calcAtBatSeq(g, side),
       }];
       return {...g, [side+"PitcherIdx"]: existIdx, [logKey]: newLog};
     }
@@ -2287,7 +2308,7 @@ function App() {
     const newPitcherLog = [...(g[logKey]||[]), {
       pitcherIdx: newPIdx,
       fromInning, fromHalf, outsAtStart,
-      atBatSeq: sameHalf ? -2 : -1,
+      atBatSeq: _calcAtBatSeq(g, side),
     }];
     return {...g,
       [side+"Pitchers"]: newPitchers,
@@ -3120,7 +3141,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.40")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v470")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3206,7 +3227,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.40")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v470")
         )
 
         // ===== 新規チーム作成 =====
@@ -4497,11 +4518,6 @@ function App() {
                             .sort((a,b)=>a.fromInning!==b.fromInning?a.fromInning-b.fromInning:
                               (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||
                               (a.outsAtStart||0)-(b.outsAtStart||0)||a._i-b._i);
-                          // デバッグ：pitcherLogのatBatSeqを画面表示
-                          const debugInfo = pLog.length>0 ? [
-                            '【pitcherLog】'+JSON.stringify(pLog.map(l=>({pi:l.pitcherIdx,inn:l.fromInning,seq:l.atBatSeq}))),
-                            '【autoArr bb】'+JSON.stringify((pitcherStats[side]||[]).map((a,i)=>({i,bb:a.autoBb,k:a.autoK,ip:a.autoIp})))
-                          ].join(' / ') : null;
                           if(!pLog.length){
                             const p = pitchers[curPIdx]||{};
                             const auto = (pitcherStats[side]||[])[curPIdx]||{};
@@ -4586,8 +4602,7 @@ function App() {
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",color:era==="∞"?"#f87171":era==="—"?"#475569":parseFloat(era)<3?"#4ade80":parseFloat(era)<5?"#fbbf24":"#f87171",fontWeight:700}},era)
                             );
                           });
-                          const debugRow = debugInfo ? [React.createElement('tr',{key:"dbg"},React.createElement('td',{colSpan:11,style:{background:"#1a0a00",padding:"4px 6px",fontSize:8,color:"#fbbf24",wordBreak:"break-all"}},debugInfo))] : [];
-                          return [...debugRow, ...rows];
+                          return [...rows];
                         })()
                     )
                   )
@@ -5901,17 +5916,33 @@ function App() {
                           const newIdx=ps.length-1;
                           const logKey=pcTeam+"PitcherLog";
                           const offKey=pcTeam==="away"?"homeLineup":"awayLineup";
-                          let seq=0;
-                          (g[offKey]||[]).forEach(p=>{Object.values(p.atBats||{}).forEach(abs=>{
-                            const arr=Array.isArray(abs)?abs:Object.values(abs||{});seq+=arr.length;});});
                           // away投手は表(top)、home投手は裏(bottom)を守る
                           const _pitchHalf=pcTeam==="away"?"top":"bottom";
                           const _sameHalf=g.half===_pitchHalf;
+                          // changePitcherと同じロジックで現時点の打席通し番号を正確に計算
+                          const _offSideUI=pcTeam==="away"?"home":"away";
+                          const _offLineupUI=g[offKey]||[];
+                          const _maxInnUI=Math.max(g.inning||1,..._offLineupUI.flatMap(p=>[...Object.keys(p.atBats||{}),...((p._subOuts||[]).flatMap(so=>Object.keys(so.atBats||{})))].map(Number).filter(n=>!isNaN(n))));
+                          let _seqUI=0;
+                          for(let _inn=1;_inn<=_maxInnUI;_inn++){
+                            for(const _half of ["top","bottom"]){
+                              const _bt=_half==="top"?"away":"home";
+                              if(_bt!==_offSideUI) continue;
+                              const _habs=[];
+                              _offLineupUI.forEach((p,pi)=>{
+                                const _leg=(p._subOut&&!p._subOuts)?[p._subOut]:[];
+                                [..._leg,...(p._subOuts||[])].forEach(so=>{const _e=so.atBats&&so.atBats[_inn];if(!_e)return;const _a=Array.isArray(_e)?_e:Object.values(_e||{});_a.forEach((_,ei)=>_habs.push({pi,ei:ei-1000}));});
+                                const _e2=p.atBats&&p.atBats[_inn];if(_e2){const _a2=Array.isArray(_e2)?_e2:Object.values(_e2||{});_a2.forEach((_,ei)=>_habs.push({pi,ei}));}
+                              });
+                              _habs.sort((a,b)=>a.pi!==b.pi?a.pi-b.pi:a.ei-b.ei);
+                              _seqUI+=_habs.length;
+                            }
+                          }
                           const entry={pitcherIdx:newIdx,
                             fromInning:_sameHalf?g.inning:(pcTeam==="away"?g.inning+1:g.inning),
                             fromHalf:_pitchHalf,
                             outsAtStart:_sameHalf?g.outs:0,
-                            atBatSeq:_sameHalf?seq:-1};
+                            atBatSeq:_seqUI};
                           const newGameLog=[{
                             ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
                             msg:`【${g[pcTeam+"Team"]}】投手交代: ${name.trim()} 登板（${g.inning}回${g.half==="top"?"表":"裏"}）`,

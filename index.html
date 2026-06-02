@@ -3120,7 +3120,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.39")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.40")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3206,7 +3206,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.39")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.40")
         )
 
         // ===== 新規チーム作成 =====
@@ -4497,11 +4497,11 @@ function App() {
                             .sort((a,b)=>a.fromInning!==b.fromInning?a.fromInning-b.fromInning:
                               (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||
                               (a.outsAtStart||0)-(b.outsAtStart||0)||a._i-b._i);
-                          // デバッグ：pitcherLogのatBatSeqを表示
-                          if(pLog.length>0) console.log('[DEBUG pitcherLog]', side, JSON.stringify(pLog.map(l=>({pi:l.pitcherIdx,inn:l.fromInning,seq:l.atBatSeq}))));
-                          const autoArrDebug = pitcherStats[side]||[];
-                          if(autoArrDebug.length>0) console.log('[DEBUG autoArr]', side, JSON.stringify(autoArrDebug.map((a,i)=>({i,bb:a.autoBb,k:a.autoK,ip:a.autoIp}))));
-                          // pitcherLogが空の場合は現在の投手を先発として表示
+                          // デバッグ：pitcherLogのatBatSeqを画面表示
+                          const debugInfo = pLog.length>0 ? [
+                            '【pitcherLog】'+JSON.stringify(pLog.map(l=>({pi:l.pitcherIdx,inn:l.fromInning,seq:l.atBatSeq}))),
+                            '【autoArr bb】'+JSON.stringify((pitcherStats[side]||[]).map((a,i)=>({i,bb:a.autoBb,k:a.autoK,ip:a.autoIp})))
+                          ].join(' / ') : null;
                           if(!pLog.length){
                             const p = pitchers[curPIdx]||{};
                             const auto = (pitcherStats[side]||[])[curPIdx]||{};
@@ -4532,7 +4532,7 @@ function App() {
                           // 同じpitcherIdxが複数あるか（再登板チェック）
                           const appearedIdx = new Set();
                           const nameCount = {};
-                          return pLog.map((entry, li)=>{
+                          const rows = pLog.map((entry, li)=>{
                             const i = entry.pitcherIdx;
                             const p = pitchers[i]||{};
                             const auto = (pitcherStats[side]||[])[i]||{};
@@ -4586,6 +4586,8 @@ function App() {
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",color:era==="∞"?"#f87171":era==="—"?"#475569":parseFloat(era)<3?"#4ade80":parseFloat(era)<5?"#fbbf24":"#f87171",fontWeight:700}},era)
                             );
                           });
+                          const debugRow = debugInfo ? [React.createElement('tr',{key:"dbg"},React.createElement('td',{colSpan:11,style:{background:"#1a0a00",padding:"4px 6px",fontSize:8,color:"#fbbf24",wordBreak:"break-all"}},debugInfo))] : [];
+                          return [...debugRow, ...rows];
                         })()
                     )
                   )

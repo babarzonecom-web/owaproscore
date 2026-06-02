@@ -774,158 +774,165 @@ const computePitcherStats = (g) => {
       });
     });
 
+    
     // pitchersが配列でない場合の防御
     const rawPitchers = Array.isArray(pitchers) ? pitchers : (pitchers ? Object.values(pitchers) : []);
+    // nullエントリはindexを保持するため空オブジェクトに変換（nameなしはスキップ）
     const safePitchers = rawPitchers.map(p=>(p&&p.name)?p:{});
     if(!safePitchers.length || safePitchers.every(p=>!p.name)) { result[defTeam]=[]; return; }
     const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, autoHbp:0, autoHr:0, autoRuns:0, _outsGot:0, _brOutsCount:0}));
 
+    
+    
     // 先発投手エントリを補完する
-    // pitcherLogが空の場合のみ先発エントリを補完（既にエントリがある場合は最初のエントリを先発扱い）
+    const starterHalf = defTeam==="home" ? "top" : "bottom";
     const rawLog = pitcherLog.length>0 ? pitcherLog : [];
-    const starterHalf = defTeam==="away" ? "top" : "bottom";
-    const sortedRaw = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||(a.outsAtStart||0)-(b.outsAtStart||0));
-    const starterIdx = sortedRaw.length>0 ? sortedRaw[0].pitcherIdx : 0;
-    const log = rawLog.length>0 ? rawLog : [{pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0}];
+    // 先発エントリが既にあるか確認
+    const hasStarter = rawLog.some(l=>l.fromInning===1 && l.fromHalf===starterHalf && l.outsAtStart===0);
+    // 先発インデックス：pitcherLogの中で最も古い（fromInningが最小）エントリのidx、なければ0
+    const sortedLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1));
+    const starterIdx = sortedLog.length>0 ? sortedLog[0].pitcherIdx : 0;
+    const starterEntry = {pitcherIdx:starterIdx, fromInning:1, fromHalf:starterHalf, outsAtStart:0, atBatSeq:0};
+    const log = hasStarter ? rawLog : [starterEntry, ...rawLog];
 
-    // fromSeq計算（v468方式）
+    // 打席の通し番号(seq)ベースで担当投手を特定するヘルパー
+    // 各交代エントリにfromSeq（何番目の打席から担当か）を紐づけて判定
+    // fromSeq以上のseqを持つ打席が新投手の担当
     const buildSeqLog = () => {
       return log.map((l, li) => {
+        // atBatSeqが記録されている場合はそれをfromSeqとして直接使用
         if(l.atBatSeq !== undefined && l.atBatSeq >= 0) {
-          return {...l, fromSeq: l.atBatSeq, _li:li};
+          return {...l, fromSeq: l.atBatSeq};
         }
-        if(li === 0) return {...l, fromSeq: 0, _li:li};
+        if(l.atBatSeq === -1 || l.atBatSeq === -2) {
+          // allAtBatsは攻撃チーム(offTeam)の打席のみ含む
+          // defTeam="home"→offTeam="away"→allAtBatsはtop(表)のみ
+          // defTeam="away"→offTeam="home"→allAtBatsはbottom(裏)のみ
+          // pitcherLogのfromHalfはdefTeamの守備ハーフ（away=top, home=bottom）
+          // 従ってallAtBatsのhalfとpitcherLogのfromHalfは常に一致する
+          const outs = l.outsAtStart||0;
+          const nextAb = allAtBats.find(ab=>{
+            if(ab.inning < l.fromInning) return false;
+            if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
+            return true;
+          });
+          return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
+        }
+        // 旧データ（atBatSeqなし）：inning/half/outsAtStartから推定
+        if(li === 0) return {...l, fromSeq: 0};
+        const logTime = l.fromInning*2 + (l.fromHalf==="top"?0:1);
         const outs = l.outsAtStart||0;
+        const prevFromSeq = log[li-1].atBatSeq !== undefined ? log[li-1].atBatSeq : 0;
         const nextAb = allAtBats.find(ab=>{
           if(ab.inning < l.fromInning) return false;
           if(ab.inning === l.fromInning) return (ab.outsAtAb||0) >= outs;
           return true;
         });
-        return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length, _li:li};
+        return {...l, fromSeq: nextAb ? nextAb.seq : allAtBats.length};
       });
     };
-    // fromSeq同じ場合はlog内順番(_li)で安定ソート
-    const seqLog = buildSeqLog().sort((a,b)=>a.fromSeq!==b.fromSeq?a.fromSeq-b.fromSeq:a._li-b._li);
-    // fromSeq重複時：次のアウトが発生した打席のseqを境界にする（0アウト降板対応）
-    for(let i=1;i<seqLog.length;i++){
-      if(seqLog[i].fromSeq<=seqLog[i-1].fromSeq){
-        const prevFromSeq = seqLog[i-1].fromSeq;
-        // prevFromSeq以降で最初にアウトが発生する打席を探す
-        const nextOutAb = allAtBats.find(ab=>
-          ab.seq >= prevFromSeq &&
-          (OUT_CODES.has(ab.entry.code)||ab.entry.code==="DP"||ab.entry.code==="TP") &&
-          !ab.hasError
-        );
-        seqLog[i] = {...seqLog[i], fromSeq: nextOutAb ? nextOutAb.seq : seqLog[i-1].fromSeq+1};
-      }
-    }
+        const seqLog = buildSeqLog().sort((a,b)=>a.fromSeq-b.fromSeq);
 
     const findActivePitcher = (abSeq) => {
-      if(abSeq===undefined||abSeq===null) return seqLog[seqLog.length-1]?.pitcherIdx??log[0].pitcherIdx;
-      let best = seqLog[0]?.pitcherIdx??0;
-      for(const l of seqLog){ if(l.fromSeq<=abSeq) best=l.pitcherIdx; }
-      return best;
+      // seqがundefined（旧データ）の場合は現在の投手インデックスを返す
+      if(abSeq === undefined || abSeq === null) return seqLog[seqLog.length-1]?.pitcherIdx ?? log[0].pitcherIdx;
+      // seqLog中でfromSeq <= abSeqを満たす最後（最新）のエントリ
+      let bestIdx = seqLog[0] ? seqLog[0].pitcherIdx : 0;
+      for(let i=0; i<seqLog.length; i++){
+        if(seqLog[i].fromSeq <= abSeq){
+          bestIdx = seqLog[i].pitcherIdx;
+        }
+      }
+      return bestIdx;
     };
-
-    // byAppearance用：seqLogの順番で登板インデックスを返す
-    const findActiveAppearance = (abSeq) => {
-      if(abSeq===undefined||abSeq===null) return seqLog.length-1;
-      let best=0;
-      for(let i=0;i<seqLog.length;i++){ if(seqLog[i].fromSeq<=abSeq) best=i; }
-      return best;
-    };
-
-    // 登板単位の成績（byAppearance）
-    const appStats = seqLog.map(l=>({
-      pitcherIdx:l.pitcherIdx,
-      name:(safePitchers[l.pitcherIdx]||{}).name||("投手"+(l.pitcherIdx+1)),
-      logEntry:l,
-      autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0,autoHbp:0,autoHr:0,autoRuns:0,_outsGot:0,
-    }));
 
     allAtBats.forEach(ab=>{
-      const pi = findActivePitcher(ab.seq);
-      const ai = findActiveAppearance(ab.seq);
-      const ps = stats[pi], as = appStats[ai];
+      let activePIdx = findActivePitcher(ab.seq);
+
+      const ps = stats[activePIdx];
+      if(!ps) return;
       const code = ab.entry.code;
-      const runs = ab.entry.runs||0;
-      if(ps){
-        if(HIT_CODES.has(code)) ps.autoH++;
-        if(code==="BB"||code==="IBB") ps.autoBb++;
-        if(code==="K"||code==="KL"||code==="KW") ps.autoK++;
-        if(code==="HBP") ps.autoHbp++;
-        if(code==="HR") ps.autoHr++;
-        if(runs>0){ps.autoEr+=runs;ps.autoRuns+=runs;}
-        if(OUT_CODES.has(code)&&!ab.hasError) ps._outsGot++;
-        if(code==="DP"&&!ab.hasError) ps._outsGot++;
-        if(code==="TP"&&!ab.hasError) ps._outsGot+=2;
-      }
-      if(as){
-        if(HIT_CODES.has(code)) as.autoH++;
-        if(code==="BB"||code==="IBB") as.autoBb++;
-        if(code==="K"||code==="KL"||code==="KW") as.autoK++;
-        if(code==="HBP") as.autoHbp++;
-        if(code==="HR") as.autoHr++;
-        if(runs>0){as.autoEr+=runs;as.autoRuns+=runs;}
-        if(OUT_CODES.has(code)&&!ab.hasError) as._outsGot++;
-        if(code==="DP"&&!ab.hasError) as._outsGot++;
-        if(code==="TP"&&!ab.hasError) as._outsGot+=2;
+      if(HIT_CODES.has(code)) ps.autoH++;
+      if(code==="BB"||code==="IBB") ps.autoBb++;
+      if(code==="K"||code==="KL"||code==="KW") ps.autoK++;
+      if(code==="HBP") ps.autoHbp = (ps.autoHbp||0)+1;
+      if(code==="HR") ps.autoHr = (ps.autoHr||0)+1;
+      const runsScored = ab.entry.runs||0;
+      if(runsScored > 0) {
+        // 失点帰責: その打席を担当する投手に全失点を帰責（シンプル方式）
+        ps.autoEr = (ps.autoEr||0) + runsScored;
+        ps.autoRuns = (ps.autoRuns||0) + runsScored;
       }
     });
 
-    // baserunnerOuts
-    (g.baserunnerOuts||[]).forEach(bo=>{
-      if(bo.defTeam!==defTeam) return;
-      // 牽制死等が起きた時点のseqを特定してfindActiveAppearanceで登板を決める
-      const boTime=(bo.inning||0)*2+((bo.half==="top")?0:1);
-      const boOuts=bo.outsAtTime||0;
-      let brSeq=0;
-      for(const ab of allAtBats){
-        const at=ab.inning*2+(ab.half==="top"?0:1);
-        if(at<boTime||(at===boTime&&(ab.outsAtAb||0)<boOuts)) brSeq=ab.seq;
-      }
-      const pi=bo.pitcherIdx!==undefined ? bo.pitcherIdx : findActivePitcher(brSeq);
-      const ai=findActiveAppearance(brSeq);
-      if(stats[pi]){stats[pi]._outsGot++;stats[pi]._brOutsCount++;}
-      if(appStats[ai]) appStats[ai]._outsGot++;
+    
+    
+    allAtBats.forEach(ab=>{
+      // findActivePitcherを使って統一（被安打・三振等と同じロジック）
+      const activePIdx = findActivePitcher(ab.seq);
+      const ps = stats[activePIdx];
+      if(!ps) return;
+      const code = ab.entry.code;
+      if(OUT_CODES.has(code) && !ab.hasError) ps._outsGot += 1;
+      if(code==="DP" && !ab.hasError) ps._outsGot += 1;
+      if(code==="TP" && !ab.hasError) ps._outsGot += 2;
     });
 
-    // 試合終了アウト補正
-    if(g.finished){
-      if(g.finalOuts!==undefined&&g.finalHalf!==undefined){
-        // 新方式：finalOutsが記録されている
-        const finalHalfOuts=allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&OUT_CODES_FOR_IP.has(ab.entry.code)&&!ab.hasError).length
-          +allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&ab.entry.code==="DP"&&!ab.hasError).length
-          +allAtBats.filter(ab=>ab.inning===g.finalInning&&ab.half===g.finalHalf&&ab.entry.code==="TP"&&!ab.hasError).length*2;
-        const brFinal=(g.baserunnerOuts||[]).filter(bo=>bo.defTeam===defTeam&&bo.inning===g.finalInning&&bo.half===g.finalHalf).length;
-        const diff=g.finalOuts-(finalHalfOuts+brFinal);
-        if(diff>0){
-          const lp=stats[stats.length-1]; if(lp) lp._outsGot+=diff;
-          const la=appStats[appStats.length-1]; if(la) la._outsGot+=diff;
-        }
+    // baserunnerOuts（走塁アウト）も投球回に加算
+    const bOuts = g.baserunnerOuts || [];
+    bOuts.forEach(bo=>{
+      if(bo.defTeam !== defTeam) return;
+      // pitcherIdxが直接記録されている場合はそれを使用（新方式）
+      let activePIdx;
+      if(bo.pitcherIdx !== undefined) {
+        activePIdx = bo.pitcherIdx;
       } else {
-        // 旧方式：finalOutsなし → 最終投手に補完（v468互換）
-        const expectedTotal=(g.innings||7)*3;
-        const totalGot=stats.reduce((s,ps)=>s+ps._outsGot,0);
-        const diff=expectedTotal-totalGot;
-        if(diff>0){
-          const lp=stats[stats.length-1]; if(lp) lp._outsGot+=diff;
-          const la=appStats[appStats.length-1]; if(la) la._outsGot+=diff;
+        // 旧データ：seqで逆引き
+        const boTime = (bo.inning||0)*2+((bo.half==="top")?0:1);
+        const boOutsN = bo.outsAtTime||0;
+        let brSeq = 0;
+        for(let k=0;k<allAtBats.length;k++){
+          const ab=allAtBats[k];
+          const at=ab.inning*2+(ab.half==="top"?0:1);
+          if(at < boTime) brSeq = ab.seq;
+          else if(at === boTime && (ab.outsAtAb||0) < boOutsN) brSeq = ab.seq;
+        }
+        activePIdx = findActivePitcher(brSeq);
+      }
+      const ps = stats[activePIdx];
+      if(ps) { ps._outsGot++; ps._brOutsCount++; }
+    });
+
+    // 試合終了時のアウト補正
+    // 最終投手にfinalOutsまでのアウトを補完（試合終了ボタンで記録漏れを防ぐ）
+    if(g.finished && g.finalOuts !== undefined && g.finalHalf !== undefined) {
+      // 最終ハーフの総アウト数を計算（allAtBatsから）
+      const finalHalfOuts = allAtBats.filter(ab =>
+        ab.inning === g.finalInning && ab.half === g.finalHalf && OUT_CODES_FOR_IP.has(ab.entry.code) && !ab.hasError
+      ).length + allAtBats.filter(ab =>
+        ab.inning === g.finalInning && ab.half === g.finalHalf && ab.entry.code === "DP" && !ab.hasError
+      ).length + allAtBats.filter(ab =>
+        ab.inning === g.finalInning && ab.half === g.finalHalf && ab.entry.code === "TP" && !ab.hasError
+      ).length * 2;
+      const brOutsInFinalHalf = (g.baserunnerOuts||[]).filter(bo =>
+        bo.defTeam === defTeam && bo.inning === g.finalInning && bo.half === g.finalHalf
+      ).length;
+      const totalFinalOuts = finalHalfOuts + brOutsInFinalHalf;
+      const expectedOuts = g.finalOuts;
+      if(totalFinalOuts < expectedOuts) {
+        // 差分を最終投手に補完
+        const lastPitcher = stats.length > 0 ? stats[stats.length - 1] : null;
+        if(lastPitcher) {
+          const diff = expectedOuts - totalFinalOuts;
+          lastPitcher._outsGot += diff;
         }
       }
     }
+    stats.forEach(ps=>{
+      ps.autoIp = Math.floor(ps._outsGot/3)*10 + (ps._outsGot%3); 
+    });
 
-    stats.forEach(ps=>{ps.autoIp=Math.floor(ps._outsGot/3)*10+(ps._outsGot%3);});
-    appStats.forEach(as=>{as.autoIp=Math.floor(as._outsGot/3)*10+(as._outsGot%3);});
-
-    result[defTeam]=stats;
-    // byAppearanceはfromInning順でソート（pLog/sortedLogと順番を一致させる）
-    result[defTeam+"_byAppearance"]=appStats.slice().sort((a,b)=>
-      (a.logEntry.fromInning-b.logEntry.fromInning)||
-      ((a.logEntry.fromHalf==="top"?0:1)-(b.logEntry.fromHalf==="top"?0:1))||
-      ((a.logEntry.outsAtStart||0)-(b.logEntry.outsAtStart||0))||
-      ((a.logEntry._li||0)-(b.logEntry._li||0))
-    );
+    result[defTeam] = stats;
   });
   return result;
 };
@@ -3116,7 +3123,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.35")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.37")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3202,7 +3209,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.35")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.37")
         )
 
         // ===== 新規チーム作成 =====
@@ -3588,13 +3595,13 @@ function App() {
                         pLog.push({pitcherIdx:0,fromInning:1,fromHalf:side==="away"?"top":"bottom",outsAtStart:0});
                       }
                       const autoArr=_pStats[side]||[];
-                      const autoByApp=_pStats[side+"_byAppearance"]||[];
+                      // byAppearance廃止
                       return React.createElement('div',{key:side,style:{marginBottom:6}}
                         ,React.createElement('div',{style:{fontSize:10,color,fontWeight:700,marginBottom:3}},label)
                         ,React.createElement('div',{style:{display:"flex",gap:4,flexWrap:"wrap"}}
                           ,pLog.map((entry,ei)=>{
                             const p=pitchers[entry.pitcherIdx]||{};
-                            const a=autoByApp[ei]||autoArr[entry.pitcherIdx]||{};
+                            const a=autoArr[entry.pitcherIdx]||{};
                             const ipOuts=Math.floor((a.autoIp||0)/10)*3+((a.autoIp||0)%10);
                             const ipDisp=Math.floor(ipOuts/3)+"."+(ipOuts%3);
                             const isCur=entry.pitcherIdx===(g[side+"PitcherIdx"]||0)&&ei===pLog.length-1;
@@ -4487,126 +4494,92 @@ function App() {
                     )
                     , React.createElement('tbody', null
                       , (()=>{
-                          // 登板単位（byAppearance）で行を生成。再登板は別行で表示
-                          const byApp = (pitcherStats[side+"_byAppearance"])||[];
-                          // byAppが空の場合は従来のpitchers配列にフォールバック
-                          if(!byApp.length) return null;
-                          // 同名投手の何回目の登板かカウント
+                          // pitcherLogを登板順に表示。成績はautoArr[pitcherIdx]（合算値）を使用
+                          const pLog = [...(game[side+"PitcherLog"]||[])]
+                            .map((l,i)=>({...l,_i:i}))
+                            .sort((a,b)=>a.fromInning!==b.fromInning?a.fromInning-b.fromInning:
+                              (a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1)||
+                              (a.outsAtStart||0)-(b.outsAtStart||0)||a._i-b._i);
+                          // pitcherLogが空の場合は現在の投手を先発として表示
+                          if(!pLog.length){
+                            const p = pitchers[curPIdx]||{};
+                            const auto = (pitcherStats[side]||[])[curPIdx]||{};
+                            const rawIp = auto.autoIp||0;
+                            const ipOuts = Math.floor(rawIp/10)*3+(rawIp%10);
+                            const effectiveIp = p.manualIp!==undefined?p.manualIp:ipOuts;
+                            const ipDisp = Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?(effectiveIp%3)+"/3":"");
+                            const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
+                            const er = p.manualOverride&&p.er!==undefined?p.er:(auto.autoEr||0);
+                            const era = ipNum>0?(er*(game.innings||9)/ipNum).toFixed(2):(er>0?"∞":"—");
+                            return [React.createElement('tr',{key:"starter"}
+                              ,React.createElement('td',{style:{...S.td,minWidth:110}}
+                                ,React.createElement('span',{style:{color,fontSize:10,fontWeight:900,marginRight:4}},"▶")
+                                ,React.createElement('span',{style:{fontSize:12,color}},p.name||"投手")
+                              )
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:10,color}},game.finished?"先発":"登板中"))
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoH||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoHr||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoK||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoBb||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoHbp||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoRuns||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center"}},er)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",color:era==="∞"?"#f87171":era==="—"?"#475569":parseFloat(era)<3?"#4ade80":parseFloat(era)<5?"#fbbf24":"#f87171",fontWeight:700}},era)
+                            )];
+                          }
+                          // 同じpitcherIdxが複数あるか（再登板チェック）
+                          const appearedIdx = new Set();
                           const nameCount = {};
-                          return byApp.map((app, ai)=>{
-                            const i = app.pitcherIdx;
-                            const p = pitchers[i]||{name:app.name};
-                            const isCur = !game.finished && i===curPIdx && (
-                              // 同じpitcherIdxの登板の中で最後のものが「登板中」
-                              !byApp.slice(ai+1).some(a=>a.pitcherIdx===i)
-                            );
-                            // 再登板かどうか（同名が既に登場済み）
-                            nameCount[app.name] = (nameCount[app.name]||0)+1;
-                            const appearNum = nameCount[app.name];
-                            const totalForName = byApp.filter(a=>a.name===app.name).length;
-                            const isReappear = totalForName > 1;
+                          return pLog.map((entry, li)=>{
+                            const i = entry.pitcherIdx;
+                            const p = pitchers[i]||{};
+                            const auto = (pitcherStats[side]||[])[i]||{};
+                            const isCur = !game.finished && i===curPIdx;
+                            const isReappear = appearedIdx.has(i);
+                            appearedIdx.add(i);
+                            nameCount[p.name||(i)] = (nameCount[p.name||(i)]||0)+1;
+                            const appearNum = nameCount[p.name||(i)];
                             const reappearLabel = isReappear
                               ? ["①","②","③","④","⑤","⑥","⑦","⑧","⑨"][appearNum-1]||("("+appearNum+")")
                               : null;
-                            const auto = app;
+                            // 投球回：再登板がある場合は合算値をそのまま①行に出す、②以降は「--」
                             const rawIp = auto.autoIp||0;
-                            const autoIpOuts = Math.floor(rawIp/10)*3 + (rawIp%10);
-                            // manualIpは投手単位のため再登板がある場合は使わない（autoのみ使用）
-                            const hasReappear = byApp.filter(a=>a.pitcherIdx===i).length > 1;
-                            const effectiveIp = (!hasReappear && p.manualIp !== undefined) ? p.manualIp : autoIpOuts;
-                            const ipDisp = Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?(effectiveIp%3)+"/3":"");
+                            const ipOuts = Math.floor(rawIp/10)*3+(rawIp%10);
+                            const effectiveIp = p.manualIp!==undefined?p.manualIp:ipOuts;
+                            const ipDisp = isReappear ? "再登板" : Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?(effectiveIp%3)+"/3":"");
                             const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
-                            const er    = p.manualOverride && p.er!==undefined ? p.er : (auto.autoEr||0);
-                            const h     = auto.autoH||0;
-                            const bb    = auto.autoBb||0;
-                            const k     = auto.autoK||0;
-                            const hbp   = auto.autoHbp||0;
-                            const hr    = auto.autoHr||0;
-                            const runs  = auto.autoRuns||0;
-                            const era   = ipNum>0 ? (er*(game.innings||9)/ipNum).toFixed(2) : (er>0?"∞":"—");
-                            return React.createElement('tr', {key:"app_"+ai,
-                              style:{background:isCur?(color+"22"):ai%2===0?"#0a1628":"transparent",
+                            const er = p.manualOverride&&p.er!==undefined?p.er:(auto.autoEr||0);
+                            const era = !isReappear&&ipNum>0?(er*(game.innings||9)/ipNum).toFixed(2):(isReappear?"—":er>0?"∞":"—");
+                            return React.createElement('tr',{key:"pl_"+li,
+                              style:{background:isCur?(color+"22"):li%2===0?"#0a1628":"transparent",
                                 outline:isCur?`1px solid ${color}33`:"none"}}
-                              // 投手名セル
-                              , React.createElement('td', {style:{...S.td, minWidth:110}}
-                                , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:3}}
-                                  , isCur&&React.createElement('span',{style:{color,fontSize:10,fontWeight:900,flexShrink:0}},"▶")
-                                  , React.createElement('span',{style:{fontSize:12,color:isCur?color:"#e2e8f0",fontWeight:isCur?700:400}},
-                                      p.name||(app.name))
-                                  , reappearLabel&&React.createElement('span',{style:{
-                                      fontSize:10,color:"#fbbf24",fontWeight:700,marginLeft:2,
-                                      background:"#78350f44",borderRadius:3,padding:"1px 4px"
-                                    }},reappearLabel)
+                              ,React.createElement('td',{style:{...S.td,minWidth:110}}
+                                ,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:3}}
+                                  ,isCur&&React.createElement('span',{style:{color,fontSize:10,fontWeight:900,flexShrink:0}},"▶")
+                                  ,React.createElement('span',{style:{fontSize:12,color:isCur?color:"#e2e8f0",fontWeight:isCur?700:400}},p.name||("投手"+(i+1)))
+                                  ,reappearLabel&&React.createElement('span',{style:{fontSize:10,color:"#fbbf24",fontWeight:700,marginLeft:2,background:"#78350f44",borderRadius:3,padding:"1px 4px"}},reappearLabel)
                                 )
                               )
-                              // 登板列（登板中 or 何回目か）
-                              , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                                , isCur
-                                  ? React.createElement('span', {style:{fontSize:10,color,fontWeight:700}},"登板中")
-                                  : React.createElement('span',{style:{fontSize:10,color:"#475569"}},
-                                      ai===0?"先発":("交代"+ai))
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}}
+                                ,React.createElement('span',{style:{fontSize:10,color:isCur?color:"#475569"}},li===0?"先発":"交代"+li)
                               )
-                              , React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                                , (()=>{
-                                    const dispStr = ipDisp;
-                                    if(!pitEditMode) return React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}},dispStr);
-                                    const btnSt = {width:22,height:22,borderRadius:4,border:"1px solid #a78bfa",
-                                      background:"#4c1d9522",color:"#a78bfa",cursor:"pointer",
-                                      fontSize:14,fontWeight:900,padding:0,flexShrink:0};
-                                    return React.createElement('div',{style:{display:"flex",alignItems:"center",gap:3,justifyContent:"center"}}
-                                      , React.createElement('button',{style:btnSt,
-                                          onClick:()=>mutGame(g=>{
-                                            const ps=[...g[side+"Pitchers"]];
-                                            const cur=ps[i]?.manualIp!==undefined?ps[i].manualIp:autoIpOuts;
-                                            ps[i]={...ps[i],manualIp:Math.max(0,cur-1)};
-                                            return{...g,[side+"Pitchers"]:ps};
-                                          })
-                                        },"−")
-                                      , React.createElement('span',{style:{fontSize:11,color:"#e2e8f0",minWidth:34,textAlign:"center"}},dispStr)
-                                      , React.createElement('button',{style:btnSt,
-                                          onClick:()=>mutGame(g=>{
-                                            const ps=[...g[side+"Pitchers"]];
-                                            const cur=ps[i]?.manualIp!==undefined?ps[i].manualIp:autoIpOuts;
-                                            ps[i]={...ps[i],manualIp:Math.min(90,cur+1)};
-                                            return{...g,[side+"Pitchers"]:ps};
-                                          })
-                                        },"+")
-                                    );
-                                  })()
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},isReappear?"—":auto.autoH||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},isReappear?"—":auto.autoHr||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},isReappear?"—":auto.autoK||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},isReappear?"—":auto.autoBb||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},isReappear?"—":auto.autoHbp||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},isReappear?"—":auto.autoRuns||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center"}}
+                                ,pitEditMode&&!isReappear
+                                  ?React.createElement('input',{type:"number",min:0,
+                                      defaultValue:er,key:"er_"+i+"_"+er+"_"+pitEditMode,
+                                      onBlur:e=>{const v=parseInt(e.target.value);if(!isNaN(v))mutGame(g=>{const ps=[...g[side+"Pitchers"]];if(ps[i])ps[i]={...ps[i],er:v,autoEr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};});},
+                                      style:{width:34,textAlign:"center",background:"#1a2a40",border:"1px solid #a78bfa",borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
+                                  :React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}},isReappear?"—":er)
                               )
-                              , (game.pitchMode||"result")==="pitch" && React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}}
-                                , React.createElement('span', {style:{
-                                    fontSize:13,fontWeight:700,
-                                    color:(p.pitchCount||0)>=100?"#f87171":(p.pitchCount||0)>=80?"#fbbf24":"#4ade80"
-                                  }}, p.pitchCount||0)
-                              )
-                              , (game.pitchMode||"result")==="pitch" && React.createElement('td', {style:{...S.td, textAlign:"center", padding:2}},
-                                  (()=>{
-                                    const total=p.pitchCount||0, strikes=p.strikeCount||0;
-                                    if(total===0) return "—";
-                                    const rate=Math.round(strikes/total*100);
-                                    const c=rate>=65?"#4ade80":rate>=55?"#fbbf24":"#f87171";
-                                    return React.createElement('span',{style:{fontSize:13,fontWeight:700,color:c}},rate+"%");
-                                  })()
-                                )
-                              , React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}},h))
-                              , React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}},hr))
-                              , React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}},k))
-                              , React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}},bb))
-                              , React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}},hbp))
-                              , React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}},runs))
-                              , React.createElement('td', {style:{...S.td, textAlign:"center"}}
-                                , pitEditMode
-                                  ? React.createElement('input', {type:"number", min:0,
-                                      defaultValue:er, key:"er_app_"+ai+"_"+er+"_"+pitEditMode,
-                                      onBlur:e=>{ const v=parseInt(e.target.value); if(!isNaN(v)) mutGame(g=>{const ps=[...g[side+"Pitchers"]];if(ps[i])ps[i]={...ps[i],er:v,autoEr:v,manualOverride:true};return{...g,[side+"Pitchers"]:ps};}); },
-                                      style:{width:34,textAlign:"center",background:"#1a2a40",border:"1px solid #a78bfa",
-                                        borderRadius:4,color:"#e2e8f0",padding:"2px",fontSize:11,outline:"none"}})
-                                  : React.createElement('span',{style:{fontSize:11,color:"#e2e8f0"}}, er)
-                              )
-                              , React.createElement('td', {style:{...S.td, textAlign:"center",
-                                  color:era==="∞"?"#f87171":era==="—"?"#475569":parseFloat(era)<3?"#4ade80":parseFloat(era)<5?"#fbbf24":"#f87171",
-                                  fontWeight:700}}, era)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",color:era==="∞"?"#f87171":era==="—"?"#475569":parseFloat(era)<3?"#4ade80":parseFloat(era)<5?"#fbbf24":"#f87171",fontWeight:700}},era)
                             );
                           });
                         })()
@@ -5343,7 +5316,7 @@ function App() {
           const curPIdx = game.finished ? -1 : (game[side+"PitcherIdx"]||0);
           const pStats = computePitcherStats(game);
           const autoArr = pStats[side]||[];
-          const autoByApp = pStats[side+"_byAppearance"]||[];
+          // byAppearance廃止
           // AddPitcherFormはグローバルコンポーネントとして定義済み
           return React.createElement('div',{style:S.overlay,onClick:()=>setModal(null)}
             ,React.createElement('div',{
@@ -5417,7 +5390,7 @@ function App() {
 
               ,sortedLog.map((entry,li)=>{
                   const pitcher=pitchers[entry.pitcherIdx]||{};
-                  const auto=autoByApp[li]||autoArr[entry.pitcherIdx]||{};
+                  const auto=autoArr[entry.pitcherIdx]||{};
                   const autoIpOuts=Math.floor((auto.autoIp||0)/10)*3+((auto.autoIp||0)%10);
                   const effectiveIp=pitcher.manualIp!==undefined?pitcher.manualIp:autoIpOuts;
                   const ipDisp=Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?effectiveIp%3+"/3":"");
@@ -6834,54 +6807,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       sides.forEach(side=>{
         const pitchers = g[side+"Pitchers"]||[];
         const autoArr = (pStats[side]||[]);
-        const autoByApp = (pStats[side+"_byAppearance"]||[]);
-        // byAppearanceがある場合はそちらを使って登板ごとに集計（再登板対応）
-        if(autoByApp.length > 0){
-          autoByApp.forEach((app)=>{
-            const p = pitchers[app.pitcherIdx]||{};
-            if(!p.name) return;
-            const isDefaultName = /^投手\d+$/.test(p.name);
-            const rawLog = g[side+"PitcherLog"]||[];
-            if(isDefaultName && !rawLog.some(l=>l.pitcherIdx===app.pitcherIdx)) return;
-            if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set(),outsXinnings:0,win:0,lose:0,save:0,hold:0,bs:0};
-            const m = map[p.name];
-            m.games.add(g.id);
-            // 投球回はmanualIpがあれば優先、なければautoArrから
-            const hasReappear = autoByApp.filter(a=>a.pitcherIdx===app.pitcherIdx).length > 1;
-            let outsGot;
-            if(p.manualIp !== undefined){
-              outsGot = p.manualIp;
-            } else if(hasReappear){
-              outsGot = Math.floor((app.autoIp||0)/10)*3 + ((app.autoIp||0)%10);
-            } else {
-              const arrEntry = autoArr[app.pitcherIdx]||{};
-              outsGot = Math.floor((arrEntry.autoIp||0)/10)*3 + ((arrEntry.autoIp||0)%10);
-            }
-            m.outs += outsGot;
-            const arrStat = autoArr[app.pitcherIdx]||{};
-            m.h    += hasReappear ? (app.autoH||0) : (arrStat.autoH||0);
-            // erの集計：再登板なしはautoArr合算、再登板ありはapp.autoEr（登板別）
-            const erVal = p.manualOverride && p.er!==undefined ? p.er
-              : hasReappear ? (app.autoEr||0)
-              : (arrStat.autoEr||0);
-            m.er   += erVal;
-            m.bb   += hasReappear ? (app.autoBb||0) : (arrStat.autoBb||0);
-            m.k    += hasReappear ? (app.autoK||0) : (arrStat.autoK||0);
-            m.hbp  += hasReappear ? (app.autoHbp||0) : (arrStat.autoHbp||0);
-            m.hr   += hasReappear ? (app.autoHr||0) : (arrStat.autoHr||0);
-            m.runs += hasReappear ? (app.autoRuns||0) : (arrStat.autoRuns||0);
-            const pr = (g.pitcherResults||{})[p.name]||{};
-            if(pr.win)  m.win++;
-            if(pr.lose) m.lose++;
-            if(pr.save) m.save++;
-            if(pr.hold) m.hold++;
-            if(pr.bs)   m.bs++;
-            m.outsXinnings += outsGot * (g.innings||9);
-          });
-          return;
-        }
-        // フォールバック：旧データ（byAppearanceなし）
-        // 実際に登板した投手のインデックスを取得（computePitcherStatsと同じ先発補完ロジック）
+        // v469: byAppearance廃止。autoArr（pitcherIdx単位）のみ使用
         const rawLog = g[side+"PitcherLog"]||[];
         const starterHalfForSide = side==="away" ? "top" : "bottom";
         const sortedRawLog = [...rawLog].sort((a,b)=>a.fromInning-b.fromInning||(a.fromHalf==="top"?0:1)-(b.fromHalf==="top"?0:1));

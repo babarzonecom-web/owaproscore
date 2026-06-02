@@ -3117,7 +3117,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.28")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v469.29")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3203,7 +3203,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.28")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v469.29")
         )
 
         // ===== 新規チーム作成 =====
@@ -6619,6 +6619,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
               if(field==="k")      p.autoK    = Number(val);
               if(field==="runs")   p.autoRuns = Number(val);
               if(field==="ipDisp") p.ipDisp   = val;
+              if(field==="outs")   p.manualIp = Number(val); // アウト数で保存
             }
             ps[idx] = p;
             return ps;
@@ -6842,11 +6843,12 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             if(!map[p.name]) map[p.name]={name:p.name,outs:0,h:0,er:0,bb:0,k:0,hbp:0,hr:0,runs:0,games:new Set(),outsXinnings:0,win:0,lose:0,save:0,hold:0,bs:0};
             const m = map[p.name];
             m.games.add(g.id);
-            // 投球回はautoArr（投手単位の合算）から取得（再登板でない場合はより正確）
-            // 再登板がある場合のみbyAppのipを使う
+            // 投球回はmanualIpがあれば優先、なければautoArrから
             const hasReappear = autoByApp.filter(a=>a.pitcherIdx===app.pitcherIdx).length > 1;
             let outsGot;
-            if(hasReappear){
+            if(p.manualIp !== undefined){
+              outsGot = p.manualIp;
+            } else if(hasReappear){
               outsGot = Math.floor((app.autoIp||0)/10)*3 + ((app.autoIp||0)%10);
             } else {
               const arrEntry = autoArr[app.pitcherIdx]||{};
@@ -7144,14 +7146,23 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           , React.createElement('tbody', null
             , pitchers.map((p,i)=>{
                 const ov = (pitchOverrides||{})[p.name]||{};
-                const ipDispVal = ov.ipDisp !== undefined ? ov.ipDisp : p.ipDisp;
+                // 手動修正値がある場合はそちらを優先
+                const effectiveOuts = ov.outs !== undefined ? ov.outs : p.outs;
+                const effectiveEr   = ov.er   !== undefined ? ov.er   : p.er;
+                const ipWhole = Math.floor(effectiveOuts/3);
+                const ipFrac  = effectiveOuts%3;
+                const ipNum   = ipWhole + ipFrac/3;
+                const ipDispVal = ipWhole+"回"+(ipFrac>0?ipFrac+"/3":"");
+                const avgInnings = p.avgInnings||9;
+                const eraVal = ipNum>0?(effectiveEr*avgInnings/ipNum).toFixed(2):(effectiveEr>0?"∞":"—");
+                const whipVal= ipNum>0?((p.bb+p.h)/ipNum).toFixed(2):"—";
                 const displayFields = [
-                  {k:"ipDisp", v:ipDispVal, s:tdS, editable:true},
+                  {k:"ipDisp", v:ipDispVal, s:tdS, editable:true, type:"ip"},
                   {k:"h",      v:p.h,      s:tdS, editable:false},
                   {k:"runs",   v:p.runs,   s:{...tdS,color:"#fb923c"}, editable:false},
-                  {k:"er",     v:p.er,     s:{...tdS,color:"#f87171"}, editable:true},
-                  {k:"era",    v:p.era,    s:{...tdS,color:parseFloat(p.era)<3?"#4ade80":parseFloat(p.era)<5?"#fbbf24":"#f87171",fontWeight:900}, editable:false},
-                  {k:"whip",   v:p.whip,   s:tdS, editable:false},
+                  {k:"er",     v:effectiveEr, s:{...tdS,color:"#f87171"}, editable:true, type:"num"},
+                  {k:"era",    v:eraVal,   s:{...tdS,color:parseFloat(eraVal)<3?"#4ade80":parseFloat(eraVal)<5?"#fbbf24":"#f87171",fontWeight:900}, editable:false},
+                  {k:"whip",   v:whipVal,  s:tdS, editable:false},
                   {k:"bb",     v:p.bb,     s:{...tdS,color:"#60a5fa"}, editable:false},
                   {k:"k",      v:p.k,      s:{...tdS,color:"#a78bfa"}, editable:false},
                 ];
@@ -7175,26 +7186,44 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                       return React.createElement('span',{style:{fontSize:13,fontWeight:700,color}},rate+"%");
                     })())
                   , displayFields.map(f=>{
-                      const {k,v,s,editable}=f;
+                      const {k,v,s,editable,type}=f;
                       if(!editable) {
-                        // 自動再計算フィールド：編集不可
                         return React.createElement('td',{key:k,style:{...s,opacity:editMode?0.6:1}}, v);
                       }
-                      return React.createElement('td',{key:k,style:editMode?{...s,padding:2}:s}
-                        , editMode
-                          ? React.createElement('input',{
-                              type:"text",
-                              defaultValue: ov[k]!==undefined?ov[k]:v,
-                              onBlur:e=>{
-                                const val=e.target.value.trim();
-                                if(val===""||val===String(v)){if(ov[k]!==undefined&&savePitchOverride)savePitchOverride(p.name,k,undefined);}
-                                else if(savePitchOverride) savePitchOverride(p.name,k,val);
-                              },
-                              style:{width:"100%",background:"#1a1535",border:"1px solid #a78bfa",
-                                borderRadius:4,color:"#c4b5fd",fontSize:11,padding:"2px 4px",
-                                textAlign:"center",outline:"none"}
-                            })
-                          : (ov[k]!==undefined?ov[k]:v)
+                      if(!editMode) return React.createElement('td',{key:k,style:s}, v);
+                      // 投球回：±ボタン
+                      if(type==="ip"){
+                        const btnS={width:20,height:20,borderRadius:3,border:"1px solid #a78bfa",
+                          background:"#4c1d9522",color:"#a78bfa",cursor:"pointer",
+                          fontSize:12,fontWeight:900,padding:0,flexShrink:0,lineHeight:"20px"};
+                        return React.createElement('td',{key:k,style:{...s,padding:"2px 4px"}}
+                          , React.createElement('div',{style:{display:"flex",alignItems:"center",gap:2,justifyContent:"center"}}
+                            , React.createElement('button',{style:btnS,onClick:()=>{
+                                const cur = ov.outs!==undefined ? ov.outs : p.outs;
+                                if(savePitchOverride) savePitchOverride(p.name,"outs",Math.max(0,cur-1));
+                              }},"−")
+                            , React.createElement('span',{style:{fontSize:10,color:"#c4b5fd",minWidth:30,textAlign:"center"}},v)
+                            , React.createElement('button',{style:btnS,onClick:()=>{
+                                const cur = ov.outs!==undefined ? ov.outs : p.outs;
+                                if(savePitchOverride) savePitchOverride(p.name,"outs",cur+1);
+                              }},"+")
+                          )
+                        );
+                      }
+                      // 自責点：input
+                      return React.createElement('td',{key:k,style:{...s,padding:2}}
+                        , React.createElement('input',{
+                            type:"number",min:0,
+                            defaultValue:v,
+                            key:"er_"+p.name+"_"+v,
+                            onBlur:e=>{
+                              const val=parseInt(e.target.value);
+                              if(!isNaN(val)&&savePitchOverride) savePitchOverride(p.name,"er",val);
+                            },
+                            style:{width:34,textAlign:"center",background:"#1a1535",
+                              border:"1px solid #a78bfa",borderRadius:4,color:"#c4b5fd",
+                              fontSize:11,padding:"2px",outline:"none"}
+                          })
                       );
                     })
                   , React.createElement('td', {style:tdS}, p.hbp)

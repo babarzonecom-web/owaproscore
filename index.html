@@ -610,7 +610,7 @@ const abbrPos = (pos) => POS_ABBR[pos] || pos;
 const makePlayer  = (i) => ({ id:i, name:`選手${i}`, pos:"", atBats:{}, rbi:0, sb:0, cs:0 });
 const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:0,
   pitchCount:0, strikeCount:0, ballCount:0,
-  autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0,
+  autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, autoTbf:0,
   manualOverride:false, 
 });
 const makeLineup  = (n=DEFAULT_PLAYERS) => Array.from({length:n},(_,i)=>makePlayer(i+1));
@@ -848,6 +848,7 @@ const computePitcherStats = (g) => {
 
       const ps = stats[activePIdx];
       if(!ps) return;
+      ps.autoTbf = (ps.autoTbf||0) + 1;
       const code = ab.entry.code;
       if(HIT_CODES.has(code)) ps.autoH++;
       if(code==="BB"||code==="IBB") ps.autoBb++;
@@ -3141,7 +3142,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v470")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3227,7 +3228,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v470")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471")
         )
 
         // ===== 新規チーム作成 =====
@@ -4498,6 +4499,7 @@ function App() {
                         , React.createElement('th', {style:{...S.th, textAlign:"left", minWidth:110}}, "投手名")
                         , React.createElement('th', {style:S.th}, "登板")
                         , React.createElement('th', {style:S.th}, "投球回")
+                        , React.createElement('th', {style:S.th}, "打者")
                         , (game.pitchMode||"result")==="pitch" && React.createElement('th', {style:S.th}, "球数")
                         , (game.pitchMode||"result")==="pitch" && React.createElement('th', {style:S.th}, "St%")
                         , React.createElement('th', {style:S.th}, "被安打")
@@ -4535,6 +4537,7 @@ function App() {
                               )
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:10,color}},game.finished?"先発":"登板中"))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},auto.autoTbf||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoH||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoHr||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoK||0)

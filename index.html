@@ -6877,13 +6877,18 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           m.hbp  += a.autoHbp||0;
           m.hr   += a.autoHr||0;
           m.runs += (p.manualOverride && p.autoRuns!==undefined) ? p.autoRuns : (a.autoRuns||0);
-          // 勝敗・セーブ・ホールド
-          const pr = (g.pitcherResults||{})[p.name]||{};
-          if(pr.win)  m.win++;
-          if(pr.lose) m.lose++;
-          if(pr.save) m.save++;
-          if(pr.hold) m.hold++;
-          if(pr.bs)   m.bs++;
+          // 勝敗・セーブ・ホールド（同名投手の再登板で重複カウントしないようgame単位で管理）
+          const _wKey = g.id+"|"+p.name;
+          if(!map[p.name]._seenGames) map[p.name]._seenGames = new Set();
+          if(!map[p.name]._seenGames.has(_wKey)) {
+            map[p.name]._seenGames.add(_wKey);
+            const pr = (g.pitcherResults||{})[p.name]||{};
+            if(pr.win)  m.win++;
+            if(pr.lose) m.lose++;
+            if(pr.save) m.save++;
+            if(pr.hold) m.hold++;
+            if(pr.bs)   m.bs++;
+          }
           // 防御率計算用：投球アウト数×試合のイニング数を累積
           m.outsXinnings += outsGot * (g.innings||9);
         });
@@ -7076,10 +7081,9 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
               , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.pa,0))
               , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+p.ab,0))
               , React.createElement('td', {style:{...tdS,color:"#4ade80",fontWeight:700}}, players.reduce((s,p)=>s+p.h,0))
-              , (()=>{const ab=players.reduce((s,p)=>s+p.ab,0);const h=players.reduce((s,p)=>s+p.h,0);return React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---");})()
               , React.createElement('td', {style:{...tdS,color:"#f87171"}}, players.reduce((s,p)=>s+p.hr,0))
+              , (()=>{const ab=players.reduce((s,p)=>s+p.ab,0);const h=players.reduce((s,p)=>s+p.h,0);return React.createElement('td',{style:{...tdS,color:"#fbbf24",fontWeight:900}},ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---");})()
               , React.createElement('td', {style:{...tdS,color:"#fbbf24",fontWeight:900}}, "—")
-              , React.createElement('td', {style:tdS}, "—")
               , React.createElement('td', {style:{...tdS,color:"#fb923c"}}, players.reduce((s,p)=>s+p.rbi,0))
               , React.createElement('td', {style:tdS}, "—")
               , React.createElement('td', {style:tdS}, "—")

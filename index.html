@@ -780,7 +780,7 @@ const computePitcherStats = (g) => {
     // nullエントリはindexを保持するため空オブジェクトに変換（nameなしはスキップ）
     const safePitchers = rawPitchers.map(p=>(p&&p.name)?p:{});
     if(!safePitchers.length || safePitchers.every(p=>!p.name)) { result[defTeam]=[]; return; }
-    const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, autoHbp:0, autoHr:0, autoRuns:0, _outsGot:0, _brOutsCount:0}));
+    const stats = safePitchers.map(p=>({...p, autoIp:0, autoH:0, autoEr:0, autoBb:0, autoK:0, autoHbp:0, autoHr:0, autoRuns:0, autoTbf:0, _outsGot:0, _brOutsCount:0}));
 
     
     

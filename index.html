@@ -4492,7 +4492,6 @@ function App() {
                       style:{...sBt("#475569",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
                     }, "＋ 投手追加")
                 )
-                , (()=>{console.log("pitcherStats",side,JSON.stringify((pitcherStats[side]||[]).map(p=>({name:p.name,tbf:p.autoTbf,h:p.autoH,bb:p.autoBb}))));return null;})()
                 , React.createElement('div', {style:{overflowX:"auto"}}
                   , React.createElement('table', {style:{...S.table, minWidth:520}})
                     , React.createElement('thead', null

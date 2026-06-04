@@ -3142,7 +3142,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.5")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.6")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3228,7 +3228,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.5")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.6")
         )
 
         // ===== 新規チーム作成 =====
@@ -6597,21 +6597,10 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const [editMode, setEditMode] = useState(false);   // 手動修正モード
   const [editPitchMode, setEditPitchMode] = useState(false);
   const [pitchOverrides, setPitchOverrides] = React.useState(()=>{
+    // チーム通算の手動修正はlocalStorageとFirebase(pitch_プレフィックス)からのみ読む
+    // 試合データ本体(autoEr等)は参照しない（過去バージョンの誤書き込みを無視するため）
     let base = {};
     try { base = JSON.parse(localStorage.getItem("pitchOverrides")||"{}"); } catch(e){}
-    [...(game.awayPitchers||[]), ...(game.homePitchers||[])].forEach(p=>{
-      if(!p||!p.name||!p.manualOverride) return;
-      const existing = base[p.name]||{};
-      base[p.name] = {
-        ...existing,
-        ...(p.autoH    !==undefined?{h:    p.autoH}:{}),
-        ...(p.autoEr   !==undefined?{er:   p.autoEr}:p.er!==undefined?{er:p.er}:{}),
-        ...(p.autoBb   !==undefined?{bb:   p.autoBb}:{}),
-        ...(p.autoK    !==undefined?{k:    p.autoK}:{}),
-        ...(p.autoRuns !==undefined?{runs: p.autoRuns}:{}),
-        ...(p.ipDisp   !==undefined?{ipDisp:p.ipDisp}:{}),
-      };
-    });
     return base;
   });
 

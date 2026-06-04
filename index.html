@@ -3142,7 +3142,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.4")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.5")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3228,7 +3228,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.4")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.5")
         )
 
         // ===== 新規チーム作成 =====
@@ -6657,42 +6657,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       else next[playerKey] = {...(next[playerKey]||{}), [field]:val};
       _persistPitchOverrides(next);
 
-      // Firebase（mutGame）にも保存：現在試合のときのみ
-      if(mutGame) {
-        mutGame(g=>{
-          // awayPitchersとhomePitchersを両方検索して該当選手を更新
-          const updateSide = (side) => {
-            const ps = [...(g[side+"Pitchers"]||[])];
-            const idx = ps.findIndex(p=>p&&p.name===playerKey);
-            if(idx<0) return null;
-            const p = {...ps[idx]};
-            if(field==="_clear"){
-              // 手動上書きをクリア
-              delete p.manualOverride;
-              delete p.autoH; delete p.autoK; delete p.autoBb; delete p.autoHbp;
-              delete p.autoRuns; delete p.autoEr; delete p.manualIp;
-            } else {
-              p.manualOverride = true;
-              if(field==="h")      p.autoH    = Number(val);
-              if(field==="er")     { p.er = Number(val); p.autoEr = Number(val); }
-              if(field==="bb")     p.autoBb   = Number(val);
-              if(field==="k")      p.autoK    = Number(val);
-              if(field==="runs")   p.autoRuns = Number(val);
-              if(field==="ipDisp") p.ipDisp   = val;
-              if(field==="outs")   p.manualIp = Number(val); // アウト数で保存
-            }
-            ps[idx] = p;
-            return ps;
-          };
-          const newAway = updateSide("away");
-          const newHome = updateSide("home");
-          return {
-            ...g,
-            ...(newAway?{awayPitchers:newAway}:{}),
-            ...(newHome?{homePitchers:newHome}:{}),
-          };
-        });
-      }
+      // チーム通算の上書きはlocalStorage/Firebaseにのみ保存。試合データ本体には書き込まない
       return next;
     });
   };
@@ -6880,7 +6845,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   };
 
   // 投手成績集計
-  const aggregatePitcherStats = (filterTeamName) => {
+  const aggregatePitcherStats = (filterTeamName, _pitchOv) => {
+    const _ov = _pitchOv || pitchOverrides || {};
     const map = {};
     filteredGames.forEach(g=>{
       // filterTeamNameに一致するsideを特定
@@ -6942,15 +6908,25 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
       });
     });
     return Object.values(map).map(m=>{
-      const ipWhole = Math.floor(m.outs/3);
-      const ipFrac  = m.outs%3;
+      // pitchOverridesによる上書き（チーム通算専用・試合データには影響しない）
+      const ov = _ov[m.name]||{};
+      const effOuts = ov.outs!==undefined ? ov.outs : m.outs;
+      const effEr   = ov.er  !==undefined ? ov.er   : m.er;
+      const effH    = ov.h   !==undefined ? ov.h    : m.h;
+      const effBb   = ov.bb  !==undefined ? ov.bb   : m.bb;
+      const effK    = ov.k   !==undefined ? ov.k    : m.k;
+      const effHbp  = ov.hbp !==undefined ? ov.hbp  : m.hbp;
+      const effHr   = ov.hr  !==undefined ? ov.hr   : m.hr;
+      const ipWhole = Math.floor(effOuts/3);
+      const ipFrac  = effOuts%3;
       const ipNum   = ipWhole + ipFrac/3;
       const ipDisp  = ipWhole+"回"+(ipFrac>0?ipFrac+"/3":"");
       // 加重平均イニング数（投球アウト数で重み付け）
       const avgInnings = m.outs>0 ? m.outsXinnings/m.outs : 9;
-      const era = ipNum>0?(m.er*avgInnings/ipNum).toFixed(2):(m.er>0?"∞":"—");
-      const whip= ipNum>0?((m.bb+m.h)/ipNum).toFixed(2):"—";
-      return {...m, ipDisp, ipNum, era, whip, avgInnings, games:m.games.size, runs:m.runs,
+      const era = ipNum>0?(effEr*avgInnings/ipNum).toFixed(2):(effEr>0?"∞":"—");
+      const whip= ipNum>0?((effBb+effH)/ipNum).toFixed(2):"—";
+      return {...m, outs:effOuts, er:effEr, h:effH, bb:effBb, k:effK, hbp:effHbp, hr:effHr,
+        ipDisp, ipNum, era, whip, avgInnings, games:m.games.size, runs:m.runs,
         win:m.win, lose:m.lose, save:m.save, hold:m.hold, bs:m.bs};
     }).sort((a,b)=>b.ipNum-a.ipNum);
   };
@@ -6964,8 +6940,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const secondTeam = selectedTeam ? null : "";
   const awayBat = aggregatePlayerStats(primaryTeam);
   const homeBat = secondTeam ? aggregatePlayerStats(secondTeam) : [];
-  const awayPit = aggregatePitcherStats(primaryTeam);
-  const homePit = secondTeam ? aggregatePitcherStats(secondTeam) : [];
+  const awayPit = aggregatePitcherStats(primaryTeam, pitchOverrides);
+  const homePit = secondTeam ? aggregatePitcherStats(secondTeam, pitchOverrides) : [];
   const defStats = aggregateDefenseStats(primaryTeam||null);
 
   // 直近5試合の個人成績
@@ -7176,17 +7152,24 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                 const ipNum   = ipWhole + ipFrac/3;
                 const ipDispVal = ipWhole+"回"+(ipFrac>0?ipFrac+"/3":"");
                 const avgInnings = p.avgInnings||9;
+                const effectiveH   = ov.h  !==undefined ? ov.h   : p.h;
+                const effectiveBb  = ov.bb !==undefined ? ov.bb  : p.bb;
+                const effectiveK   = ov.k  !==undefined ? ov.k   : p.k;
+                const effectiveHbp = ov.hbp!==undefined ? ov.hbp : p.hbp;
+                const effectiveHr  = ov.hr !==undefined ? ov.hr  : p.hr;
                 const eraVal = ipNum>0?(effectiveEr*avgInnings/ipNum).toFixed(2):(effectiveEr>0?"∞":"—");
-                const whipVal= ipNum>0?((p.bb+p.h)/ipNum).toFixed(2):"—";
+                const whipVal= ipNum>0?((effectiveBb+effectiveH)/ipNum).toFixed(2):"—";
                 const displayFields = [
-                  {k:"ipDisp", v:ipDispVal, s:tdS, editable:true, type:"ip"},
-                  {k:"h",      v:p.h,      s:tdS, editable:false},
-                  {k:"runs",   v:p.runs,   s:{...tdS,color:"#fb923c"}, editable:false},
-                  {k:"er",     v:effectiveEr, s:{...tdS,color:"#f87171"}, editable:true, type:"num"},
-                  {k:"era",    v:eraVal,   s:{...tdS,color:parseFloat(eraVal)<3?"#4ade80":parseFloat(eraVal)<5?"#fbbf24":"#f87171",fontWeight:900}, editable:false},
-                  {k:"whip",   v:whipVal,  s:tdS, editable:false},
-                  {k:"bb",     v:p.bb,     s:{...tdS,color:"#60a5fa"}, editable:false},
-                  {k:"k",      v:p.k,      s:{...tdS,color:"#a78bfa"}, editable:false},
+                  {k:"ipDisp", v:ipDispVal,    s:tdS, editable:true, type:"ip"},
+                  {k:"h",      v:effectiveH,   s:tdS, editable:true, type:"num"},
+                  {k:"runs",   v:p.runs,       s:{...tdS,color:"#fb923c"}, editable:false},
+                  {k:"er",     v:effectiveEr,  s:{...tdS,color:"#f87171"}, editable:true, type:"num"},
+                  {k:"era",    v:eraVal,       s:{...tdS,color:parseFloat(eraVal)<3?"#4ade80":parseFloat(eraVal)<5?"#fbbf24":"#f87171",fontWeight:900}, editable:false},
+                  {k:"whip",   v:whipVal,      s:tdS, editable:false},
+                  {k:"bb",     v:effectiveBb,  s:{...tdS,color:"#60a5fa"}, editable:true, type:"num"},
+                  {k:"k",      v:effectiveK,   s:{...tdS,color:"#a78bfa"}, editable:true, type:"num"},
+                  {k:"hbp",    v:effectiveHbp, s:{...tdS,color:"#c084fc"}, editable:true, type:"num"},
+                  {k:"hr",     v:effectiveHr,  s:{...tdS,color:"#f87171"}, editable:true, type:"num"},
                 ];
                 return React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0a1628":"#0d1f35"}}
                   , React.createElement('td', {style:{...tdN,color:"#e2e8f0",whiteSpace:"nowrap",minWidth:70}}
@@ -7232,15 +7215,15 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                           )
                         );
                       }
-                      // 自責点：input
+                      // 数値：input（被安打・自責点・四球・奪三振・死球・被本塁打）
                       return React.createElement('td',{key:k,style:{...s,padding:2}}
                         , React.createElement('input',{
                             type:"number",min:0,
                             defaultValue:v,
-                            key:"er_"+p.name+"_"+v,
+                            key:k+"_"+p.name+"_"+v,
                             onBlur:e=>{
                               const val=parseInt(e.target.value);
-                              if(!isNaN(val)&&savePitchOverride) savePitchOverride(p.name,"er",val);
+                              if(!isNaN(val)&&savePitchOverride) savePitchOverride(p.name,k,val);
                             },
                             style:{width:34,textAlign:"center",background:"#1a1535",
                               border:"1px solid #a78bfa",borderRadius:4,color:"#c4b5fd",
@@ -7248,8 +7231,6 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                           })
                       );
                     })
-                  , React.createElement('td', {style:tdS}, p.hbp)
-                  , React.createElement('td', {style:{...tdS,color:p.hr>0?"#f87171":"#475569"}}, p.hr)
                   , React.createElement('td',{style:{...tdS,color:(p.win||0)>0?"#4ade80":"#475569",fontWeight:(p.win||0)>0?700:400}},p.win||0)
                   , React.createElement('td',{style:{...tdS,color:(p.lose||0)>0?"#f87171":"#475569"}},p.lose||0)
                   , React.createElement('td',{style:{...tdS,color:(p.save||0)>0?"#fbbf24":"#475569",fontWeight:(p.save||0)>0?700:400}},p.save||0)
@@ -7660,7 +7641,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             // チーム通算投手成績（チーム全体の合計）
             , React.createElement('div', {style:{...S.ct,marginBottom:10,marginTop:16}}, "⚾ チーム通算投手成績")
             , (()=>{
-                const pitStats = aggregatePitcherStats(selectedTeam);
+                const pitStats = aggregatePitcherStats(selectedTeam, pitchOverrides);
                 if(!pitStats||pitStats.length===0) return React.createElement('div',{style:{fontSize:12,color:"#475569"}},"投手データなし");
                 // 全投手を合計
                 const totalOuts = pitStats.reduce((s,p)=>s+p.outs,0);

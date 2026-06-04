@@ -3142,7 +3142,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.2")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.3")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3228,7 +3228,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.2")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.3")
         )
 
         // ===== 新規チーム作成 =====
@@ -4537,7 +4537,7 @@ function App() {
                               )
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:10,color}},game.finished?"先発":"登板中"))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
-                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},"tbf:"+(auto.autoTbf||0)+" k:"+(auto.autoK||0))
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},auto.autoTbf||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoH||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoHr||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoK||0)
@@ -4588,6 +4588,7 @@ function App() {
                                 ,React.createElement('span',{style:{fontSize:10,color:isCur?color:"#475569"}},li===0?"先発":"交代"+li)
                               )
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},auto.autoTbf||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoH||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoHr||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoK||0)

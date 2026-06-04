@@ -3142,7 +3142,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.1")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3228,7 +3228,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.1")
         )
 
         // ===== 新規チーム作成 =====
@@ -4492,8 +4492,9 @@ function App() {
                       style:{...sBt("#475569",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
                     }, "＋ 投手追加")
                 )
+                , (()=>{console.log("pitcherStats",side,JSON.stringify((pitcherStats[side]||[]).map(p=>({name:p.name,tbf:p.autoTbf,h:p.autoH,bb:p.autoBb}))));return null;})()
                 , React.createElement('div', {style:{overflowX:"auto"}}
-                  , React.createElement('table', {style:{...S.table, minWidth:520}}
+                  , React.createElement('table', {style:{...S.table, minWidth:520}})
                     , React.createElement('thead', null
                       , React.createElement('tr', null
                         , React.createElement('th', {style:{...S.th, textAlign:"left", minWidth:110}}, "投手名")

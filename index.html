@@ -4537,7 +4537,7 @@ function App() {
                               )
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:10,color}},game.finished?"先発":"登板中"))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
-                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},auto.autoTbf||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},"tbf:"+(auto.autoTbf||0)+" k:"+(auto.autoK||0))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoH||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoHr||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoK||0)

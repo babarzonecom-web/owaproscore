@@ -2509,14 +2509,14 @@ function App() {
       const autoStats = pStats[side]||[];
       pitchers.forEach((p,i)=>{
         const auto = autoStats[i]||{};
-        // 打席データから再計算した値を使用。erのみ手動修正を尊重
+        // 打席データから再計算した値を使用。manual値がある場合は優先
         const autoIpOuts = Math.floor((auto.autoIp||0)/10)*3 + ((auto.autoIp||0)%10);
         const ipOuts = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
         const ipDisp = Math.floor(ipOuts/3)+"."+ipOuts%3;
-        const h  = auto.autoH||0;
+        const h  = p.manualH !==undefined ? p.manualH  : (auto.autoH||0);
         const er = p.manualOverride && p.er!==undefined ? p.er : (auto.autoEr||0);
-        const bb = auto.autoBb||0;
-        const k  = auto.autoK||0;
+        const bb = p.manualBb!==undefined ? p.manualBb : (auto.autoBb||0);
+        const k  = p.manualK !==undefined ? p.manualK  : (auto.autoK||0);
         const ipNum = Math.floor(ipOuts/3)+(ipOuts%3)/3;
         const era = ipNum>0 ? (er*(g.innings||9)/ipNum).toFixed(2) : "---";
         pitRows.push([teamName,p.name,ipDisp,h,er,bb,k,era]);
@@ -3142,7 +3142,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.3")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.4")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3228,7 +3228,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.3")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.4")
         )
 
         // ===== 新規チーム作成 =====
@@ -4538,11 +4538,11 @@ function App() {
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:10,color}},game.finished?"先発":"登板中"))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},auto.autoTbf||0)
-                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoH||0)
-                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoHr||0)
-                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoK||0)
-                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoBb||0)
-                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoHbp||0)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispH)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispHr)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispK)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispBb)
+                              ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispHbp)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoRuns||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center"}},er)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",color:era==="∞"?"#f87171":era==="—"?"#475569":parseFloat(era)<3?"#4ade80":parseFloat(era)<5?"#fbbf24":"#f87171",fontWeight:700}},era)
@@ -4574,6 +4574,11 @@ function App() {
                             const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
                             const er = p.manualOverride&&p.er!==undefined?p.er:(auto.autoEr||0);
                             const era = !isReappear&&ipNum>0?(er*(game.innings||9)/ipNum).toFixed(2):(isReappear?"—":er>0?"∞":"—");
+                            const dispH   = p.manualH  !==undefined?p.manualH  :(auto.autoH||0);
+                            const dispHr  = p.manualHr !==undefined?p.manualHr :(auto.autoHr||0);
+                            const dispBb  = p.manualBb !==undefined?p.manualBb :(auto.autoBb||0);
+                            const dispHbp = p.manualHbp!==undefined?p.manualHbp:(auto.autoHbp||0);
+                            const dispK   = p.manualK  !==undefined?p.manualK  :(auto.autoK||0);
                             return React.createElement('tr',{key:"pl_"+li,
                               style:{background:isCur?(color+"22"):li%2===0?"#0a1628":"transparent",
                                 outline:isCur?`1px solid ${color}33`:"none"}}
@@ -5544,6 +5549,44 @@ function App() {
                           ,React.createElement('div',{style:{fontSize:13,fontWeight:700,color:"#e2e8f0"}},val)
                         ))
                     )
+                    ,(()=>{
+                      const pi=entry.pitcherIdx;
+                      const manualFields=[
+                        {key:"manualH",  autoKey:"autoH",  label:"被安打", color:"#4ade80"},
+                        {key:"manualHr", autoKey:"autoHr", label:"被本塁打",color:"#f87171"},
+                        {key:"manualBb", autoKey:"autoBb", label:"四球",   color:"#60a5fa"},
+                        {key:"manualHbp",autoKey:"autoHbp",label:"死球",   color:"#a78bfa"},
+                        {key:"manualK",  autoKey:"autoK",  label:"奪三振", color:"#94a3b8"},
+                      ];
+                      return React.createElement('div',{style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}},
+                        manualFields.map(({key,autoKey,label,color})=>{
+                          const autoVal=auto[autoKey]||0;
+                          const manVal=pitchers[pi]&&pitchers[pi][key]!==undefined?pitchers[pi][key]:undefined;
+                          return React.createElement('label',{key,style:{fontSize:11,color,display:"flex",flexDirection:"column",gap:2,minWidth:60,flex:1}}
+                            ,label+"（手動）"
+                            ,React.createElement('input',{
+                                type:"number",min:0,
+                                defaultValue:manVal!==undefined?manVal:"",
+                                placeholder:"自動:"+autoVal,
+                                key:key+"_"+pi+"_"+manVal,
+                                onBlur:e=>{
+                                  const v=e.target.value.trim();
+                                  mutGame(g=>{
+                                    const ps=[...g[side+"Pitchers"]];
+                                    if(!ps[pi]) return g;
+                                    if(v==="") {const p={...ps[pi]};delete p[key];ps[pi]=p;}
+                                    else{const n=parseInt(v);if(!isNaN(n))ps[pi]={...ps[pi],[key]:n};}
+                                    return {...g,[side+"Pitchers"]:ps};
+                                  });
+                                },
+                                style:{background:"#0a1628",border:"1px solid "+color+"66",
+                                  borderRadius:6,color,padding:"5px 6px",fontSize:12,width:"100%"}
+                              })
+                            ,React.createElement('span',{style:{fontSize:9,color:"#475569"}},"空欄で自動")
+                          );
+                        })
+                      );
+                    })()
                     ,React.createElement('div',{style:{display:"flex",gap:10}}
                       ,React.createElement('label',{style:{flex:1,fontSize:11,color:"#f87171",display:"flex",flexDirection:"column",gap:4}}
                         ,"自責点（手動修正）"
@@ -6870,16 +6913,16 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           const m = map[p.name];
           m.games.add(g.id);
           const a = autoArr[i]||{};
-          // 打席データから再計算した値を使用。erのみ手動修正を尊重
+          // 打席データから再計算した値を使用。manual値がある場合は優先
           const autoIpOuts = Math.floor((a.autoIp||0)/10)*3 + ((a.autoIp||0)%10);
           const outsGot = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
           m.outs += outsGot;
-          m.h    += a.autoH||0;
+          m.h    += p.manualH  !==undefined ? p.manualH   : (a.autoH||0);
           m.er   += (p.manualOverride && p.er!==undefined) ? p.er : (a.autoEr||0);
-          m.bb   += a.autoBb||0;
-          m.k    += a.autoK||0;
-          m.hbp  += a.autoHbp||0;
-          m.hr   += a.autoHr||0;
+          m.bb   += p.manualBb !==undefined ? p.manualBb  : (a.autoBb||0);
+          m.k    += p.manualK  !==undefined ? p.manualK   : (a.autoK||0);
+          m.hbp  += p.manualHbp!==undefined ? p.manualHbp : (a.autoHbp||0);
+          m.hr   += p.manualHr !==undefined ? p.manualHr  : (a.autoHr||0);
           m.runs += (p.manualOverride && p.autoRuns!==undefined) ? p.autoRuns : (a.autoRuns||0);
           // 勝敗・セーブ・ホールド（同名投手の再登板で重複カウントしないようgame単位で管理）
           const _wKey = g.id+"|"+p.name;

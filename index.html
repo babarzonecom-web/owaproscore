@@ -1321,6 +1321,7 @@ function App() {
     return s;
   });
   const [gameInfoOpen, setGameInfoOpen] = React.useState(false);
+  const [termsAgreed, setTermsAgreed] = React.useState(false);
   const [tab,   setTab]   = useState(()=>{ const code=localStorage.getItem("tsCode"); const role=localStorage.getItem("tsRole"); if(code&&role){ window.__teamShareCode=code; window.__teamShareRole=role; return role==="member"?"live":"score"; } return "login"; });
   const [syncMode,   setSyncMode]   = useState("off");
   const [syncGameId, setSyncGameId] = useState("");
@@ -3143,7 +3144,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.9")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.10")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3229,7 +3230,25 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.9")
+          , React.createElement('div', {style:{
+              width:"100%",maxWidth:340,background:"#0a1628",border:"1px solid #1e3a5f",
+              borderRadius:12,padding:"14px",marginBottom:16
+            }}
+            , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#7dd3fc",marginBottom:10}}, "📋 ご利用にあたってのお願い")
+            , React.createElement('div', {style:{fontSize:11,color:"#64748b",lineHeight:1.7,marginBottom:8}},
+              "チームデータはチームコードとパスワードで保護されています。完全な安全性の保証は技術的に不可能なため、コードとパスワードは大切に管理し、不特定多数への共有はお控えください。"
+            )
+            , ["データの消失・破損・漏洩について、運営は責任を負いかねます",
+               "大切なデータは定期的にExcel出力でバックアップすることをおすすめします",
+               "サービスは予告なく変更・終了する場合があります",
+               "本サービスの利用によって生じた損害について運営は責任を負いかねます",
+               "他チームへの不正アクセス・個人情報の無断掲載は禁止です"
+              ].map((t,i)=>React.createElement('div',{key:i,style:{fontSize:10,color:"#475569",lineHeight:1.7,paddingLeft:8,marginBottom:1}},"・"+t))
+            , React.createElement('div', {style:{fontSize:10,color:"#475569",marginTop:8,lineHeight:1.6}},
+              "本サービスはご利用の方々の自己責任のもとでお使いください。"
+            )
+          )
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.10")
         )
 
         // ===== 新規チーム作成 =====
@@ -3307,10 +3326,21 @@ function App() {
                 "※ チームPWでメンバーが速報・成績を閲覧できます", React.createElement('br',null),
                 "※ 管理者PWでスコア入力・成績修正ができます")
               , teamShareError&&React.createElement('div',{style:{color:"#f87171",fontSize:12,marginBottom:8}},teamShareError)
+              , React.createElement('label', {style:{display:"flex",alignItems:"flex-start",gap:8,marginBottom:12,cursor:"pointer"}}
+                , React.createElement('input', {
+                    type:"checkbox", checked:termsAgreed,
+                    onChange:e=>setTermsAgreed(e.target.checked),
+                    style:{marginTop:2,width:16,height:16,cursor:"pointer",accentColor:"#4ade80"}
+                  })
+                , React.createElement('span', {style:{fontSize:11,color:"#94a3b8",lineHeight:1.6}},
+                  "ご利用にあたってのお願い（データの取り扱い・免責事項）を確認し、自己責任のもとで利用することに同意します"
+                )
+              )
               , (()=>{
                   const ok = teamShareInput && newTeamPw && newTeamPw.length>=6
                     && newAdminPw && newAdminPw.length>=6
-                    && newTeamPw===confirmTeamPw && newAdminPw===confirmAdminPw;
+                    && newTeamPw===confirmTeamPw && newAdminPw===confirmAdminPw
+                    && termsAgreed;
                   return React.createElement('button', {
                     onClick:()=>{
                       if(!ok) return;
@@ -3884,9 +3914,6 @@ function App() {
           )
 
           , React.createElement('div', { style: S.card,}
-            , React.createElement('div', { style: S.ct,}, "📊 スコアボード"
-              , React.createElement('span', { style: {fontSize:11,fontWeight:400,color:"#64748b",marginLeft:8},}, "※得点は打席記録から自動計算")
-            )
             , React.createElement('div', { style: {overflowX:"auto"},}
               , React.createElement('table', { style: S.table,}
                 , React.createElement('thead', null

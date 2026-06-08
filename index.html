@@ -3142,7 +3142,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.6")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.7")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3228,7 +3228,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.6")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.7")
         )
 
         // ===== 新規チーム作成 =====
@@ -4637,7 +4637,7 @@ function App() {
         , tab==="logout"&&(
           React.createElement('div', {style:{maxWidth:400,margin:"0 auto",padding:"20px 0"}}
             , React.createElement('div', {style:{
-                background:"#0a1628",border:"1px solid #1e3a5f",borderRadius:12,padding:"20px"
+                background:"#0a1628",border:"1px solid #1e3a5f",borderRadius:12,padding:"20px",marginBottom:16
               }}
               , React.createElement('div', {style:{fontSize:13,color:"#64748b",marginBottom:4}}, "接続中のチームコード")
               , React.createElement('div', {style:{fontSize:22,fontWeight:900,color:"#7dd3fc",marginBottom:20,letterSpacing:2}}, teamShareCode)
@@ -4651,6 +4651,32 @@ function App() {
                     color:"#fff",padding:"12px",width:"100%",fontSize:14,fontWeight:700,cursor:"pointer"
                   }
                 }, "🚪 ログアウト")
+            )
+            , React.createElement('div', {style:{
+                background:"#0a1628",border:"1px solid #1e3a5f",borderRadius:12,padding:"20px"
+              }}
+              , React.createElement('div', {style:{fontSize:15,fontWeight:700,color:"#7dd3fc",marginBottom:16}}, "📋 ご利用にあたってのお願い")
+              , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#94a3b8",marginBottom:8,marginTop:12}}, "データの保護について")
+              , React.createElement('div', {style:{fontSize:12,color:"#64748b",lineHeight:1.7,marginBottom:12}},
+                "チームデータはチームコードとパスワードによって保護されています。第三者がコードとパスワードを知らない限り、データへのアクセスはできません。"
+                ,React.createElement('br',null)
+                ,React.createElement('br',null)
+                ,"ただし、インターネットを通じたデータ通信の完全な安全性を保証することは技術的に不可能です。チームコードとパスワードは大切に管理いただき、不特定多数への共有はお控えください。"
+              )
+              , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#94a3b8",marginBottom:8,marginTop:12}}, "免責事項")
+              , ["データの消失・破損・漏洩について、運営は責任を負いかねます",
+                 "大切なデータは定期的にExcel出力機能でバックアップすることをおすすめします",
+                 "サービスの内容は予告なく変更・終了する場合があります",
+                 "本サービスの利用によって生じたいかなる損害についても、運営は責任を負いかねます"
+                ].map((t,i)=>React.createElement('div',{key:i,style:{fontSize:12,color:"#64748b",lineHeight:1.7,paddingLeft:12,marginBottom:4}},"・"+t))
+              , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#94a3b8",marginBottom:8,marginTop:12}}, "禁止事項")
+              , ["他チームのコードへの不正アクセス",
+                 "選手の個人情報の無断掲載",
+                 "本サービスを違法な目的で使用すること"
+                ].map((t,i)=>React.createElement('div',{key:i,style:{fontSize:12,color:"#64748b",lineHeight:1.7,paddingLeft:12,marginBottom:4}},"・"+t))
+              , React.createElement('div', {style:{fontSize:12,color:"#475569",marginTop:16,padding:"12px",background:"#0f1f3d",borderRadius:8,lineHeight:1.7}},
+                "本サービスはご利用の方々の自己責任のもとでお使いください。ご不明な点やお気づきの点があればお気軽にお問い合わせください。"
+              )
             )
           )
         )

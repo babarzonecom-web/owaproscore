@@ -3142,7 +3142,7 @@ function App() {
 
       
       , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.7")
+        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.8")
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
@@ -3228,7 +3228,7 @@ function App() {
             )
           )
 
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.7")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.8")
         )
 
         // ===== 新規チーム作成 =====
@@ -3821,8 +3821,22 @@ function App() {
           React.createElement(React.Fragment, null
 
           , !isReadOnly && React.createElement('div', { style: S.card,}
-            , React.createElement('div', { style: S.ct,}, "⚙️ 試合情報" )
-            , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-end"},}
+            , React.createElement('div', {
+                style: {...S.ct, cursor:"pointer", userSelect:"none", display:"flex", justifyContent:"space-between", alignItems:"center"},
+                onClick: ()=>setGameInfoOpen(o=>!o)
+              }
+              , React.createElement('span', null, "⚙️ 試合情報")
+              , React.createElement('span', {style:{fontSize:12, color:"#64748b"}},
+                gameInfoOpen ? "▲ 閉じる" :
+                React.createElement('span', null,
+                  React.createElement('span', {style:{color:"#fbbf24", fontWeight:700}}, game.awayTeam||"未設定")
+                  , React.createElement('span', {style:{color:"#94a3b8", margin:"0 6px"}}, "vs")
+                  , React.createElement('span', {style:{color:"#7dd3fc", fontWeight:700}}, game.homeTeam||"未設定")
+                  , React.createElement('span', {style:{color:"#94a3b8", marginLeft:8}}, game.date||"")
+                  , React.createElement('span', {style:{color:"#64748b", marginLeft:6}}, "▼")
+                )
+              )
+            , gameInfoOpen && React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-end"},}
               , [["awayTeam","アウェイ",game.awayTeam],["homeTeam","ホーム",game.homeTeam],["venue","球場",game.venue]].map(([k,l,v])=>(
                 React.createElement('label', { key: k, style: {display:"flex",flexDirection:"column",gap:3},}
                   , React.createElement('span', { style: {fontSize:11,color:"#64748b"},}, l)
@@ -3864,6 +3878,7 @@ function App() {
                   )
                 );
               })()
+            )
             )
           )
 
@@ -6622,6 +6637,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
 
   const [editMode, setEditMode] = useState(false);   // 手動修正モード
   const [editPitchMode, setEditPitchMode] = useState(false);
+  const [gameInfoOpen, setGameInfoOpen] = React.useState(false);
   const [pitchOverrides, setPitchOverrides] = React.useState(()=>{
     // チーム通算の手動修正はlocalStorageとFirebase(pitch_プレフィックス)からのみ読む
     // 試合データ本体(autoEr等)は参照しない（過去バージョンの誤書き込みを無視するため）

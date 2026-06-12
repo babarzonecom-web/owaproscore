@@ -4731,7 +4731,7 @@ function App() {
               showToast:showToast,
               tournaments:tournaments,
               isReadOnly:isReadOnly,
-              onLoad:isReadOnly?null:loadGame,
+              onLoad:loadGame,
               onDelete:delHistory,
               onExcel:(g)=>{ showToast("📊 出力処理を開始します..."); exportExcel(g); },
               onRecompute:()=>{
@@ -8114,7 +8114,7 @@ function HistoryTab({ history, teamShareCode, onLoad, onDelete, onExcel, onImpor
 
             // アクションボタン
             , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
-              , !isReadOnly && onLoad && React.createElement('button', {
+              , onLoad && React.createElement('button', {
                   onClick:()=>onLoad(g),
                   style:{...sBt("#1d4ed8"),fontSize:11,padding:"4px 10px"}
                 }, "📂 読み込む")

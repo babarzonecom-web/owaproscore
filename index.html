@@ -3143,28 +3143,30 @@ function App() {
       )
 
       
-      , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v471.10")
-        , tab!=="login" && (isReadOnly
-          ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
-              React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
-                background:"transparent",border:"none",
-                borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
-                color:tab===id?"#fb923c":"#7db8e8",
-                padding:"10px 12px",cursor:"pointer",fontSize:13,whiteSpace:"nowrap",
-                fontWeight:tab===id?800:400,
-              },}, l)
-            ))
-          : [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
-              React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
-                background:"transparent",border:"none",
-                borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
-                color:tab===id?"#7dd3fc":"#7db8e8",
-                padding:"10px 12px",cursor:"pointer",fontSize:12,whiteSpace:"nowrap",
-                fontWeight:tab===id?700:400,
-              },}, l)
-            ))
+      , React.createElement('nav', { style: {...S.nav, position:"relative", padding:"0 4px"},}
+        , React.createElement('div',{style:{display:"flex",overflowX:"auto",flex:1,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}
+          , tab!=="login" && (isReadOnly
+            ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
+                React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
+                  background:"transparent",border:"none",
+                  borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
+                  color:tab===id?"#fb923c":"#7db8e8",
+                  padding:"8px 9px",cursor:"pointer",fontSize:11,whiteSpace:"nowrap",
+                  fontWeight:tab===id?800:400,
+                },}, l)
+              ))
+            : [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
+                React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
+                  background:"transparent",border:"none",
+                  borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
+                  color:tab===id?"#7dd3fc":"#7db8e8",
+                  padding:"8px 9px",cursor:"pointer",fontSize:11,whiteSpace:"nowrap",
+                  fontWeight:tab===id?700:400,
+                },}, l)
+              ))
+          )
         )
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v471.11")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3248,7 +3250,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.10")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.11")
         )
 
         // ===== 新規チーム作成 =====

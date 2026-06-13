@@ -3143,16 +3143,16 @@ function App() {
       )
 
       
-      , React.createElement('nav', { style: {...S.nav, position:"relative", padding:"0 4px", paddingTop: isReadOnly ? "calc(env(safe-area-inset-top, 0px) + 18px)" : undefined},}
+      , React.createElement('nav', { style: {...S.nav, position:"relative", padding:"0 4px", paddingTop: isReadOnly ? "calc(env(safe-area-inset-top, 0px) + 40px)" : undefined},}
         , React.createElement('div',{style:{display:"flex",overflowX:"auto",flex:1,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}
           , tab!=="login" && (isReadOnly
             ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
                 React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
-                  background:"transparent",border:"none",
+                  background:tab===id?"#1a2a45":"transparent",border:"none",borderRadius:"8px 8px 0 0",
                   borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
                   color:tab===id?"#fb923c":"#7db8e8",
-                  padding:"8px 9px",cursor:"pointer",fontSize:11,whiteSpace:"nowrap",
-                  fontWeight:tab===id?800:400,
+                  padding:"12px 10px",cursor:"pointer",fontSize:13,whiteSpace:"nowrap",
+                  fontWeight:tab===id?800:500,
                 },}, l)
               ))
             : [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
@@ -3166,7 +3166,7 @@ function App() {
               ))
           )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v471.12")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v471.13")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3250,7 +3250,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.12")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v471.13")
         )
 
         // ===== 新規チーム作成 =====

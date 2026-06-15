@@ -3691,9 +3691,9 @@ function App() {
               , React.createElement('span', { style: {color:"#2e4234",margin:"0 4px",fontSize:18},}, "—")
               , React.createElement('span', { style: {color:"#7dd3fc"},}, homeTotal)
             )
-            , React.createElement('div', { style: {display:"inline-block",background:"#e02d24",borderRadius:5,
+            , React.createElement('div', { style: {display:"inline-block",background: game.finished?"#3a4a5e":"#e02d24",borderRadius:5,
               padding:"2px 8px",fontSize:11,fontWeight:700,marginTop:2},}
-              , game.inning, "回", game.half==="top"?"表":"裏"
+              , game.finished ? "試合終了" : [game.inning, "回", game.half==="top"?"表":"裏"]
             )
           )
         )
@@ -3825,7 +3825,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.20")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.21")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3909,7 +3909,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.20")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.21")
         )
 
         // ===== 新規チーム作成 =====
@@ -4538,13 +4538,14 @@ function App() {
 
           , !isReadOnly && React.createElement('div', { style: S.card,}
             , React.createElement('div', {
-                style: {...S.ct, cursor:"pointer", userSelect:"none", display:"flex", justifyContent:"space-between", alignItems:"center"},
+                style: {...S.ct, cursor:"pointer", userSelect:"none", display:"flex", justifyContent:"space-between", alignItems:"center", gap:10},
                 onClick: ()=>setGameInfoOpen(o=>!o)
               }
-              , React.createElement('span', null, "⚙️ 試合情報")
-              , React.createElement('span', {style:{fontSize:12, color:"#74897b"}},
+              , React.createElement('span', {style:{flexShrink:0, whiteSpace:"nowrap"}}, "⚙️ 試合情報")
+              , React.createElement('span', {style:{fontSize:12, color:"#74897b", flex:1, minWidth:0, textAlign:"right",
+                  overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}},
                 gameInfoOpen ? "▲ 閉じる" :
-                React.createElement('span', null,
+                React.createElement('span', {style:{whiteSpace:"nowrap"}},
                   React.createElement('span', {style:{color:"#ffb52e", fontWeight:700}}, game.awayTeam||"未設定")
                   , React.createElement('span', {style:{color:"#9fb3a5", margin:"0 6px"}}, "vs")
                   , React.createElement('span', {style:{color:"#7dd3fc", fontWeight:700}}, game.homeTeam||"未設定")
@@ -6583,7 +6584,8 @@ function App() {
                       React.createElement('button', {key:mode,
                         onClick:()=>setNewPitchMode(mode),
                         style:{
-                          flex:1, padding:"10px 8px", borderRadius:8, fontSize:12, fontWeight:700, cursor:"pointer",
+                          flex:1, padding:"12px 8px", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer",
+                          whiteSpace:"nowrap", minHeight:48,
                           background: newPitchMode===mode ? (mode==="result"?"#1d4ed8":"#065f46") : "#122016",
                           border: `2px solid ${newPitchMode===mode?(mode==="result"?"#3b82f6":"#10b981"):"#24402b"}`,
                           color: newPitchMode===mode ? "#fff" : "#74897b",
@@ -6591,9 +6593,6 @@ function App() {
                       }
                       , mode==="result" ? "🎯 打席結果のみ" : "⚾ 一球ごと記録"
                     )
-                  )
-                , React.createElement('div', {style:{fontSize:10,color:"#4b6052",marginTop:6,textAlign:"center"}},
-                    newPitchMode==="result" ? "打席結果モーダルが自動で開きます" : "B/S/Fボタンで投球を入力してから打席結果を選択"
                   )
                 )
               )

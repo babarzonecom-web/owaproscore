@@ -391,6 +391,11 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
   const buildRunners = () => {
     const list = [];
 
+    // DP/TPで走者が1人だけのとき、その走者は必ずアウト(論理的に確定)
+    const _preRunnerCount = (preBases||[]).filter(Boolean).length;
+    const _isDP = pendingCode==="DP" || pendingCode==="TP";
+    const _soloDpOut = _isDP && _preRunnerCount===1;
+
     // 既存ランナーの処理
     preBases.forEach((name, i) => {
       if (!name) return;
@@ -404,8 +409,8 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
       for (let j = 0; j < 3; j++) {
         if (postBases[j] === name) { to = j; break; }
       }
-      // 見つからない場合: batterOutならout、そうでなければscored
-      if (to === null) to = runnerDefaultTo;
+      // 見つからない場合: DP/TPで走者1人なら必ずout、それ以外はdefault
+      if (to === null) to = _soloDpOut ? "out" : runnerDefaultTo;
       list.push({ name, from: i, to });
     });
 
@@ -488,6 +493,10 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
         , runners.length > 0 ? (
           React.createElement('div', { style: {marginBottom:16},}
             , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "選手の行き先")
+            , ((pendingCode==="DP"||pendingCode==="TP") && (preBases||[]).filter(Boolean).length>=2) && React.createElement('div', {
+                style: {fontSize:11,color:"#ffb52e",background:"#2a2410",border:"1px solid #5a4a1a",
+                  borderRadius:8,padding:"8px 10px",marginBottom:10,fontWeight:700,lineHeight:1.4},
+              }, "⚠️ ランナーの動きを確認してください（誰がアウトか・進塁したかをタップで設定）")
             , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:6},}
               , runners.map((r, i) => (
                 React.createElement('div', { key: i, style: {display:"flex",alignItems:"center",gap:8,
@@ -584,7 +593,7 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
               ["投","捕","一","二","三","遊","左","中","右"].map(pos => {
                 const defLineup = defTeamLineup||[];
                 const posMap = {};
-                defLineup.forEach(p=>{ if(p.pos) posMap[abbrPos(p.pos)]=p.name; });
+                defLineup.forEach(p=>{ if(p&&p.pos) posMap[abbrPos(p.pos)]=p.name; });
                 const pname = posMap[pos];
                 return React.createElement('button', {
                   key: pos,
@@ -621,6 +630,10 @@ const POS_ABBR = {
   "内野手":"内","外野手":"外"
 };
 const abbrPos = (pos) => POS_ABBR[pos] || pos;
+/* ============================================================
+   LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
+   グローバルスコープに定義（ZONES等の定数を利用）
+   ============================================================ */
 /* ============================================================
    LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
    グローバルスコープに定義（ZONES等の定数を利用）
@@ -760,6 +773,7 @@ const LiveFieldComponent = (function(){
       animating:false, syncedBases:null
     });
     const lastSigRef = R.useRef(null);
+    const finishedRef = R.useRef(false);
 
     // 守備位置→選手名マップ(守備側)
     const half = game.half||"top";
@@ -900,6 +914,32 @@ const LiveFieldComponent = (function(){
             ctx.font="900 24px -apple-system,sans-serif";ctx.textAlign="center";
             ctx.lineWidth=6;ctx.strokeStyle="#fff";ctx.strokeText(e.txt,0,0);
             ctx.fillStyle=e.color;ctx.fillText(e.txt,0,0);ctx.restore();
+          } else if(e.type==="gameset"){
+            ctx.save();
+            ctx.translate(-OFX,-OFY);
+            // 暗幕
+            const veil = t<0.3? (t/0.3)*0.55 : (t>0.8?(1-(t-0.8)/0.2)*0.55:0.55);
+            ctx.globalAlpha=veil; ctx.fillStyle="#000";
+            ctx.fillRect(0,0,CW,CH);
+            // GAME SET 文字
+            const pop = t<0.25? (t/0.25) : 1;
+            const sc2 = 0.6+0.4*Math.min(1,pop*1.4);
+            const al2 = t>0.85?1-(t-0.85)/0.15:1;
+            ctx.globalAlpha=al2;
+            ctx.textAlign="center";
+            ctx.translate(CW/2, CH/2-6);
+            ctx.scale(sc2,sc2);
+            // ゴールドグラデ風(2色重ね)
+            ctx.font="900 46px -apple-system,sans-serif";
+            ctx.lineWidth=8; ctx.strokeStyle="#1a1000";
+            ctx.strokeText("GAME SET", 0, 0);
+            ctx.fillStyle="#FFD54F";
+            ctx.fillText("GAME SET", 0, 0);
+            ctx.font="900 20px -apple-system,sans-serif";
+            ctx.lineWidth=5; ctx.strokeStyle="#1a1000";
+            ctx.strokeText("!!", 0, 30);
+            ctx.fillStyle="#FFD54F";
+            ctx.restore();
           }
           return true;
         });
@@ -924,6 +964,16 @@ const LiveFieldComponent = (function(){
       }
       playLatest(latest);
     },[latest&&latest.ts, latest&&latest.msg]);
+
+    // 試合終了でGAME SET演出
+    R.useEffect(()=>{
+      if(game.finished && !finishedRef.current){
+        finishedRef.current=true;
+        const st=stateRef.current;
+        st.effects.push({type:"gameset",t:performance.now(),dur:4000});
+      }
+      if(!game.finished) finishedRef.current=false;
+    },[game.finished]);
 
     // 選手交代演出
     function playSub(entry){
@@ -1136,8 +1186,8 @@ const recomputeScores = (g) => {
   ]);
   allInns.forEach(inn=>{
     let ar=0, hr=0, aHas=false, hHas=false;
-    g.awayLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ ar+=norm(e).runs||0; aHas=true; }));
-    g.homeLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ hr+=norm(e).runs||0; hHas=true; }));
+    (g.awayLineup||[]).forEach(p=>{ if(p) toList(p.atBats,inn).forEach(e=>{ ar+=norm(e).runs||0; aHas=true; }); });
+    (g.homeLineup||[]).forEach(p=>{ if(p) toList(p.atBats,inn).forEach(e=>{ hr+=norm(e).runs||0; hHas=true; }); });
 
     // atBatsのruns合計を正とし、盗塁等（recordSBで直接加算）の分を上乗せする
     // recordSBはscoreKeyに直接加算しているので、atBatsで説明できない分がある
@@ -1883,10 +1933,17 @@ function App() {
   const rawGame   = storage.currentGame;
   // Firebaseから受信したデータはarrayがobjectに変換されるため正規化
   const _toArr = (v, def) => Array.isArray(v) ? v : (v && typeof v==="object" ? Object.values(v) : def);
+  // bases専用: 疎配列(走者が一部の塁のみ)でもインデックスを保持して復元する
+  // 例 {0:"A",2:"B"} → ["A",null,"B"]  (Object.valuesだと["A","B"]になり走者位置がズレる)
+  const _toBases = (v) => {
+    if(Array.isArray(v)) return [v[0]??null, v[1]??null, v[2]??null];
+    if(v && typeof v==="object") return [0,1,2].map(i=> v[i]!=null ? v[i] : null);
+    return [null,null,null];
+  };
   const _fixPlayer = (p) => p ? {...p, atBats: (p.atBats && typeof p.atBats==="object") ? p.atBats : {}} : p;
   const game = rawGame ? {
     ...rawGame,
-    bases:          _toArr(rawGame.bases, [null,null,null]),
+    bases:          _toBases(rawGame.bases),
     awayLineup:     _toArr(rawGame.awayLineup, []).map(_fixPlayer),
     homeLineup:     _toArr(rawGame.homeLineup, []).map(_fixPlayer),
     awayPitchers:   _toArr(rawGame.awayPitchers, []),
@@ -3680,7 +3737,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.11")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.17")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3764,7 +3821,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.11")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.17")
         )
 
         // ===== 新規チーム作成 =====
@@ -4075,6 +4132,27 @@ function App() {
               }
                 ,React.createElement('span',{style:{fontSize:16}},"🔴")
                 ,"LIVE に戻る"
+              )
+
+              // 「最新の速報を読み込む」ボタン（閲覧モードで常時表示・履歴閲覧中以外）
+              , isReadOnly && window.__teamShareCode && !_showReturnLive && React.createElement('button',{
+                onClick:()=>{
+                  const restUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json";
+                  fetch(restUrl,{cache:"no-store"}).then(r=>r.json()).then(data=>{
+                    if(!data||!data.id){ showToast("速報データがありません"); return; }
+                    setStorage(s=>({...s, currentGame:{...s.currentGame,...data}}));
+                    showToast("🔄 最新の速報を読み込みました");
+                  }).catch(()=>showToast("接続できません"));
+                },
+                style:{
+                  background:"#1d4ed8",border:"none",borderRadius:10,
+                  color:"#fff",padding:"10px",width:"100%",
+                  fontSize:13,fontWeight:700,cursor:"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:6
+                }
+              }
+                ,React.createElement('span',{style:{fontSize:15}},"🔄")
+                ,"最新の速報を読み込む"
               )
 
               // ① スコア行（タップでアコーディオン展開）
@@ -4411,19 +4489,18 @@ function App() {
                 return (
                   React.createElement('label', { style: {display:"flex",flexDirection:"column",gap:3},}
                     , React.createElement('span', { style: {fontSize:11,color:"#74897b"},}, "日付")
-                    , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:4},}
-                      , React.createElement('select', { value: y, onChange: e=>setDate(Number(e.target.value),m,d), style: selSt,}
-                        , years.map(yy=>React.createElement('option', { key: yy, value: yy,}, yy))
-                      )
-                      , React.createElement('span', { style: {color:"#74897b",fontSize:12},}, "年")
-                      , React.createElement('select', { value: m, onChange: e=>{ const nm=Number(e.target.value); const maxD=new Date(y,nm,0).getDate(); setDate(y,nm,Math.min(d,maxD)); }, style: selSt,}
-                        , months.map(mm=>React.createElement('option', { key: mm, value: mm,}, mm))
-                      )
-                      , React.createElement('span', { style: {color:"#74897b",fontSize:12},}, "月")
-                      , React.createElement('select', { value: d, onChange: e=>setDate(y,m,Number(e.target.value)), style: selSt,}
-                        , days.map(dd=>React.createElement('option', { key: dd, value: dd,}, dd))
-                      )
-                      , React.createElement('span', { style: {color:"#74897b",fontSize:12},}, "日")
+                    , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"},}
+                      // ネイティブ日付ピッカー(確実に変更できる)
+                      , React.createElement('input', {
+                          type:"date",
+                          value:`${y}-${pad(m)}-${pad(d)}`,
+                          onChange:e=>{
+                            const v=e.target.value; if(!v) return;
+                            const [ny,nm,nd]=v.split("-").map(Number);
+                            setDate(ny,nm,nd);
+                          },
+                          style:{...S.si, cursor:"pointer", colorScheme:"dark"}
+                        })
                     )
                   )
                 );
@@ -5288,17 +5365,22 @@ function App() {
                             save: p.save,
                             hold: p.hold,
                             bs:   p.bs,
-                            // manualIpは保持
-                            ...(p.manualIp!==undefined?{manualIp:p.manualIp}:{}),
+                            // 手動修正値(manual*)は全て保持する。存在するものだけ引き継ぐ
+                            ...(p.manualIp !==undefined?{manualIp:p.manualIp}:{}),
+                            ...(p.manualH  !==undefined?{manualH:p.manualH}:{}),
+                            ...(p.manualBb !==undefined?{manualBb:p.manualBb}:{}),
+                            ...(p.manualK  !==undefined?{manualK:p.manualK}:{}),
+                            ...(p.manualHbp!==undefined?{manualHbp:p.manualHbp}:{}),
+                            ...(p.manualHr !==undefined?{manualHr:p.manualHr}:{}),
                           };
                           if(p.manualOverride){
-                            // 手動修正あり: erとautoRunsは保持、他はautoで更新
+                            // 手動修正あり: er/autoRunsは保持、auto*は再計算値で更新
                             return {...base,
                               manualOverride: true,
                               er:      p.er,
                               autoEr:  p.autoEr,
                               autoRuns:p.autoRuns,
-                              // 被安打等はautoで更新
+                              // 被安打等のauto値はautoで更新(manual値は上のbaseで保持済み)
                               autoH:    a.autoH||0,
                               autoBb:   a.autoBb||0,
                               autoK:    a.autoK||0,
@@ -6974,7 +7056,7 @@ function App() {
           const POS_LIST = ["投","捕","一","二","三","遊","左","中","右"];
           
           const posMap = {};
-          defLineup.forEach(p=>{ if(p.pos) { const abbr=abbrPos(p.pos); if(POS_LIST.includes(abbr)) posMap[abbr]=p.name; } });
+          defLineup.forEach(p=>{ if(p&&p.pos) { const abbr=abbrPos(p.pos); if(POS_LIST.includes(abbr)) posMap[abbr]=p.name; } });
           return (
             React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
               , React.createElement('div', { style: {...S.mBox,maxWidth:380}, onClick: e=>e.stopPropagation(),}
@@ -7598,9 +7680,9 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                       const effectiveAb = getV("ab", p.ab);
                       const effectiveH  = getV("h",  p.h);
                       const effectiveBb = getV("bb", p.bb);
-                      const effectiveHbp = getV("hbp", p._hbp||0);
+                      const effectiveHbp = getV("hbp", p.hbp||0);
                       const effectiveHr = getV("hr", p.hr);
-                      const effectiveSf = p._sf||0;
+                      const effectiveSf = p.sf||0;
                       // 打率 = 安打 / 打数
                       const recalcAvg = effectiveAb>0 ? (effectiveH/effectiveAb).toFixed(3).replace(/^0/,"") : ".---";
                       // 塁打 = 安打 + 二塁打 + 三塁打*2 + 本塁打*3
@@ -7630,11 +7712,11 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                         ["run",  p.run,            tdS],
                         ["sb",   p.sb,             {...tdS,color:"#54e08c"}],
                         ["bb",   p.bb,             {...tdS,color:"#60a5fa"}],
-                        ["hbp",  p._hbp||0,        {...tdS,color:"#a78bfa"}],
+                        ["hbp",  p.hbp||0,        {...tdS,color:"#a78bfa"}],
                         ["h2",   p.h2||0,          {...tdS,color:"#54e08c"}],
                         ["h3",   p.h3||0,          {...tdS,color:"#54e08c"}],
-                        ["sac",  p._sac||0,         {...tdS,color:"#9fb3a5"}],
-                        ["sf",   p._sf||0,          {...tdS,color:"#9fb3a5"}],
+                        ["sac",  p.sac||0,         {...tdS,color:"#9fb3a5"}],
+                        ["sf",   p.sf||0,          {...tdS,color:"#9fb3a5"}],
                         ["k",    p.k,              {...tdS,color:"#9fb3a5"}],
                         ["e",    p.e||0,           {...tdS,color:p.e>0?"#ff7d72":"#4b6052"}],
                       ];
@@ -9683,7 +9765,7 @@ const S = {
   header:{
     background:"linear-gradient(180deg,#0f2040,#0c160e)",
     borderBottom:"1px solid #24402b",
-    padding:"12px 16px 10px",
+    padding:"calc(env(safe-area-inset-top, 0px) + 14px) 16px 10px",
     position:"sticky", top:0, zIndex:90,
   },
   hRow:{

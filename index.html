@@ -382,30 +382,91 @@ const BASE_LABELS = ["1塁","2塁","3塁","ホームイン🏠","アウト❌"];
 const BASE_COLORS = ["#ffb52e","#2dd068","#ff7d72","#f97316","#9fb3a5"];
 
 // 日付ピッカー: 自前stateで値を保持し、親(game)のポーリング再描画でカレンダーが閉じないようにする
-const DateEditor = React.memo(function DateEditor({ value, onChange, style }){
-  // 内部stateで保持。propsのvalueが外部要因(別端末の更新等)で変わったときのみ追従
-  const [local, setLocal] = React.useState(value||"");
-  const focusedRef = React.useRef(false);
-  React.useEffect(()=>{
-    // 入力中(フォーカス中)は外部からの上書きを無視してピッカーを閉じさせない
-    if(!focusedRef.current && value && value!==local) setLocal(value);
-  },[value]);
-  return React.createElement('label', { style:{display:"flex",flexDirection:"column",gap:3} }
-    , React.createElement('span', { style:{fontSize:11,color:"#74897b"} }, "日付")
-    , React.createElement('input', {
-        type:"date",
-        value: local,
-        onFocus: ()=>{ focusedRef.current=true; },
-        onChange: e=>{
-          const v=e.target.value;
-          setLocal(v);
-          if(v) onChange(v);
-        },
-        onBlur: ()=>{ focusedRef.current=false; },
-        style: {...style, cursor:"pointer", colorScheme:"dark"}
+// 自前カレンダーモーダル: OSのdateピッカーを使わず、アプリが状態管理する
+// → ポーリングで親が再描画されてもモーダルが閉じない(記録モーダルと同じ仕組み)
+function DatePickerModal({ value, onConfirm, onClose }){
+  const today = new Date();
+  const parse = (s)=>{
+    const m=(s||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(m) return {y:+m[1], mo:+m[2], d:+m[3]};
+    return {y:today.getFullYear(), mo:today.getMonth()+1, d:today.getDate()};
+  };
+  const init = parse(value);
+  const [viewY, setViewY] = React.useState(init.y);
+  const [viewM, setViewM] = React.useState(init.mo);
+  const [selY, setSelY] = React.useState(init.y);
+  const [selM, setSelM] = React.useState(init.mo);
+  const [selD, setSelD] = React.useState(init.d);
+  const pad = n => String(n).padStart(2,"0");
+  const daysInMonth = new Date(viewY, viewM, 0).getDate();
+  const firstDow = new Date(viewY, viewM-1, 1).getDay();
+  const startBlank = (firstDow + 6) % 7;
+  const prevMonth = ()=>{ if(viewM===1){ setViewY(viewY-1); setViewM(12); } else setViewM(viewM-1); };
+  const nextMonth = ()=>{ if(viewM===12){ setViewY(viewY+1); setViewM(1); } else setViewM(viewM+1); };
+  const cells = [];
+  for(let i=0;i<startBlank;i++) cells.push(null);
+  for(let d=1;d<=daysInMonth;d++) cells.push(d);
+  const isSelected = (d)=> d===selD && viewY===selY && viewM===selM;
+  const isToday = (d)=> viewY===today.getFullYear() && viewM===today.getMonth()+1 && d===today.getDate();
+  const _btn = {background:"#16331f",border:"1px solid #2e4234",borderRadius:8,color:"#dff0e5",padding:"8px 14px",fontSize:16,cursor:"pointer"};
+  const E = React.createElement;
+  return E('div', {
+      style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,
+        display:"flex",alignItems:"center",justifyContent:"center",padding:20},
+      onClick: onClose
+    },
+    E('div', {
+      onClick: ev=>ev.stopPropagation(),
+      style:{background:"#0f2018",border:"1px solid #2e4234",borderRadius:16,
+        padding:18,width:"100%",maxWidth:340,boxShadow:"0 12px 40px rgba(0,0,0,0.5)"}
+    },
+      E('div',{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}
+        , E('button',{onClick:prevMonth, style:_btn}, "‹")
+        , E('div',{style:{fontSize:18,fontWeight:700,color:"#dff0e5"}}, viewY+"年 "+viewM+"月")
+        , E('button',{onClick:nextMonth, style:_btn}, "›")
+      ),
+      E('div',{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:6}}
+        , ["月","火","水","木","金","土","日"].map((w,i)=>
+            E('div',{key:i,style:{textAlign:"center",fontSize:11,color:i>=5?"#7fa8d0":"#74897b",fontWeight:600}}, w))
+      ),
+      E('div',{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}
+        , cells.map((d,i)=> d===null
+            ? E('div',{key:"b"+i})
+            : E('button',{ key:i,
+                onClick:()=>{ setSelY(viewY); setSelM(viewM); setSelD(d); },
+                style:{ aspectRatio:"1",border:"none",borderRadius:8,cursor:"pointer",
+                  fontSize:15,fontWeight: isSelected(d)?800:500,
+                  background: isSelected(d)?"#1d7a3e":(isToday(d)?"#16331f":"transparent"),
+                  color: isSelected(d)?"#fff":"#cfe8d5" }
+              }, d)
+          )
+      ),
+      E('div',{style:{display:"flex",gap:8,marginTop:16}}
+        , E('button',{onClick:onClose, style:{..._btn,flex:1,background:"#1a2a20",color:"#9fb3a5"}}, "キャンセル")
+        , E('button',{ onClick:()=>{ onConfirm(selY+"-"+pad(selM)+"-"+pad(selD)); },
+            style:{..._btn,flex:1,background:"#1d7a3e",color:"#fff",fontWeight:700} }, "決定")
+      )
+    )
+  );
+}
+
+// 日付欄: タップで自前カレンダーモーダルを開く(OSピッカー不使用)
+function DateEditor({ value, onChange, style }){
+  const [open, setOpen] = React.useState(false);
+  const E = React.createElement;
+  return E('label', { style:{display:"flex",flexDirection:"column",gap:3} }
+    , E('span', { style:{fontSize:11,color:"#74897b"} }, "日付")
+    , E('div', {
+        onClick:()=>setOpen(true),
+        style:{...style, cursor:"pointer", minWidth:120}
+      }, value||"日付を選択")
+    , open && E(DatePickerModal, {
+        value: value,
+        onConfirm: (v)=>{ setOpen(false); if(v) onChange(v); },
+        onClose: ()=>setOpen(false)
       })
   );
-}, (prev,next)=> prev.value===next.value);  // valueが同じなら再描画しない(ポーリング無視)
+}
 
 function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel, defTeamLineup, pendingCode, preErrorPos, runnerDefault }) {
   
@@ -3764,7 +3825,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.18")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.19")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3848,7 +3909,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.18")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.19")
         )
 
         // ===== 新規チーム作成 =====

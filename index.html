@@ -1982,7 +1982,7 @@ function App() {
   });
   const [gameInfoOpen, setGameInfoOpen] = React.useState(false);
   const [termsAgreed, setTermsAgreed] = React.useState(false);
-  const [tab,   setTab]   = useState(()=>{ const code=localStorage.getItem("tsCode"); const role=localStorage.getItem("tsRole"); if(code&&role){ window.__teamShareCode=code; window.__teamShareRole=role; return role==="member"?"live":"top"; } return "login"; });
+  const [tab,   setTab]   = useState(()=>{ const code=localStorage.getItem("tsCode"); const role=localStorage.getItem("tsRole"); if(code&&role){ window.__teamShareCode=code; window.__teamShareRole=role; return role==="member"?"top":"top"; } return "login"; });
   const [syncMode,   setSyncMode]   = useState("off");
   const [syncGameId, setSyncGameId] = useState("");
   const [viewerCode, setViewerCode] = useState("");
@@ -3872,7 +3872,7 @@ function App() {
       , React.createElement('nav', { style: {...S.nav, position:"relative", padding:"0 4px", paddingTop: isReadOnly ? "calc(env(safe-area-inset-top, 0px) + 40px)" : undefined},}
         , React.createElement('div',{style:{display:"flex",overflowX:"auto",flex:1,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}
         , tab!=="login" && (isReadOnly
-          ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
+          ? [["top","🏠 トップ"],["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
                 background:tab===id?"#1a2a45":"transparent",border:"none",borderRadius:"8px 8px 0 0",
                 borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
@@ -3892,7 +3892,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.38")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.39")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3976,7 +3976,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.38")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.39")
         )
 
         // ===== 新規チーム作成 =====
@@ -4160,6 +4160,77 @@ function App() {
               }, "🔑 管理者としてログイン")
           )
         )
+
+
+        , tab==="top"&&isReadOnly&&(React.createElement(React.Fragment, null
+
+          // ===== 閲覧モード トップタブ =====
+          , React.createElement('div', {style:{maxWidth:400,margin:"0 auto",padding:"16px 0"}}
+
+            // ロゴ・接続情報
+            , React.createElement('div', {style:{textAlign:"center",marginBottom:28}}
+              , React.createElement('div', {style:{fontSize:44,marginBottom:8}}, "⚾")
+              , React.createElement('div', {style:{fontSize:22,fontWeight:900,color:"#e9f0ea",marginBottom:8}}, "おわプロスコア")
+              , React.createElement('div', {style:{display:"inline-flex",alignItems:"center",gap:6,
+                  background:"#0c2a0c",border:"1px solid #18b257",borderRadius:20,padding:"4px 14px"}}
+                , React.createElement('div', {style:{width:7,height:7,borderRadius:"50%",background:"#18b257"}} )
+                , React.createElement('div', {style:{fontSize:11,color:"#18b257",fontWeight:700}},
+                    (myTeam&&myTeam.name?myTeam.name:"チーム")+" 閲覧モード接続中")
+              )
+            )
+
+            // メインCTA
+            , React.createElement('button', {
+                onClick:()=>setTab("live"),
+                style:{...sBt("#1a56a0"), width:"100%", fontSize:17, padding:"16px",
+                  borderRadius:14, fontWeight:900, marginBottom:12,
+                  boxShadow:"0 4px 20px rgba(26,86,160,0.3)"}
+              }, "📡 速報を見る")
+
+            // サブリンク
+            , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:28}}
+              , React.createElement('button', {
+                  onClick:()=>setTab("history"),
+                  style:{flex:1,background:"#0c160e",border:"1px solid #24402b",borderRadius:10,
+                    color:"#7db8e8",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700}
+                }, "📋 試合履歴")
+              , React.createElement('button', {
+                  onClick:()=>setTab("stats"),
+                  style:{flex:1,background:"#0c160e",border:"1px solid #24402b",borderRadius:10,
+                    color:"#7db8e8",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700}
+                }, "📈 成績を見る")
+            )
+
+            // 運営からのお知らせ（管理者トップと同じ）
+            , React.createElement('div', {style:{...S.card,borderLeft:"4px solid #f97316"}}
+              , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}}
+                , React.createElement('div', {style:{fontSize:14}}, "📢")
+                , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
+              )
+              , [
+                  {ver:"v472.39",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
+                  {ver:"v472.36",date:"2026/06/21",items:["履歴から試合を開くとスコアボードが表示されるよう修正"]},
+                  {ver:"v472.35",date:"2026/06/21",items:["対戦相手登録で交代出場した全選手を取得するよう修正"]},
+                  {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設","チームデータ同期（手動）を廃止"]},
+                ].map((n,ni)=>
+                  React.createElement('div', {key:ni, style:{
+                    borderTop:ni===0?"none":"1px solid #1a2d1e",
+                    paddingTop:ni===0?0:10, marginTop:ni===0?0:10,
+                  }}
+                    , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}}
+                      , React.createElement('span', {style:{fontSize:11,fontWeight:700,color:"#f97316",
+                          background:"#2d1a00",border:"1px solid #92400e",borderRadius:4,padding:"2px 7px"}}, n.ver)
+                      , React.createElement('span', {style:{fontSize:10,color:"#4b6052"}}, n.date)
+                    )
+                    , n.items.map((item,ii)=>
+                        React.createElement('div', {key:ii, style:{fontSize:11,color:"#9fb3a5",
+                          paddingLeft:8,marginBottom:3,lineHeight:1.5}}, "・"+item)
+                      )
+                  )
+                )
+            )
+          )
+        ))
 
         , tab==="live"&&(React.createElement(React.Fragment, null
 
@@ -5459,37 +5530,12 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {
-                    ver: "v472.38",
-                    date: "2026/06/20",
-                    items: [
-                      "新試合ウィザードでビジター・ホームが同じチームになるバグを修正",
-                      "トップタブを新設しました",
-                      "チームデータ同期（手動）を廃止しました（自動保存に統合済み）",
-                    ]
-                  },
-                  {
-                    ver: "v472.32",
-                    date: "2026/06/20",
-                    items: [
-                      "試合開始ウィザードフロー実装（新試合→先攻オーダー→後攻オーダー→記録）",
-                      "試合終了後も準備画面を表示するよう改善",
-                    ]
-                  },
-                  {
-                    ver: "v472.30",
-                    date: "2026/06/20",
-                    items: [
-                      "ログアウト後にメンバーデータが消えるバグを修正",
-                    ]
-                  },
-                  {
-                    ver: "v472.29",
-                    date: "2026/06/20",
-                    items: [
-                      "投球回（IP）が投手交代時にズレる根本バグを修正（打席ごとに投手を直接記録する方式に変更）",
-                    ]
-                  },
+                  {ver:"v472.39",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
+                  {ver:"v472.37",date:"2026/06/22",items:["先攻→後攻スタメン設定で同じチームになるバグを修正"]},
+                  {ver:"v472.36",date:"2026/06/21",items:["履歴から試合を開くとスコアボードが表示されるよう修正"]},
+                  {ver:"v472.35",date:"2026/06/21",items:["対戦相手登録で交代出場した全選手を取得するよう修正","対戦相手データをFirebaseに確実に保存するよう修正"]},
+                  {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設","チームデータ同期（手動）を廃止"]},
+                  {ver:"v472.33",date:"2026/06/20",items:["新試合ウィザードでビジター・ホームが同じチームになるバグを修正"]},
                 ].map((n,ni)=>
                   React.createElement('div', {key:ni, style:{
                     borderTop: ni===0?"none":"1px solid #1a2d1e",

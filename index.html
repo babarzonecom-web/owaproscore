@@ -1296,25 +1296,28 @@ const recomputeScores = (g) => {
 const computeOneStats = (p) => {
   let ab=0,h=0,hr=0,bb=0,hbp=0,k=0,tb=0,r=0,sac=0,sf=0;
   const atBatsObj = p.atBats || {};
+  let ci=0;
   Object.values(atBatsObj).flat().forEach(e=>{
     const ne=norm(e); const code=ne.code; if(!code) return;
     if(!NOAB_CODES.has(code)) ab++;
     if(HIT_CODES.has(code)){h++;tb+=code==="H1"?1:code==="H2"?2:code==="H3"?3:4;}
     if(code==="HR") hr++;
-    if(code==="BB"||code==="IBB"||code==="CI") bb++;  // IBB・打撃妨害も四球扱い
+    if(code==="BB"||code==="IBB") bb++;  // IBBは四球に含む。CI(打撃妨害)は四球ではないので除外
+    if(code==="CI") ci++;                // 打撃妨害は独立カウント
     if(code==="HBP") hbp++;
     if(code==="K"||code==="KL"||code==="KW") k++;
     if(code==="SAC") sac++;
     if(code==="SF")  sf++;
   });
   r += (p.run||0);
-  const pa = ab + bb + hbp + sac + sf;  // IBBはbbに含まれるので別途加算不要
+  // 打席数: 打撃妨害も打席として成立するので含める
+  const pa = ab + bb + hbp + sac + sf + ci;
   const slg = ab>0 ? (tb/ab) : 0;
-  // 出塁率: (H+BB+HBP) / (AB+BB+HBP+SF)  ※SFは分母に含める（犠打SACは除外）
+  // 出塁率: (H+BB+HBP)/(AB+BB+HBP+SF)  ※犠打(SAC)と打撃妨害(CI)は分母から除外(公式規則)
   const obp = (ab+bb+hbp+sf)>0 ? ((h+bb+hbp)/(ab+bb+hbp+sf)) : 0;
   const ops = obp + slg;
   const fmtAvg = v => v>0 ? v.toFixed(3).replace(/^0/,"") : ".---";
-  return {...p,_pa:pa,_ab:ab,_h:h,_hr:hr,_bb:bb,_hbp:hbp,_k:k,_tb:tb,_r:r,
+  return {...p,_pa:pa,_ab:ab,_h:h,_hr:hr,_bb:bb,_hbp:hbp,_k:k,_tb:tb,_r:r,_ci:ci,
     _avg:ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---",
     _slg:ab>0?fmtAvg(slg):".---",
     _obp:(ab+bb+hbp)>0?fmtAvg(obp):".---",
@@ -1373,8 +1376,8 @@ const computePitcherStats = (g) => {
     const maxInn = Math.max(
       g.innings||9,
       g.endInning||0,
-      // 実際に記録のある最大イニング
-      ...(offTeam==="away"?g.awayLineup:g.homeLineup||[]).flatMap(p=>Object.keys(p.atBats||{}).map(Number))
+      // 実際に記録のある最大イニング(lineup未定義でもクラッシュしないよう||[]でガード)
+      ...((offTeam==="away"?g.awayLineup:g.homeLineup)||[]).flatMap(p=>Object.keys((p&&p.atBats)||{}).map(Number))
     );
     const _pitInns = Array.from({length:maxInn},(_,i)=>i+1);
     _pitInns.forEach(inn=>{
@@ -1489,8 +1492,19 @@ const computePitcherStats = (g) => {
       return bestIdx;
     };
 
+    // 打席を担当した投手を特定する。
+    // entry.pLogIdx（記録時に直接書き込まれた登板エントリ番号）があれば最優先で使う＝推測不要で100%正確。
+    // 旧データ（pLogIdxがない過去の試合）はseq推測にフォールバックする。
+    const resolveActivePitcher = (ab) => {
+      const pli = ab.entry && ab.entry.pLogIdx;
+      if(pli !== undefined && pli !== null && log[pli]) {
+        return log[pli].pitcherIdx;
+      }
+      return findActivePitcher(ab.seq);
+    };
+
     allAtBats.forEach(ab=>{
-      let activePIdx = findActivePitcher(ab.seq);
+      let activePIdx = resolveActivePitcher(ab);
 
       const ps = stats[activePIdx];
       if(!ps) return;
@@ -1503,8 +1517,8 @@ const computePitcherStats = (g) => {
       if(code==="HR") ps.autoHr = (ps.autoHr||0)+1;
       const runsScored = ab.entry.runs||0;
       if(runsScored > 0) {
-        // 失点帰責: その打席を担当する投手に全失点を帰責（シンプル方式）
-        ps.autoEr = (ps.autoEr||0) + runsScored;
+        // 失点(autoRuns)は機械的に決まるため自動計算。
+        // 自責点(autoEr)はエラー絡みの判定が必要なため、得点時の自責点モーダルで人間が記録する(ここでは加算しない)
         ps.autoRuns = (ps.autoRuns||0) + runsScored;
       }
     });
@@ -1512,8 +1526,8 @@ const computePitcherStats = (g) => {
     
     
     allAtBats.forEach(ab=>{
-      // findActivePitcherを使って統一（被安打・三振等と同じロジック）
-      const activePIdx = findActivePitcher(ab.seq);
+      // resolveActivePitcherを使って統一（pLogIdxがあれば直接参照、なければ被安打・三振等と同じロジック）
+      const activePIdx = resolveActivePitcher(ab);
       const ps = stats[activePIdx];
       if(!ps) return;
       const code = ab.entry.code;
@@ -1564,8 +1578,8 @@ const computePitcherStats = (g) => {
       const totalFinalOuts = finalHalfOuts + brOutsInFinalHalf;
       const expectedOuts = g.finalOuts;
       if(totalFinalOuts < expectedOuts) {
-        // 差分を最終投手に補完
-        const lastPitcher = stats.length > 0 ? stats[stats.length - 1] : null;
+        // 差分を「実際に最後に投げている投手」に補完(配列末尾だと未登板投手に付く不具合を回避)
+        const lastPitcher = stats[currentPIdx] || (stats.length > 0 ? stats[stats.length - 1] : null);
         if(lastPitcher) {
           const diff = expectedOuts - totalFinalOuts;
           lastPitcher._outsGot += diff;
@@ -1968,7 +1982,7 @@ function App() {
   });
   const [gameInfoOpen, setGameInfoOpen] = React.useState(false);
   const [termsAgreed, setTermsAgreed] = React.useState(false);
-  const [tab,   setTab]   = useState(()=>{ const code=localStorage.getItem("tsCode"); const role=localStorage.getItem("tsRole"); if(code&&role){ window.__teamShareCode=code; window.__teamShareRole=role; return role==="member"?"live":"score"; } return "login"; });
+  const [tab,   setTab]   = useState(()=>{ const code=localStorage.getItem("tsCode"); const role=localStorage.getItem("tsRole"); if(code&&role){ window.__teamShareCode=code; window.__teamShareRole=role; return role==="member"?"live":"top"; } return "login"; });
   const [syncMode,   setSyncMode]   = useState("off");
   const [syncGameId, setSyncGameId] = useState("");
   const [viewerCode, setViewerCode] = useState("");
@@ -1980,7 +1994,6 @@ function App() {
   const [statsTabTeamId, setStatsTabTeamId] = useState("");
   const [statsTabTeamData, setStatsTabTeamData] = useState(null);
   const [statsTabLoading, setStatsTabLoading] = useState(false);
-  const [teamSyncStatus, setTeamSyncStatus] = useState("idle"); // idle/syncing/ok/error
   const isViewer = syncMode==="member";
   const isHost   = syncMode==="host";
   const [modal, setModal] = useState(null);
@@ -2169,19 +2182,18 @@ function App() {
     setNewTeamPw("");
     setNewAdminPw("");
 
-    // ゲームデータをリセット
+    // ゲームデータをリセット（チームデータは保持する）
     const freshGame = newGame();
-    setStorage({
+    setStorage(s=>({
+      ...s,
       currentGame: freshGame,
       history: [],
       undoStack: [],
-      teams: [],
-      myTeam: null,
-      opponents: [],
-    });
+      // teams/myTeam/opponentsは保持(メンバー登録データが消えないように)
+    }));
 
     setTab("login");
-    showToast("ログアウトしました。データをクリアしました。");
+    showToast("ログアウトしました。");
   };
 
   // 自動再接続は削除（手動接続のみ）
@@ -2398,6 +2410,10 @@ function App() {
       // 得点圏打率計算のため打席前のランナー状態をentryに追加
       const _preB = g.bases||[null,null,null];
       if(_preB[1]||_preB[2]) entry.sp = true;
+      // この打席を担当した投手の登板(pitcherLogの何番目のエントリか)を直接記録する。
+      // 後からseq推測で「誰が投げたか」を逆算する必要がなくなり、再登板でもズレない。
+      const _defTeamForP = team==="away"?"home":"away";
+      entry.pLogIdx = Math.max(0, (g[_defTeamForP+"PitcherLog"]||[]).length - 1);
       const lk=team+"Lineup";
       const rbiAdd = (RBI_CODES.has(code) && (runs||0)>0) ? (runs||0) : 0;
       const lineup=g[lk].map((p,i)=>{
@@ -2538,34 +2554,43 @@ function App() {
       setModal(null);
       showToast(`チェンジ！ ${_optionalChain([rOf, 'call', _9 => _9(code), 'optionalAccess', _10 => _10.label])||code} 記録`);
     } else {
-      // 得点があれば自責点モーダルを表示
-      if((runs||0) > 0) {
+      // 得点があれば自責点モーダルを表示(次打者モーダルより優先)
+      const hasRuns = (runs||0) > 0;
+      if(hasRuns) {
         const defSide3 = team==="away" ? "home" : "away";
-        setModal({step:"earned_run", defSide:defSide3, runs, inning, scoredNames:scoredNames||[]});
+        // 自責点モーダルに、閉じた後に進む次打者情報を持たせる
+        setModal({step:"earned_run", defSide:defSide3, runs, inning, scoredNames:scoredNames||[],
+                  _nextBatter:{team, pidx:nextPidx, inning}});
       }
       showToast(`${_optionalChain([rOf, 'call', _11 => _11(code), 'optionalAccess', _12 => _12.label])||code}${(runs||0)>0?` +${runs}点`:""} ✅`);
       
       // pitchModeはgameから直接取得（クロージャの古い値を避けるため）
       const currentPitchMode = document.body.getAttribute("data-pitch-mode") || "result";
-      setTimeout(()=>{
-        // 結果入力モードのみ次の打者を自動表示（1球モードは自動表示しない）
-        if(currentPitchMode === "result") {
-          setModal({team, pidx:nextPidx, inning, step:"result"});
-        } else {
-          setModal(null);
-        }
-      }, 350);
+      // 得点がある場合は自責点モーダルを優先するため、次打者の自動表示はしない
+      if(!hasRuns){
+        setTimeout(()=>{
+          // 結果入力モードのみ次の打者を自動表示（1球モードは自動表示しない）
+          if(currentPitchMode === "result") {
+            setModal({team, pidx:nextPidx, inning, step:"result"});
+          } else {
+            setModal(null);
+          }
+        }, 350);
+      }
     }
   },[mutGame]);
 
   
   const overwriteEntry = useCallback((team,pidx,inning,eidx,code,dir,runs)=>{
-    const entry={code,...(dir?{dir}:{}),runs:runs||0};
     mutGame(g=>{
       const lk=team+"Lineup";
       const lineup=g[lk].map((p,i)=>{
         if(i!==pidx) return p;
-        const list=[...toList(p.atBats,inning)]; list[eidx]=entry;
+        const list=[...toList(p.atBats,inning)];
+        const oldEntry = list[eidx]; // 修正前のentry。pLogIdx(誰が投げたか)を引き継ぐため保持する
+        const entry={code,...(dir?{dir}:{}),runs:runs||0,
+          ...(oldEntry&&oldEntry.pLogIdx!==undefined?{pLogIdx:oldEntry.pLogIdx}:{})};
+        list[eidx]=entry;
         return {...p,atBats:{...p.atBats,[inning]:list}};
       });
       const tmp={...g,[lk]:lineup};
@@ -2603,6 +2628,8 @@ function App() {
   const recordSB = useCallback((team, moves, type, primaryPidx)=>{
     const isOutType = type==="CS" || type==="PO" || type==="RO";
     const isSB      = type==="SB";
+    let _scoredForEr = [];  // 得点した走者(自責点モーダル用にmutGameの外で保持)
+    let _erInning = game.inning;
 
     mutGame(g=>{
       const lk = team+"Lineup";
@@ -2653,6 +2680,8 @@ function App() {
       lineup = lineup.map(p=>
         scoredRunners.includes(p.name) ? {...p, run:(p.run||0)+1} : p
       );
+      _scoredForEr = [...scoredRunners];  // 自責点モーダル用に保持
+      _erInning = g.inning;
 
       // アウトカウント（isOutのmoveの数だけ増やす）
       const outsAdded = moves.filter(m=>m.isOut).length;
@@ -2700,7 +2729,6 @@ function App() {
         baserunnerOuts:brOuts,
         log};
     });
-    setModal(null);
     // チェンジになった場合のみストライク・ボールカウントをリセット（球数は保持）
     const outsAfter = (game.outs||0) + moves.filter(m=>m.isOut).length;
     if(outsAfter >= 3) {
@@ -2713,17 +2741,28 @@ function App() {
       OBI:"走塁妨害・進塁✅", ADV:"進塁✅",
     }[type]||type;
     showToast(toastMsg);
+    // 得点があれば自責点モーダルを表示(走塁による得点)
+    if(_scoredForEr.length > 0){
+      const defSide = team==="away" ? "home" : "away";
+      setModal({step:"earned_run", defSide, runs:_scoredForEr.length, inning:_erInning, scoredNames:_scoredForEr});
+    } else {
+      setModal(null);
+    }
   },[mutGame]);
 
   
   const recordSpecialPlay = useCallback((team, code, advanceBases, runs)=>{
     const sp = SPECIAL_PLAYS.find(p=>p.code===code);
+    let _scoredSP = [];
+    let _innSP = game.inning;
     mutGame(g=>{
       const _gb2 = Array.isArray(g.bases) ? g.bases : [0,1,2].map(i => (g.bases&&g.bases[i]!=null)?g.bases[i]:null);
       const newBases = advanceBases !== undefined ? advanceBases : _gb2;
       // 得点したランナー名を特定（元の塁から消えて新basesにもいない選手）
       const oldBases = _gb2;
       const scoredRunners = (oldBases).filter(n => n && !(newBases||[]).includes(n));
+      _scoredSP = [...scoredRunners];
+      _innSP = g.inning;
       const updatedLineup = g[team+"Lineup"].map(p => {
         if(scoredRunners.includes(p.name)) return {...p, run:(p.run||0)+1};
         return p;
@@ -2744,8 +2783,17 @@ function App() {
         log,
       };
     });
-    setModal(null);
     showToast(`${_optionalChain([sp, 'optionalAccess', _17 => _17.label])||code}記録`);
+    // 得点があれば自責点モーダルを表示
+    const erRuns = (runs||0) > 0 ? runs : _scoredSP.length;
+    if(erRuns > 0){
+      const defSide = team==="away" ? "home" : "away";
+      // scoredNamesが取れていればそれを使い、なければ得点数ぶんの匿名走者
+      const names = _scoredSP.length>0 ? _scoredSP : Array.from({length:erRuns},(_,i)=>"走者"+(i+1));
+      setModal({step:"earned_run", defSide, runs:erRuns, inning:_innSP, scoredNames:names});
+    } else {
+      setModal(null);
+    }
   },[mutGame]);
 
   
@@ -2837,7 +2885,18 @@ function App() {
     const ac = team.adminCode || Math.random().toString(36).slice(2,8).toUpperCase();
     const teamWithId = team.id ? {...team, adminCode:ac} : {...team, id:makeTeamId(), adminCode:ac};
     fbSaveTeam(teamWithId);
-    setStorage(s => ({...s, myTeam: teamWithId}));
+    setStorage(s => {
+      const next = {...s, myTeam: teamWithId};
+      // teamData/{code}にも自動保存(ログアウト後も復元できるように)
+      const code = localStorage.getItem("tsCode");
+      if(code){
+        const data = {teams:s.teams||[], myTeam:teamWithId, opponents:s.opponents||[], savedAt:new Date().toISOString()};
+        fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+code+".json",
+          {method:"PUT", body:JSON.stringify(data)})
+          .catch(e=>console.log("[FB] teamData auto-save error:", e));
+      }
+      return next;
+    });
     showToast(`自チーム「${teamWithId.name}」を保存しました`);
     return teamWithId;
   };
@@ -2850,6 +2909,14 @@ function App() {
       const opponents = existing>=0
         ? s.opponents.map(t=>t.id===teamWithId.id?teamWithId:t)
         : [...(s.opponents||[]), teamWithId];
+      // teamData/{code}にも自動保存
+      const code = localStorage.getItem("tsCode");
+      if(code){
+        const data = {teams:s.teams||[], myTeam:s.myTeam||null, opponents, savedAt:new Date().toISOString()};
+        fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+code+".json",
+          {method:"PUT", body:JSON.stringify(data)})
+          .catch(e=>console.log("[FB] teamData auto-save error:", e));
+      }
       return {...s, opponents};
     });
     showToast(`「${teamWithId.name}」を保存しました`);
@@ -3175,7 +3242,7 @@ function App() {
         const ipOuts = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
         const ipDisp = Math.floor(ipOuts/3)+"."+ipOuts%3;
         const h  = p.manualH !==undefined ? p.manualH  : (auto.autoH||0);
-        const er = p.manualOverride && p.er!==undefined ? p.er : (auto.autoEr||0);
+        const er = p.erManual!==undefined ? p.erManual : (p.manualOverride && p.er!==undefined ? p.er : 0);
         const bb = p.manualBb!==undefined ? p.manualBb : (auto.autoBb||0);
         const k  = p.manualK !==undefined ? p.manualK  : (auto.autoK||0);
         const ipNum = Math.floor(ipOuts/3)+(ipOuts%3)/3;
@@ -3814,7 +3881,7 @@ function App() {
                 fontWeight:tab===id?800:500,
               },}, l)
             ))
-          : [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
+          : [["top","🏠 トップ"],["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
                 background:"transparent",border:"none",
                 borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
@@ -3825,7 +3892,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.22")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.38")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3909,7 +3976,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.22")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.38")
         )
 
         // ===== 新規チーム作成 =====
@@ -4129,7 +4196,7 @@ function App() {
             const _pitAutoIpOuts = Math.floor((_pitAuto.autoIp||0)/10)*3+((_pitAuto.autoIp||0)%10);
             const _pitIpOuts = _pitcher.manualIp!==undefined?_pitcher.manualIp:_pitAutoIpOuts;
             const _pitIpDisp = Math.floor(_pitIpOuts/3)+"."+(_pitIpOuts%3);
-            const _pitEr = _pitcher.manualOverride&&_pitcher.er!==undefined?_pitcher.er:(_pitAuto.autoEr||0);
+            const _pitEr = _pitcher.erManual!==undefined ? _pitcher.erManual : (_pitcher.manualOverride&&_pitcher.er!==undefined?_pitcher.er:0);
 
             // 現打者の全打席結果（イニング順）
             const batterAbList = [];
@@ -4517,21 +4584,32 @@ function App() {
 
                 , tab==="score"&&(React.createElement(React.Fragment, null
 
-          // 未開始状態: 「記録を始める」画面
+          // 未開始状態: ステップ式の直感的な動線（started===falseのみ。finished試合はスコアボード表示）
           , (game.started === false) ? (
-            React.createElement('div', {style:{...S.card, textAlign:"center", padding:"40px 20px"}}
-              , React.createElement('div', {style:{fontSize:48, marginBottom:16}}, "⚾")
-              , React.createElement('div', {style:{fontSize:20, fontWeight:900, color:"#e9f0ea", marginBottom:8}},
-                "おわプロスコア")
-              , React.createElement('div', {style:{fontSize:13, color:"#4b6052", marginBottom:32, lineHeight:1.6}},
-                "試合を記録して成績を管理しましょう。\nチーム同期で複数端末からリアルタイム共有できます。")
+            React.createElement('div', {style:{padding:"24px 8px", textAlign:"center"}}
+              , React.createElement('div', {style:{fontSize:48, marginBottom:12}}, "⚾")
+              , React.createElement('div', {style:{fontSize:20,fontWeight:900,color:"#e9f0ea",marginBottom:24}},
+                  "おわプロスコア")
+              // メインCTA
               , React.createElement('button', {
                   onClick:()=>setModal({step:"confirm_new", fromWelcome:true}),
-                  style:{...sBt("#18b257"), fontSize:16, padding:"14px 32px", marginBottom:16,
-                    borderRadius:12, fontWeight:900, width:"100%", maxWidth:280}
-                }, "⚾ 記録を始める")
-              , (myTeam||opponents.length>0) && React.createElement('div', {style:{fontSize:12, color:"#4b6052", marginTop:4}},
-                "チームタブでチームを選択するとスムーズに開始できます")
+                  style:{...sBt("#18b257"), width:"100%", fontSize:17, padding:"16px",
+                    borderRadius:14, fontWeight:900, marginBottom:20, maxWidth:320,
+                    boxShadow:"0 4px 20px rgba(24,178,87,0.3)"}
+                }, "⚾ 試合を開始する")
+              // サブリンク
+              , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:2}}
+                , React.createElement('button', {
+                    onClick:()=>setTab("history"),
+                    style:{background:"transparent",border:"none",color:"#74897b",
+                      fontSize:14,cursor:"pointer",padding:"10px",textDecoration:"underline"}
+                  }, "📋 試合履歴を見る")
+                , React.createElement('button', {
+                    onClick:()=>setTab("stats"),
+                    style:{background:"transparent",border:"none",color:"#74897b",
+                      fontSize:14,cursor:"pointer",padding:"10px",textDecoration:"underline"}
+                  }, "📈 成績を見る")
+              )
             )
           ) : (
           React.createElement(React.Fragment, null
@@ -5233,7 +5311,7 @@ function App() {
                             const effectiveIp = p.manualIp!==undefined?p.manualIp:ipOuts;
                             const ipDisp = Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?(effectiveIp%3)+"/3":"");
                             const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
-                            const er = p.manualOverride&&p.er!==undefined?p.er:(auto.autoEr||0);
+                            const er = p.erManual!==undefined ? p.erManual : (p.manualOverride&&p.er!==undefined?p.er:0);
                             const era = ipNum>0?(er*(game.innings||9)/ipNum).toFixed(2):(er>0?"∞":"—");
                             return [React.createElement('tr',{key:"starter"}
                               ,React.createElement('td',{style:{...S.td,minWidth:110}}
@@ -5243,6 +5321,8 @@ function App() {
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:10,color}},game.finished?"先発":"登板中"))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},auto.autoTbf||0)
+                              , (game.pitchMode||"result")==="pitch" && React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},p.pitchCount||0)
+                              , (game.pitchMode||"result")==="pitch" && React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}}, (p.pitchCount>0?Math.round((p.strikeCount||0)/p.pitchCount*100)+"%":"—"))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispH)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispHr)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispK)
@@ -5277,7 +5357,7 @@ function App() {
                             const effectiveIp = p.manualIp!==undefined?p.manualIp:ipOuts;
                             const ipDisp = isReappear ? "—" : Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?(effectiveIp%3)+"/3":"");
                             const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
-                            const er = p.manualOverride&&p.er!==undefined?p.er:(auto.autoEr||0);
+                            const er = p.erManual!==undefined ? p.erManual : (p.manualOverride&&p.er!==undefined?p.er:0);
                             const era = !isReappear&&ipNum>0?(er*(game.innings||9)/ipNum).toFixed(2):(isReappear?"—":er>0?"∞":"—");
                             const dispH   = p.manualH  !==undefined?p.manualH  :(auto.autoH||0);
                             const dispHr  = p.manualHr !==undefined?p.manualHr :(auto.autoHr||0);
@@ -5299,6 +5379,8 @@ function App() {
                               )
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},auto.autoTbf||0)
+                              , (game.pitchMode||"result")==="pitch" && React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},p.pitchCount||0)
+                              , (game.pitchMode||"result")==="pitch" && React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}}, (p.pitchCount>0?Math.round((p.strikeCount||0)/p.pitchCount*100)+"%":"—"))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoH||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoHr||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoK||0)
@@ -5333,6 +5415,102 @@ function App() {
               );
             })
 
+        ))
+
+
+        , tab==="top"&&(React.createElement(React.Fragment, null
+
+          // ===== トップタブ =====
+          , React.createElement('div', {style:{maxWidth:400,margin:"0 auto",padding:"16px 0"}}
+
+            // ロゴ・タイトル
+            , React.createElement('div', {style:{textAlign:"center",marginBottom:28}}
+              , React.createElement('div', {style:{fontSize:44,marginBottom:8}}, "⚾")
+              , React.createElement('div', {style:{fontSize:22,fontWeight:900,color:"#e9f0ea",marginBottom:4}}, "おわプロスコア")
+              , React.createElement('div', {style:{fontSize:11,color:"#4b6052"}}, "簡単！みんなの野球記録")
+            )
+
+            // メインCTA
+            , React.createElement('button', {
+                onClick:()=>setModal({step:"confirm_new", fromWelcome:true}),
+                style:{...sBt("#18b257"), width:"100%", fontSize:17, padding:"16px",
+                  borderRadius:14, fontWeight:900, marginBottom:12,
+                  boxShadow:"0 4px 20px rgba(24,178,87,0.3)"}
+              }, "⚾ 試合を開始する")
+
+            // サブリンク
+            , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:28}}
+              , React.createElement('button', {
+                  onClick:()=>setTab("history"),
+                  style:{flex:1,background:"#0c160e",border:"1px solid #24402b",borderRadius:10,
+                    color:"#7db8e8",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700}
+                }, "📋 試合履歴")
+              , React.createElement('button', {
+                  onClick:()=>setTab("stats"),
+                  style:{flex:1,background:"#0c160e",border:"1px solid #24402b",borderRadius:10,
+                    color:"#7db8e8",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700}
+                }, "📈 成績を見る")
+            )
+
+            // 運営からのお知らせ
+            , React.createElement('div', {style:{...S.card,borderLeft:"4px solid #f97316"}}
+              , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}}
+                , React.createElement('div', {style:{fontSize:14}}, "📢")
+                , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
+              )
+              , [
+                  {
+                    ver: "v472.38",
+                    date: "2026/06/20",
+                    items: [
+                      "新試合ウィザードでビジター・ホームが同じチームになるバグを修正",
+                      "トップタブを新設しました",
+                      "チームデータ同期（手動）を廃止しました（自動保存に統合済み）",
+                    ]
+                  },
+                  {
+                    ver: "v472.32",
+                    date: "2026/06/20",
+                    items: [
+                      "試合開始ウィザードフロー実装（新試合→先攻オーダー→後攻オーダー→記録）",
+                      "試合終了後も準備画面を表示するよう改善",
+                    ]
+                  },
+                  {
+                    ver: "v472.30",
+                    date: "2026/06/20",
+                    items: [
+                      "ログアウト後にメンバーデータが消えるバグを修正",
+                    ]
+                  },
+                  {
+                    ver: "v472.29",
+                    date: "2026/06/20",
+                    items: [
+                      "投球回（IP）が投手交代時にズレる根本バグを修正（打席ごとに投手を直接記録する方式に変更）",
+                    ]
+                  },
+                ].map((n,ni)=>
+                  React.createElement('div', {key:ni, style:{
+                    borderTop: ni===0?"none":"1px solid #1a2d1e",
+                    paddingTop: ni===0?0:10,
+                    marginTop: ni===0?0:10,
+                  }}
+                    , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}}
+                      , React.createElement('span', {style:{fontSize:11,fontWeight:700,color:"#f97316",
+                          background:"#2d1a00",border:"1px solid #92400e",borderRadius:4,padding:"2px 7px"}},
+                          n.ver)
+                      , React.createElement('span', {style:{fontSize:10,color:"#4b6052"}}, n.date)
+                    )
+                    , n.items.map((item,ii)=>
+                        React.createElement('div', {key:ii, style:{fontSize:11,color:"#9fb3a5",
+                          paddingLeft:8,marginBottom:3,lineHeight:1.5}},
+                          "・"+item)
+                      )
+                  )
+                )
+            )
+          )
         ))
 
         , tab==="stats"&&(React.createElement(React.Fragment, null
@@ -5433,6 +5611,7 @@ function App() {
                             ...(p.manualK  !==undefined?{manualK:p.manualK}:{}),
                             ...(p.manualHbp!==undefined?{manualHbp:p.manualHbp}:{}),
                             ...(p.manualHr !==undefined?{manualHr:p.manualHr}:{}),
+                            ...(p.erManual !==undefined?{erManual:p.erManual}:{}),
                           };
                           if(p.manualOverride){
                             // 手動修正あり: er/autoRunsは保持、auto*は再計算値で更新
@@ -5498,24 +5677,55 @@ function App() {
                 setTab("teams");
                 const lineupRaw = g.awayTeam===oppName ? g.awayLineup : g.homeLineup;
                 const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
-                const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
-                if(members.length===0){ showToast("メンバーが見つかりません"); return; }
-                const oppObj = {id:Date.now().toString(36), name:oppName, members};
-                setStorage(s=>{
-                  // 常に新規追加（同名チームでも別エントリとして追加）
-                  const next = {...s, opponents: [...(s.opponents||[]), oppObj]};
-                  showToast("✅ 対戦相手「"+oppName+"」を登録しました");
-                  return next;
+                // スタメン＋交代で出場した全選手を収集
+                const allMembers = [];
+                const seenNames = new Set();
+                const addMember = (name, pos) => {
+                  if(!name || name.startsWith("選手") || seenNames.has(name)) return;
+                  seenNames.add(name);
+                  allMembers.push({name, pos:pos||""});
+                };
+                lineup.forEach(p=>{
+                  if(!p) return;
+                  // _subOuts（交代前の選手たち）を先に追加
+                  const legacySub = (p._subOut&&!p._subOuts)?[p._subOut]:[];
+                  [...legacySub,...(p._subOuts||[])].forEach(so=>addMember(so.name, so.pos));
+                  // 現在の選手
+                  addMember(p.name, p.pos);
                 });
+                if(allMembers.length===0){ showToast("メンバーが見つかりません"); return; }
+                // 既存の同名チームがあればメンバーをマージ、なければ新規
+                const existingOpp = (storage.opponents||[]).find(t=>t.name===oppName);
+                if(existingOpp){
+                  const existNames = new Set((existingOpp.members||[]).map(m=>typeof m==="string"?m:(m.name||"")));
+                  const merged = [...(existingOpp.members||[]),...allMembers.filter(m=>!existNames.has(m.name))];
+                  saveOpponent({...existingOpp, members:merged});
+                } else {
+                  saveOpponent({name:oppName, members:allMembers});
+                }
+                showToast("✅ 対戦相手「"+oppName+"」を登録しました（"+allMembers.length+"名）");
               },
               onRestoreTeam:(g, myTeamSide)=>{
                 setTab("teams");
                 const makeTeamObj = (teamName, lineupRaw) => {
                   if(!teamName||teamName==="ビジターチーム"||teamName==="ホームチーム") return null;
                   const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
-                  const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
-                  if(members.length===0) return null;
-                  return {id:Date.now().toString(36), name:teamName, members};
+                  // スタメン＋交代で出場した全選手を収集
+                  const allMems = [];
+                  const seenN = new Set();
+                  const addM = (name, pos) => {
+                    if(!name||name.startsWith("選手")||seenN.has(name)) return;
+                    seenN.add(name);
+                    allMems.push({name, pos:pos||""});
+                  };
+                  lineup.forEach(p=>{
+                    if(!p) return;
+                    const leg = (p._subOut&&!p._subOuts)?[p._subOut]:[];
+                    [...leg,...(p._subOuts||[])].forEach(so=>addM(so.name,so.pos));
+                    addM(p.name, p.pos);
+                  });
+                  if(allMems.length===0) return null;
+                  return {id:Date.now().toString(36), name:teamName, members:allMems};
                 };
                 const myObj  = makeTeamObj(g[myTeamSide+"Team"], g[myTeamSide+"Lineup"]);
                 const oppSide = myTeamSide==="away"?"home":"away";
@@ -5765,43 +5975,7 @@ function App() {
               )
           )
 
-          // ===== チームデータ同期（接続中のみ）=====
-          , teamShareCode && teamShareRole==="admin" && React.createElement('div', {style:{...S.card,borderLeft:"4px solid #3b82f6"}}
-            , React.createElement('div', {style:{...S.ct,marginBottom:6}}, "☁️ チームデータ同期")
-            , React.createElement('div', {style:{fontSize:11,color:"#74897b",marginBottom:10}},
-                "自チーム・対戦相手のメンバー情報をFirebaseに保存して他の端末と共有できます")
-            , React.createElement('div', {style:{display:"flex",gap:8}}
-              , React.createElement('button', {
-                  onClick:()=>{
-                    const data={teams:storage.teams||[],myTeam:storage.myTeam||null,
-                      opponents:storage.opponents||[],savedAt:new Date().toISOString()};
-                    fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+teamShareCode+".json",
-                      {method:"PUT",body:JSON.stringify(data)})
-                      .then(()=>showToast("✅ 保存しました"))
-                      .catch(e=>showToast("❌ 保存失敗: "+e.message));
-                  },
-                  style:{...sBt("#3b82f6"),fontSize:12,padding:"6px 14px"}
-                }, "☁️ Firebaseに保存")
-              , React.createElement('button', {
-                  onClick:()=>{
-                    if(!window.confirm("Firebaseからチームデータを読み込みます。現在のデータは上書きされます。")) return;
-                    fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+teamShareCode+".json",{cache:"no-store"})
-                      .then(r=>r.json())
-                      .then(data=>{
-                        if(!data||typeof data!=="object"){showToast("データなし");return;}
-                        setStorage(s=>({...s,
-                          teams:data.teams||s.teams,
-                          myTeam:data.myTeam!==undefined?data.myTeam:s.myTeam,
-                          opponents:data.opponents||s.opponents
-                        }));
-                        showToast("✅ 読み込みました");
-                      })
-                      .catch(e=>showToast("❌ 読み込み失敗: "+e.message));
-                  },
-                  style:{...sBt("#0369a1"),fontSize:12,padding:"6px 14px"}
-                }, "📥 読み込み")
-            )
-          )
+
 
 
 
@@ -5828,13 +6002,16 @@ function App() {
           const sideLabel = side==="away" ? game.awayTeam : game.homeTeam;
           const sideColor = side==="away" ? "#ffb52e" : "#7dd3fc";
           const lineup = side==="away" ? game.awayLineup : game.homeLineup;
-          const preselect = modal.preselect || null;
+          // ウィザードフローではmodal._selAway/_selHomeを優先
+          const preselectFromModal = side==="away" ? modal._selAway : modal._selHome;
+          const preselect = preselectFromModal || modal.preselect || null;
           return (
             React.createElement(TeamLineupModal, {
               side: side,
               sideLabel: sideLabel,
               sideColor: sideColor,
               teams: (()=>{
+                if(preselectFromModal) return [preselectFromModal];
                 // 試合でセットされているチーム名に対応する登録チームだけを返す
                 const teamName = side==="away" ? game.awayTeam : game.homeTeam;
                 const allRegistered = [...(myTeam&&myTeam.name?[myTeam]:[]), ...teams, ...opponents];
@@ -5879,7 +6056,20 @@ function App() {
                   return updated;
                 });
                 showToast(`${t.name} スタメンをセットしました${selPitcher?" / 先発: "+selPitcher:""}`);
-                setModal(null);
+                // autoNext: ウィザードフロー中は先攻完了→後攻モーダル、後攻完了→記録画面へ自動遷移
+                if(modal.autoNext) {
+                  if(side==="away") {
+                    // 先攻完了 → 後攻のオーダー設定へ（_selHomeを引き継ぐ）
+                    setModal({step:"team_lineup", side:"home", autoNext:true, _selHome:modal._selHome});
+                  } else {
+                    // 後攻完了 → スコアタブで記録開始
+                    setTab("score");
+                    setModal(null);
+                    showToast("オーダー設定完了！記録を開始してください ⚾");
+                  }
+                } else {
+                  setModal(null);
+                }
               },
               onCancel: ()=>setModal(null),}
             )
@@ -5940,15 +6130,7 @@ function App() {
           const defSide = modal.defSide;
           const pitchers = game[defSide+"Pitchers"]||[];
           const pitLog = game[defSide+"PitcherLog"]||[];
-          // 同イニングに投げた可能性のある投手を特定
-          const inningPitchers = pitLog.filter((l,li)=>{
-            const nextL = pitLog[li+1];
-            const lTime = l.fromInning*2+(l.fromHalf==="top"?0:1);
-            const innTime = modal.inning*2+(defSide==="away"?0:1);
-            const nextTime = nextL ? nextL.fromInning*2+(nextL.fromHalf==="top"?0:1) : 9999;
-            return lTime<=innTime && innTime<nextTime || (lTime===innTime && nextTime===innTime);
-          });
-          // 重複除去してそのイニングに投げた投手のインデックス一覧
+          // そのイニングに投げた投手のインデックス一覧
           const inningIdxSet = new Set();
           pitLog.forEach((l,li)=>{
             const lTime = l.fromInning*2+(l.fromHalf==="top"?0:1);
@@ -5957,58 +6139,88 @@ function App() {
             const nextTime = nextL ? nextL.fromInning*2+(nextL.fromHalf==="top"?0:1) : 9999;
             if(lTime<=innTime && innTime<=nextTime) inningIdxSet.add(l.pitcherIdx);
           });
-          const inningPit = [...inningIdxSet].map(idx=>({idx, name:(pitchers[idx]||{}).name||"投手"+idx}));
+          // 現投手も必ず候補に含める
+          inningIdxSet.add(game[defSide+"PitcherIdx"]||0);
+          const inningPit = [...inningIdxSet].sort((a,b)=>a-b).map(idx=>({idx, name:(pitchers[idx]||{}).name||"投手"+(idx+1)}));
+
+          // 生還した走者を1人ずつ処理
+          const scored = modal.scoredNames || [];
+          const erIndex = modal.erIndex || 0;
+          const curRunner = scored[erIndex] || "走者";
+          const totalRunners = scored.length;
+          const defaultPit = game[defSide+"PitcherIdx"]||0; // デフォルトは現投手
+
+          // 1人分の自責点を記録して次へ進む関数(案1: 自責点のみ記録、失点は自動計算)
+          const recordOne = (pitIdx)=>{ // pitIdx=null なら自責なし
+            if(pitIdx!==null){
+              mutGame(g=>{
+                const ps=[...g[defSide+"Pitchers"]];
+                if(ps[pitIdx]){
+                  // 自責点あり: 指定投手のerManual+1(失点autoRunsは自動計算なので触らない)
+                  ps[pitIdx]={...ps[pitIdx],
+                    erManual:(ps[pitIdx].erManual||0)+1,
+                  };
+                }
+                return {...g,[defSide+"Pitchers"]:ps};
+              });
+            }
+            // 自責なし(pitIdx===null)は何も加算しない(失点は自動、自責点は付かない)
+            // 次の走者へ or 終了
+            if(erIndex+1 < totalRunners){
+              setModal(m=>({...m, erIndex:erIndex+1, selPitIdx:undefined}));
+            } else {
+              // 全走者の自責点を聞き終わった → 次打者モーダルへ進む(結果入力モードのみ)
+              const nb = modal._nextBatter;
+              const pm = document.body.getAttribute("data-pitch-mode") || "result";
+              if(nb && pm==="result"){
+                setModal({team:nb.team, pidx:nb.pidx, inning:nb.inning, step:"result"});
+              } else {
+                setModal(null);
+              }
+            }
+          };
 
           return React.createElement('div',{style:{position:"fixed",inset:0,background:"#000a",zIndex:300,
-              display:"flex",alignItems:"flex-end",justifyContent:"center"}, onClick:()=>setModal(null)}
-            , React.createElement('div',{style:{background:"#122016",borderRadius:"14px 14px 0 0",
-                width:"100%",maxWidth:500,padding:"20px 20px 36px"},onClick:e=>e.stopPropagation()}
+              display:"flex",alignItems:"center",justifyContent:"center",padding:20}, onClick:()=>setModal(null)}
+            , React.createElement('div',{style:{background:"#122016",borderRadius:16,
+                width:"100%",maxWidth:440,padding:"22px 20px",boxShadow:"0 12px 40px rgba(0,0,0,0.5)"},onClick:e=>e.stopPropagation()}
+              // 進捗表示(複数走者のとき)
+              , totalRunners>1 && React.createElement('div',{style:{fontSize:11,color:"#74897b",marginBottom:6,textAlign:"right"}},
+                  (erIndex+1)+" / "+totalRunners+"人目")
               , React.createElement('div',{style:{fontSize:15,fontWeight:700,color:"#ffb52e",marginBottom:6}},
-                  modal.runs+"点 入りました")
-              , React.createElement('div',{style:{fontSize:12,color:"#9fb3a5",marginBottom:16}},
-                  "自責点を記録しますか？")
-              , inningPit.length > 1 && React.createElement('div',null
-                  , React.createElement('div',{style:{fontSize:12,color:"#7db8e8",fontWeight:700,marginBottom:8}},"投手を選択")
-                  , React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}},
-                      inningPit.map(({idx,name})=>
-                        React.createElement('button',{key:idx,
-                          onClick:e=>{e.stopPropagation();setModal(m=>({...m,selPitIdx:idx}));},
-                          style:{padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,
-                            background:(modal.selPitIdx===idx)?"#1d4ed8":"#122016",
-                            border:"2px solid "+(modal.selPitIdx===idx?"#3b82f6":"#24402b"),
-                            color:(modal.selPitIdx===idx)?"#fff":"#9fb3a5"}
-                        }, name)
+                  "🏃 "+curRunner+" が生還")
+              , React.createElement('div',{style:{fontSize:13,color:"#9fb3a5",marginBottom:16}},
+                  "この得点は誰の自責点ですか？")
+              // 投手が複数いる場合は投手ボタン、1人なら自責あり/なしの2択
+              , inningPit.length > 1
+                ? React.createElement('div',null
+                    , React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:8}},
+                        inningPit.map(({idx,name})=>
+                          React.createElement('button',{key:idx,
+                            onClick:e=>{e.stopPropagation(); recordOne(idx);},
+                            style:{padding:"14px",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:700,
+                              background:"#e02d24",border:"none",color:"#fff",textAlign:"left",paddingLeft:18}
+                          }, "⚾ "+name+" の自責点")
+                        )
                       )
-                    )
-                )
-              , React.createElement('div',{style:{display:"flex",gap:10}}
-                , React.createElement('button',{
-                    onClick:()=>{
-                      // 自責点あり
-                      const pitIdx = modal.selPitIdx !== undefined ? modal.selPitIdx
-                        : (inningPit.length===1 ? inningPit[0].idx : (game[defSide+"PitcherIdx"]||0));
-                      mutGame(g=>{
-                        const ps=[...g[defSide+"Pitchers"]];
-                        if(ps[pitIdx]){
-                          ps[pitIdx]={...ps[pitIdx],
-                            manualOverride:true,
-                            er:(ps[pitIdx].er||0)+modal.runs,
-                            autoRuns:(ps[pitIdx].autoRuns||0)+modal.runs,
-                          };
-                        }
-                        return {...g,[defSide+"Pitchers"]:ps};
-                      });
-                      setModal(null);
-                    },
-                    style:{flex:1,padding:"14px",borderRadius:10,cursor:"pointer",
-                      background:"#e02d24",border:"none",color:"#fff",fontSize:15,fontWeight:700}
-                  }, "✅ 自責点あり")
-                , React.createElement('button',{
-                    onClick:()=>setModal(null),
-                    style:{flex:1,padding:"14px",borderRadius:10,cursor:"pointer",
-                      background:"#122016",border:"1px solid #2e4234",color:"#9fb3a5",fontSize:15,fontWeight:700}
-                  }, "なし")
-              )
+                    , React.createElement('button',{
+                        onClick:e=>{e.stopPropagation(); recordOne(null);},
+                        style:{width:"100%",marginTop:8,padding:"14px",borderRadius:10,cursor:"pointer",
+                          background:"#122016",border:"1px solid #2e4234",color:"#9fb3a5",fontSize:14,fontWeight:700}
+                      }, "自責なし（失策などによる失点）")
+                  )
+                : React.createElement('div',{style:{display:"flex",gap:10}}
+                    , React.createElement('button',{
+                        onClick:e=>{e.stopPropagation(); recordOne(inningPit.length===1?inningPit[0].idx:defaultPit);},
+                        style:{flex:1,padding:"14px",borderRadius:10,cursor:"pointer",
+                          background:"#e02d24",border:"none",color:"#fff",fontSize:15,fontWeight:700}
+                      }, "✅ "+(inningPit.length===1?inningPit[0].name:"投手")+" の自責点")
+                    , React.createElement('button',{
+                        onClick:e=>{e.stopPropagation(); recordOne(null);},
+                        style:{flex:1,padding:"14px",borderRadius:10,cursor:"pointer",
+                          background:"#122016",border:"1px solid #2e4234",color:"#9fb3a5",fontSize:15,fontWeight:700}
+                      }, "自責なし")
+                  )
             )
           );
         }
@@ -6160,7 +6372,7 @@ function App() {
                   const autoIpOuts=Math.floor((auto.autoIp||0)/10)*3+((auto.autoIp||0)%10);
                   const effectiveIp=pitcher.manualIp!==undefined?pitcher.manualIp:autoIpOuts;
                   const ipDisp=Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?effectiveIp%3+"/3":"");
-                  const er=pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:(auto.autoEr||0);
+                  const er=pitcher.erManual!==undefined?pitcher.erManual:(pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:0);
                   const entryKey=JSON.stringify(entry);
                   return React.createElement('div',{key:li,style:{
                     background:"#122016",border:"1px solid #24402b",borderRadius:10,
@@ -6328,8 +6540,8 @@ function App() {
                         ,"自責点（手動修正）"
                         ,React.createElement('input',{
                             type:"number",min:0,
-                            defaultValue:pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:"",
-                            placeholder:"自動: "+(auto.autoEr||0),
+                            defaultValue:pitcher.erManual!==undefined?pitcher.erManual:(pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:""),
+                            placeholder:"0",
                             key:"er_"+entry.pitcherIdx+"_"+er,
                             onBlur:e=>{
                               const v=e.target.value.trim();
@@ -6337,15 +6549,15 @@ function App() {
                               mutGame(g=>{
                                 const ps=[...g[side+"Pitchers"]];
                                 if(!ps[pi]) return g;
-                                if(v==="") ps[pi]={...ps[pi],manualOverride:false,er:undefined};
-                                else{const n=parseInt(v);if(!isNaN(n))ps[pi]={...ps[pi],er:n,autoEr:n,manualOverride:true};}
+                                if(v==="") ps[pi]={...ps[pi],erManual:undefined};
+                                else{const n=parseInt(v);if(!isNaN(n))ps[pi]={...ps[pi],erManual:n};}
                                 return {...g,[side+"Pitchers"]:ps};
                               });
                             },
                             style:{background:"#0c160e",border:"1px solid #e02d24",
                               borderRadius:6,color:"#ff7d72",padding:"6px 8px",fontSize:12,width:"100%"}
                           })
-                        ,React.createElement('span',{style:{fontSize:9,color:"#4b6052"}},"空欄で自動計算に戻す")
+                        ,React.createElement('span',{style:{fontSize:9,color:"#4b6052"}},"得点時のモーダルでも記録できます")
                       )
                       ,React.createElement('label',{style:{flex:1,fontSize:11,color:"#a78bfa",display:"flex",flexDirection:"column",gap:4}}
                         ,"投球回補正（+/−アウト）"
@@ -6440,18 +6652,34 @@ function App() {
             const g = newGame(newInnings, newPitchMode, newSeason, newTournament);
             g.started = true;
 
-            // チーム名だけセット（lineupはオーダータブで手動設定）
+            // チーム名・メンバーをセット
             if(selAway) {
               g.awayTeam = selAway.name;
+              // メンバーが登録されていれば自動でオーダーにセット
+              if((selAway.members||[]).length>0){
+                g.awayLineup = selAway.members.slice(0,9).map((m,i)=>({
+                  id:i+1, name:typeof m==="string"?m:(m.name||""), pos:typeof m==="string"?"":m.pos||"",
+                  atBats:{}, rbi:0, sb:0, cs:0
+                }));
+                while(g.awayLineup.length<9) g.awayLineup.push({id:g.awayLineup.length+1,name:`選手${g.awayLineup.length+1}`,pos:"",atBats:{},rbi:0,sb:0,cs:0});
+              }
             }
             if(selHome) {
               g.homeTeam = selHome.name;
+              if((selHome.members||[]).length>0){
+                g.homeLineup = selHome.members.slice(0,9).map((m,i)=>({
+                  id:i+1, name:typeof m==="string"?m:(m.name||""), pos:typeof m==="string"?"":m.pos||"",
+                  atBats:{}, rbi:0, sb:0, cs:0
+                }));
+                while(g.homeLineup.length<9) g.homeLineup.push({id:g.homeLineup.length+1,name:`選手${g.homeLineup.length+1}`,pos:"",atBats:{},rbi:0,sb:0,cs:0});
+              }
             }
 
             if(save) saveGame();
             setStorage(s=>({...s, currentGame:g, undoStack:[]}));
-            setTab("score");
-            setModal(null);
+            setTab("lineup");
+            // オーダー設定モーダルを自動で開く（先攻チームから）
+            setModal({step:"team_lineup", side:"away", autoNext:true, _selAway:selAway, _selHome:selHome});
             showToast(`新試合を開始しました（${newInnings}回制）`);
           };
 
@@ -7270,7 +7498,7 @@ function App() {
                   onConfirm: (adjBases,scoredNames,adjOuts,adjErrorPos)=>{
                     commitAtBat(modal.team,modal.pidx,modal.inning,
                       modal.pendingCode,modal.pendingDir||null,scoredNames,adjBases,adjOuts,adjErrorPos||modal.errorPos||null,modal.skipPitchAdd||false);
-                    setModal(null);
+                    // commitAtBat内でモーダル制御(自責点モーダル/次打者)を行うため、ここではsetModal(null)しない
                   },
                   onCancel: ()=>setModal(null),}
                 )
@@ -7525,7 +7753,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             // 全チーム表示時はチーム名で区別、チーム絞り込み時はそのまま
             const key = filterTeamName ? name : (teamName ? teamName+" "+name : name);
             const dispName = filterTeamName ? name : (teamName ? teamName+" "+name : name);
-            if(!map[key]) map[key]={name:dispName,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,sb:0,cs:0,run:0,sac:0,sf:0,tb:0,e:0,spAb:0,spH:0,games:new Set()};
+            if(!map[key]) map[key]={name:dispName,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,sb:0,cs:0,run:0,sac:0,sf:0,tb:0,e:0,ci:0,spAb:0,spH:0,games:new Set()};
             const m = map[key];
           m.games.add(g.id);
           Object.values(v.atBats||{}).flat().forEach(e=>{
@@ -7539,7 +7767,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             if(c==="H2") m.h2++;
             if(c==="H3") m.h3++;
             if(c==="HR") m.hr++;
-            if(c==="BB"||c==="IBB"||c==="CI") m.bb++;  // 打撃妨害も出塁扱い
+            if(c==="BB"||c==="IBB") m.bb++;  // 四球(IBB含む)。CIは四球ではない
+            if(c==="CI") m.ci=(m.ci||0)+1;   // 打撃妨害は独立カウント
             if(c==="HBP") m.hbp++;
             if(["K","KL","KW"].includes(c)) m.k++;
             if(c==="SAC") m.sac++;
@@ -7557,7 +7786,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
     return Object.values(map).map(m=>{
       const spAvg = m.spAb>0 ? (m.spH/m.spAb).toFixed(3).replace(/^0/,"") : "---";
       m.spAvg = spAvg;
-      const pa = m.ab+m.bb+m.hbp+m.sac+m.sf;
+      const pa = m.ab+m.bb+m.hbp+m.sac+m.sf+(m.ci||0);
       const avg = m.ab>0?(m.h/m.ab).toFixed(3).replace(/^0/,""):".---";
       const slg = m.ab>0?(m.tb/m.ab).toFixed(3).replace(/^0/,""):".---";
       const obp = (m.ab+m.bb+m.hbp+m.sf)>0?((m.h+m.bb+m.hbp)/(m.ab+m.bb+m.hbp+m.sf)).toFixed(3).replace(/^0/,""):".---";
@@ -7611,12 +7840,14 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           const outsGot = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
           m.outs += outsGot;
           m.h    += p.manualH  !==undefined ? p.manualH   : (a.autoH||0);
-          m.er   += (p.manualOverride && p.er!==undefined) ? p.er : (a.autoEr||0);
+          // 自責点: モーダルで記録したerManualを優先。旧データのer(manualOverride)もフォールバックで考慮
+          m.er   += p.erManual!==undefined ? p.erManual : ((p.manualOverride && p.er!==undefined) ? p.er : 0);
           m.bb   += p.manualBb !==undefined ? p.manualBb  : (a.autoBb||0);
           m.k    += p.manualK  !==undefined ? p.manualK   : (a.autoK||0);
           m.hbp  += p.manualHbp!==undefined ? p.manualHbp : (a.autoHbp||0);
           m.hr   += p.manualHr !==undefined ? p.manualHr  : (a.autoHr||0);
-          m.runs += (p.manualOverride && p.autoRuns!==undefined) ? p.autoRuns : (a.autoRuns||0);
+          // 失点: 機械的に決まるため自動計算(autoRuns)を使用
+          m.runs += (a.autoRuns||0);
           // 勝敗・セーブ・ホールド（同名投手の再登板で重複カウントしないようgame単位で管理）
           const _wKey = g.id+"|"+p.name;
           if(!map[p.name]._seenGames) map[p.name]._seenGames = new Set();
@@ -8061,7 +8292,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             if(c==="H2") h2++;
             if(c==="H3") h3++;
             if(c==="HR") hr++;
-            if(c==="BB"||c==="IBB"||c==="CI") bb++;
+            if(c==="BB"||c==="IBB") bb++;  // CIは四球ではないため除外
             if(c==="HBP") hbp++;
             if(["K","KL","KW"].includes(c)) k++;
           });
@@ -8994,6 +9225,19 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
   const [activeSlot, setActiveSlot] = useState(null);
   const [slotCount, setSlotCount] = useState(9);
   const [selPitcher, setSelPitcher] = useState("");
+  // side/preselectが変わったら（away→homeへの自動遷移時）stateをリセット
+  const prevSideRef = React.useRef(side);
+  React.useEffect(()=>{
+    if(prevSideRef.current !== side) {
+      prevSideRef.current = side;
+      const next = preselect || (teams.length===1 ? teams[0] : null);
+      setSelTeam(next);
+      setAssignments({});
+      setActiveSlot(null);
+      setSlotCount(9);
+      setSelPitcher("");
+    }
+  }, [side, preselect]);
   const POS_LIST = ["投","捕","一","二","三","遊","左","中","右","指"];
 
   const members = (selTeam && selTeam.members) || [];

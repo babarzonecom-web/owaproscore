@@ -1289,7 +1289,24 @@ const makePitchers= () => [makePitcher(1)]; // 先発1人だけ生成
 const emptyScore  = (n=9) => Object.fromEntries(Array.from({length:n},(_,i)=>i+1).map(i=>[i,""]));
 const calcTotal   = (s) => Object.values(s).reduce((a,v)=>a+(parseInt(v)||0),0);
 
-const recomputeScores = (g) => {
+// ================================================================
+// 🔒 LOCKED ZONE START - 成績・記録計算ロジック 変更禁止
+// ================================================================
+// このゾーン内の関数は野球の公式ルールに基づく計算ロジックです。
+// バグ修正・機能追加であっても、変更する場合は必ず事前に許可を求めること。
+//
+// 対象関数：
+//   - recomputeScores  : 得点再計算
+//   - computeStats     : 打撃成績計算
+//   - computePitcherStats : 投手成績計算（v447/v468仕様）
+//
+// 重要な不変条件（絶対に変えないこと）：
+//   - pLogIdx  : 打席ごとの投手直接紐づけフィールド（廃止・変更禁止）
+//   - erManual : 自責点の正式記録フィールド（autoErは廃止済み）
+//   - fromSeq  : イニング番号のみ使用（打席数ベースの計算は禁止）
+//   - allAtBats: 攻撃ハーフイニングのみを含む（守備側は含めない）
+// ================================================================
+const recomputeScores = (g) => { // 🔒 LOCKED
   const aScore={...g.awayScore}, hScore={...g.homeScore};
   // 全イニング（延長含む）のキーを取得
   const allInns = new Set([
@@ -1350,7 +1367,7 @@ const computeOneStats = (p) => {
   };
 };
 
-const computeStats = (players) => {
+const computeStats = (players) => { // 🔒 LOCKED
   const rows = [];
   players.forEach(p => {
     // _subOuts配列（旧_subOut単体も吸収）から過去選手を先に追加
@@ -1377,7 +1394,7 @@ const computeStats = (players) => {
   });
   return rows;
 };
-const computePitcherStats = (g) => {
+const computePitcherStats = (g) => { // 🔒 LOCKED - v447/v468仕様 変更禁止
   const result = { away:[], home:[] };
 
   ["away","home"].forEach(defTeam=>{
@@ -1619,6 +1636,9 @@ const computePitcherStats = (g) => {
   });
   return result;
 };
+// ================================================================
+// 🔒 LOCKED ZONE END
+// ================================================================
 
 const newGame = (innings=7, pitchMode="result", season=null, tournament=null) => ({
   id:Date.now(),
@@ -3928,7 +3948,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.42")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.44")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4012,7 +4032,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.42")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.44")
         )
 
         // ===== 新規チーム作成 =====
@@ -4244,7 +4264,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.42",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
+                  {ver:"v472.44",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
                   {ver:"v472.36",date:"2026/06/21",items:["履歴から試合を開くとスコアボードが表示されるよう修正"]},
                   {ver:"v472.35",date:"2026/06/21",items:["対戦相手登録で交代出場した全選手を取得するよう修正"]},
                   {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設","チームデータ同期（手動）を廃止"]},
@@ -5566,7 +5586,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.42",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
+                  {ver:"v472.44",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
                   {ver:"v472.37",date:"2026/06/22",items:["先攻→後攻スタメン設定で同じチームになるバグを修正"]},
                   {ver:"v472.36",date:"2026/06/21",items:["履歴から試合を開くとスコアボードが表示されるよう修正"]},
                   {ver:"v472.35",date:"2026/06/21",items:["対戦相手登録で交代出場した全選手を取得するよう修正","対戦相手データをFirebaseに確実に保存するよう修正"]},
@@ -7990,6 +8010,9 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const thS = {...S.th, fontSize:10, padding:"5px 3px"};
   const tdS = {...S.td, textAlign:"center", fontSize:12, padding:"5px 3px"};
   const tdN = {...tdS, textAlign:"left", paddingLeft:8, fontWeight:700};
+  // 左列固定用スタイル（選手名列）
+  const stickyTh = {position:"sticky", left:0, zIndex:3, background:"#0c160e", whiteSpace:"nowrap"};
+  const stickyTd = {position:"sticky", left:0, zIndex:2, background:"inherit", whiteSpace:"nowrap"};
 
   const BattingTable = ({players, teamName, color, editMode, statOverrides, saveOverride, clearOverride}) => {
     const [highlightRow, setHighlightRow] = React.useState(null);
@@ -8009,9 +8032,10 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                   ["二","h2"],["三","h3"],["犠打","sac"],["犠飛","sf"],["三振","k"],["失策","e"]
                 ].map(([label,key])=>
                   React.createElement('th', {key:label, style:{...thS,
+                    ...(label==="選手"?stickyTh:{}),
                     cursor:key?"pointer":"default",
                     color:sortKey===key?"#ffb52e":"#9fb3a5",
-                    background:sortKey===key?"#1a1505":"transparent",
+                    background:label==="選手"?"#0c160e":sortKey===key?"#1a1505":"transparent",
                     userSelect:"none"},
                     onClick:key?()=>{
                       if(sortKey===key) setSortDesc(d=>!d);
@@ -8027,7 +8051,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                   outline:highlightRow===p.name?"2px solid #3b82f6":"none"
                 }}
                   , React.createElement('td', {
-                    style:{...tdN,color:"#e9f0ea",whiteSpace:"nowrap",cursor:"pointer"},
+                    style:{...tdN,...stickyTd,color:"#e9f0ea",whiteSpace:"nowrap",cursor:"pointer",
+                      background:highlightRow===p.name?"#24402b":i%2===0?"#0c160e":"#122016"},
                     onClick:()=>setHighlightRow(r=>r===p.name?null:p.name)
                   }
                     , p.name
@@ -8178,7 +8203,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           , React.createElement('thead', null
             , React.createElement('tr', null
               , ["投手","試","投球回","被安打","失点","自責点","防御率","WHIP","四球","奪三振","死球","被本塁","勝","敗","S","H","BS"].map(h=>
-                  React.createElement('th', {key:h,style:thS}, h))
+                  React.createElement('th', {key:h,style:{...thS,...(h==="投手"?stickyTh:{}),background:h==="投手"?"#0c160e":"transparent"}}, h))
             )
           )
           , React.createElement('tbody', null
@@ -8212,7 +8237,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                   {k:"hr",     v:effectiveHr,  s:{...tdS,color:"#ff7d72"}, editable:true, type:"num"},
                 ];
                 return React.createElement('tr', {key:p.name,style:{background:i%2===0?"#0c160e":"#122016"}}
-                  , React.createElement('td', {style:{...tdN,color:"#e9f0ea",whiteSpace:"nowrap",minWidth:70}}
+                  , React.createElement('td', {style:{...tdN,...stickyTd,color:"#e9f0ea",whiteSpace:"nowrap",minWidth:70,background:i%2===0?"#0c160e":"#122016"}}
                     , p.name
 
                   )
@@ -8410,9 +8435,10 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             , React.createElement('tr', null
               , ["選手","打席","打数","安打","通算打率","本塁","打点","四球","三振","盗塁"].map(h=>
                   React.createElement('th', {key:h, style:{...thS,
+                    ...(h==="選手"?stickyTh:{}),
                     fontSize:h==="通算打率"?11:10,
-                    color:h==="通算打率"?"#ffb52e":"#9fb3a5",
-                    background:h==="通算打率"?"#1a1505":"transparent"}}, h)
+                    color:h==="通算打率"?"#ffb52e":h==="選手"?"#9fb3a5":"#9fb3a5",
+                    background:h==="選手"?"#0c160e":h==="通算打率"?"#1a1505":"transparent"}}, h)
                 )
             )
           )
@@ -8420,7 +8446,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             , pList.map((p,i)=>{
                 const t = p.tots;
                 return React.createElement('tr', {key:p.name, style:{background:i%2===0?"#0c160e":"#122016"}}
-                  , React.createElement('td',{style:{...tdN,color:"#e9f0ea",minWidth:56,fontSize:12}},p.name)
+                  , React.createElement('td',{style:{...tdN,...stickyTd,color:"#e9f0ea",minWidth:56,fontSize:12,background:i%2===0?"#0c160e":"#122016"}},p.name)
                   , React.createElement('td',{style:tdS},t.pa)
                   , React.createElement('td',{style:tdS},t.ab)
                   , React.createElement('td',{style:{...tdS,color:t.h>0?"#54e08c":"#e9f0ea",fontWeight:t.h>0?700:400}},t.h)

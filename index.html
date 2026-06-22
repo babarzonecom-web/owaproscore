@@ -868,12 +868,18 @@ const LiveFieldComponent = (function(){
     const defSide = half==="top"?"home":"away";
     const defLineup = game[defSide+"Lineup"]||[];
     const posName = {};
-    defLineup.forEach(p=>{ if(p&&p.pos){ posName[abbrPos(p.pos)] = p.name; } });
-    // 投手は専用データ(投手タブ/先発選択)を優先
+    // 投手ポジションはlineupから取らない（投手タブのcurPitcherで上書きするため）
+    defLineup.forEach(p=>{ if(p&&p.pos){ const abbr=abbrPos(p.pos); if(abbr!=="投") posName[abbr]=p.name; } });
+    // 投手は必ず投手タブ専用データから取得
     const defPitchers = game[defSide+"Pitchers"]||[];
     const defPIdx = game[defSide+"PitcherIdx"]||0;
     const curPitcher = defPitchers[defPIdx];
     if(curPitcher && curPitcher.name){ posName["投"]=curPitcher.name; posName["P"]=curPitcher.name; }
+    else {
+      // 投手タブ未設定の場合のみlineupの投手ポジション選手を使う
+      const lpPit = defLineup.find(p=>p&&(p.pos==="投手"||p.pos==="投"));
+      if(lpPit&&lpPit.name){ posName["投"]=lpPit.name; posName["P"]=lpPit.name; }
+    }
 
     // 現在の走者(bases)
     const _rb = game.bases||[null,null,null];
@@ -1088,11 +1094,23 @@ const LiveFieldComponent = (function(){
     // プレー再生
     function playLatest(entry){
       const st=stateRef.current;
-      // 最新打者のcode/dirを取得
-      const info = extractPlay(game, entry);
-      const code = info.code;
-      const dir  = info.dir;
       const runs = entry.runs||0;
+      // 走塁系（盗塁・暴投・捕逸・ボーク・走塁死など）はlogTypeまたはmsgから直接判定
+      const SB_CODES = new Set(["SB","CS","PO","RO","WP","PB","BK","FC"]);
+      let code, dir;
+      if(entry.logType && SB_CODES.has(entry.logType)){
+        // 走塁ログはcodeをそのまま使う（打席のcode/dirは不要）
+        code = entry.logType;
+        dir  = null;
+      } else if(entry.logType==="run" || /生還|得点|スコア/.test(entry.msg||"")){
+        code = "run";
+        dir  = null;
+      } else {
+        // 通常打席はextractPlayで取得
+        const info = extractPlay(game, entry);
+        code = info.code;
+        dir  = info.dir;
+      }
 
       function fxTxt(txt,color,size,y,sub){ st.effects.push({type:"txt",txt,color,size:size||30,y:y||110,sub,t:performance.now(),dur:2000}); }
       function fxStamp(txt,x,y,color){ st.effects.push({type:"stamp",txt,x,y,color,t:performance.now(),dur:1600}); }
@@ -1179,8 +1197,15 @@ const LiveFieldComponent = (function(){
           fxTxt(jp,"#C62828",28,108, dir?("打球方向："+(dirLabel[dir]||dir)):"");
           revealRunners();
           await wait(1400);
+        } else if(["SB","CS","PO","RO","WP","PB","BK","run"].includes(code)){
+          // 走塁系専用テロップ
+          const SB_COLOR = {SB:"#54e08c",CS:"#ff7d72",PO:"#ff7d72",RO:"#ff7d72",WP:"#f97316",PB:"#f97316",BK:"#f97316",run:"#C62828"};
+          const jp = codeJa[code] || code;
+          fxTxt(jp, SB_COLOR[code]||"#EF6C00", 28, 108);
+          revealRunners();
+          await wait(1200);
         } else {
-          // その他(盗塁・進塁など)はログmsgから簡易表示
+          // その他
           const jp = codeJa[code] || (entry.msg||"").replace(/【.*?】/,"").slice(0,12) || "プレー";
           fxTxt(jp,"#EF6C00",24,108);
           revealRunners();
@@ -2490,7 +2515,7 @@ function App() {
       };
       const batterKey = team+"BatterIdx";
       const lineupLen = lineup.length;
-      nextPidx = (pidx+1) % lineupLen;
+      nextPidx = ((Number.isFinite(pidx)?pidx:0)+1) % lineupLen;
       const scores=recomputeScores(tmp);
       const zl=ZONES.find(z=>z.id===dir);
       const baseLabel = b => b===0?'一塁':b===1?'二塁':b===2?'三塁':b==='scored'?'得点':b==='out'?'アウト':'?';
@@ -3892,7 +3917,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.39")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.41")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3976,7 +4001,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.39")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.41")
         )
 
         // ===== 新規チーム作成 =====
@@ -4208,7 +4233,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.39",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
+                  {ver:"v472.41",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
                   {ver:"v472.36",date:"2026/06/21",items:["履歴から試合を開くとスコアボードが表示されるよう修正"]},
                   {ver:"v472.35",date:"2026/06/21",items:["対戦相手登録で交代出場した全選手を取得するよう修正"]},
                   {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設","チームデータ同期（手動）を廃止"]},
@@ -5530,7 +5555,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.39",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
+                  {ver:"v472.41",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
                   {ver:"v472.37",date:"2026/06/22",items:["先攻→後攻スタメン設定で同じチームになるバグを修正"]},
                   {ver:"v472.36",date:"2026/06/21",items:["履歴から試合を開くとスコアボードが表示されるよう修正"]},
                   {ver:"v472.35",date:"2026/06/21",items:["対戦相手登録で交代出場した全選手を取得するよう修正","対戦相手データをFirebaseに確実に保存するよう修正"]},
@@ -7335,7 +7360,7 @@ function App() {
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginBottom:4,flexWrap:"wrap"},}
                 , React.createElement('div', null
                   , React.createElement('div', { style: {fontSize:11,color:"#74897b"},}, mTeamLabel, " / "  , modal.inning, "回")
-                  , React.createElement('div', { style: {...S.mt,fontSize:18},}, modal.pidx+1, "番 " , _optionalChain([mPlayer, 'optionalAccess', _45 => _45.name]))
+                  , React.createElement('div', { style: {...S.mt,fontSize:18},}, (modal.pidx!=null&&modal.pidx!==undefined?modal.pidx+1:"?"), "番 " , _optionalChain([mPlayer, 'optionalAccess', _45 => _45.name]))
                 )
                 , React.createElement('div', { style: {marginLeft:"auto",display:"flex",alignItems:"center",gap:8},}
                   , React.createElement(MiniDiamond, { bases: game.bases, size: 42,})

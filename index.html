@@ -3948,7 +3948,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.48")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.50")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4032,7 +4032,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.48")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.50")
         )
 
         // ===== 新規チーム作成 =====
@@ -4264,8 +4264,8 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.48",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.48",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
+                  {ver:"v472.50",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
+                  {ver:"v472.50",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
                   {ver:"v472.41",date:"2026/06/22",items:["打席モーダルで0番表示になるバグを修正"]},
                   {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記が違う選手になるバグを修正"]},
@@ -5219,8 +5219,7 @@ function App() {
                 , React.createElement('table', { style: S.table,}
                   , React.createElement('thead', null
                     , React.createElement('tr', null
-                      , React.createElement('th', { style: {...S.th,width:26,position:"sticky",left:0,zIndex:3,background:"#0c160e"},}, "#")
-                      , React.createElement('th', { style: {...S.th,width:86,textAlign:"left",position:"sticky",left:26,zIndex:3,background:"#0c160e"},}, "名前")
+                      , React.createElement('th', { style: {...S.th,width:110,textAlign:"left",paddingLeft:8,position:"sticky",left:0,zIndex:3,background:"#0c160e"},}, "# 名前")
                       , React.createElement('th', { style: {...S.th,width:32},}, "守")
                       , React.createElement('th', { style: {...S.th,width:34},}, "盗/刺")
                       , React.createElement('th', { style: {...S.th,width:32},})
@@ -5246,12 +5245,10 @@ function App() {
                         const soKey = (p.id||idx)+"_sub_"+si;
                         return React.createElement('tr', {key:soKey,
                           style:{background:"#0a1e0a",borderBottom:"none",opacity:0.85}}
-                          , React.createElement('td', {style:{...S.td,textAlign:"center",fontSize:10,color:"#4b6052",
-                            borderBottom:"none",paddingTop:4,
-                            position:"sticky",left:0,zIndex:2,background:"#0a1e0a"}}, idx+1)
-                          , React.createElement('td', {style:{...S.td,borderBottom:"none",paddingTop:4,
-                            position:"sticky",left:26,zIndex:2,background:"#0a1e0a"}}
-                            , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:3}}
+                          , React.createElement('td', {style:{...S.td,minWidth:110,borderBottom:"none",paddingTop:4,
+                            position:"sticky",left:0,zIndex:2,background:"#0a1e0a"}}
+                            , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:6}}
+                              , React.createElement('span',{style:{fontSize:10,color:"#4b6052",flexShrink:0,minWidth:16,textAlign:"right"}}, idx+1)
                               , React.createElement('span', {style:{fontSize:11,color:"#9fb3a5",
                                 textDecoration:"line-through",maxWidth:66,overflow:"hidden",
                                 textOverflow:"ellipsis",whiteSpace:"nowrap"}}, so.name||"—")
@@ -5298,12 +5295,10 @@ function App() {
                           ? (idx%2===0?"#0c160e":"#122016")
                           : (idx%2===0?"#0c160e":"#122016"),
                           borderTop: subOuts.length>0 ? "1px solid #2dd06833" : "none"},}
-                        , React.createElement('td', { style: {...S.td,textAlign:"center",fontSize:11,
-                          color:idx<DEFAULT_PLAYERS?"#7db8e8":"#74897b",
-                          position:"sticky",left:0,zIndex:2,background:idx%2===0?"#0c160e":"#122016"},}, idx+1)
-                        , React.createElement('td', { style: {...S.td, minWidth:80,
-                          position:"sticky",left:26,zIndex:2,background:idx%2===0?"#0c160e":"#122016"},}
-                          , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:3},}
+                        , React.createElement('td', { style: {...S.td, minWidth:110,
+                          position:"sticky",left:0,zIndex:2,background:idx%2===0?"#0c160e":"#122016"},}
+                          , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:6},}
+                            , React.createElement('span', {style:{fontSize:11,color:idx<DEFAULT_PLAYERS?"#7db8e8":"#74897b",flexShrink:0,minWidth:16,textAlign:"right"}}, idx+1)
                             , React.createElement(MemberPicker, {
                                 name: p.name,
                                 onChange: isReadOnly ? ()=>{} : v=>editPlayer(team,idx,"name",v),
@@ -5502,11 +5497,11 @@ function App() {
                             const dispHbp = p.manualHbp!==undefined?p.manualHbp:(auto.autoHbp||0);
                             const dispK   = p.manualK  !==undefined?p.manualK  :(auto.autoK||0);
                             return React.createElement('tr',{key:"pl_"+li,
-                              style:{background:isCur?(color+"22"):li%2===0?"#0c160e":"transparent",
+                              style:{background:isCur?(color+"22"):li%2===0?"#0c160e":"#122016",
                                 outline:isCur?`1px solid ${color}33`:"none"}}
                               ,React.createElement('td',{style:{...S.td,minWidth:110,
                                 position:"sticky",left:0,zIndex:2,
-                                background:isCur?(color+"22"):li%2===0?"#0c160e":"transparent"}}
+                                background:isCur?(color+"22"):li%2===0?"#0c160e":"#122016"}}
                                 ,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:3}}
                                   ,isCur&&React.createElement('span',{style:{color,fontSize:10,fontWeight:900,flexShrink:0}},"▶")
                                   ,React.createElement('span',{style:{fontSize:12,color:isCur?color:"#e9f0ea",fontWeight:isCur?700:400}},p.name||("投手"+(i+1)))
@@ -5598,8 +5593,8 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.48",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.48",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
+                  {ver:"v472.50",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
+                  {ver:"v472.50",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
                   {ver:"v472.41",date:"2026/06/22",items:["打席モーダルで0番表示になるバグを修正"]},
                   {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記が違う選手になるバグを修正"]},

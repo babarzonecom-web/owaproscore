@@ -19,7 +19,7 @@
 :root{color-scheme:dark;}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{-webkit-text-size-adjust:100%;}
-body{background:#0c160e;color:white;margin:0;padding:0;font-size:16px;overscroll-behavior:none;font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;}
+html{background:#0c160e;}body{background:#0c160e;color:white;margin:0;padding:0;font-size:16px;overscroll-behavior:none;font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;}
 #root{min-height:100vh;min-height:100dvh;}
 button{font-family:inherit;touch-action:manipulation;-webkit-user-select:none;user-select:none;transition:scale .1s ease,filter .15s ease;}
 button:active{scale:.96;filter:brightness(1.15);}
@@ -3948,7 +3948,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.45")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.46")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4032,7 +4032,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.45")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.46")
         )
 
         // ===== 新規チーム作成 =====
@@ -4264,8 +4264,8 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.45",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.45",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
+                  {ver:"v472.46",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
+                  {ver:"v472.46",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
                   {ver:"v472.41",date:"2026/06/22",items:["打席モーダルで0番表示になるバグを修正"]},
                   {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記が違う選手になるバグを修正"]},
@@ -5598,8 +5598,8 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.45",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.45",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
+                  {ver:"v472.46",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
+                  {ver:"v472.46",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
                   {ver:"v472.41",date:"2026/06/22",items:["打席モーダルで0番表示になるバグを修正"]},
                   {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記が違う選手になるバグを修正"]},
@@ -8024,9 +8024,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const thS = {...S.th, fontSize:10, padding:"5px 3px"};
   const tdS = {...S.td, textAlign:"center", fontSize:12, padding:"5px 3px"};
   const tdN = {...tdS, textAlign:"left", paddingLeft:8, fontWeight:700};
-  // 左列固定用スタイル（選手名列）
-  const stickyTh = {position:"sticky", left:0, zIndex:3, background:"#0c160e", whiteSpace:"nowrap"};
-  const stickyTd = {position:"sticky", left:0, zIndex:2, background:"inherit", whiteSpace:"nowrap"};
+  // stickyTh/stickyTdはグローバル定数として定義（下部参照）
 
   const BattingTable = ({players, teamName, color, editMode, statOverrides, saveOverride, clearOverride}) => {
     const [highlightRow, setHighlightRow] = React.useState(null);
@@ -10188,6 +10186,10 @@ function SubstituteModal({ player, team, game, pidx, teams, onConfirm, onCancel 
     )
   );
 }
+// 左列固定用スタイル（テーブル全体で共通使用）
+const stickyTh = {position:"sticky", left:0, zIndex:3, background:"#0c160e", whiteSpace:"nowrap"};
+const stickyTd = {position:"sticky", left:0, zIndex:2, background:"inherit", whiteSpace:"nowrap"};
+
 const sBt = (color, outline=false) => ({
   background:outline?"transparent":color,
   border:`1.5px solid ${color}`,

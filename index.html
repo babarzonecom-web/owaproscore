@@ -3078,7 +3078,17 @@ function App() {
       const outPlayer = g[lk][outIdx];
       const isPosChange = newName === outPlayer.name; // 同名＝ポジション変更のみ
 
+      // ポジションスワップ：newPosを既に持つ別の選手を探す
+      const swapTargetIdx = newPos ? g[lk].findIndex((p,i)=> i!==outIdx && p && p.pos===newPos) : -1;
+      const swapTargetOldPos = outPlayer.pos || ""; // outPlayerの元ポジションをswap先に渡す
+
       const lineup = g[lk].map((p,i)=>{
+        // スワップ対象の選手：outPlayerの元ポジションを引き受ける
+        if(i===swapTargetIdx) {
+          const prevPosLog = p._posLog || [];
+          return {...p, pos: swapTargetOldPos,
+            _posLog: [...prevPosLog, {pos: p.pos||"", inning: g.inning, half: g.half}]};
+        }
         if(i!==outIdx) return p;
 
         if(isPosChange) {
@@ -3115,10 +3125,11 @@ function App() {
       });
 
       const ts = new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"});
+      const swapNote = swapTargetIdx>=0 ? ` ／ ${(g[lk][swapTargetIdx]||{}).name||"?"}:${newPos}→${swapTargetOldPos}` : "";
       const log=[{
         ts,
         msg: isPosChange
-          ? `【${g[team+"Team"]}】ポジション変更: ${outPlayer.name} ${outPlayer.pos||"-"}→${newPos} (${g.inning}回${g.half==="top"?"表":"裏"})`
+          ? `【${g[team+"Team"]}】ポジション変更: ${outPlayer.name} ${outPlayer.pos||"-"}→${newPos}${swapNote} (${g.inning}回${g.half==="top"?"表":"裏"})`
           : `【${g[team+"Team"]}】交代: ${outPlayer.name}(${outPlayer.pos||"-"}) → ${newName}(${newPos||"-"})${reason?` [${reason}]`:""} (${g.inning}回${g.half==="top"?"表":"裏"}）`,
         logType:"sub", runs:0
       },...(g.log||[]).slice(0,99)];
@@ -3917,7 +3928,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.41")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.42")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4001,7 +4012,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.41")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.42")
         )
 
         // ===== 新規チーム作成 =====
@@ -4233,7 +4244,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.41",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
+                  {ver:"v472.42",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
                   {ver:"v472.36",date:"2026/06/21",items:["履歴から試合を開くとスコアボードが表示されるよう修正"]},
                   {ver:"v472.35",date:"2026/06/21",items:["対戦相手登録で交代出場した全選手を取得するよう修正"]},
                   {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設","チームデータ同期（手動）を廃止"]},
@@ -5555,7 +5566,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.41",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
+                  {ver:"v472.42",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
                   {ver:"v472.37",date:"2026/06/22",items:["先攻→後攻スタメン設定で同じチームになるバグを修正"]},
                   {ver:"v472.36",date:"2026/06/21",items:["履歴から試合を開くとスコアボードが表示されるよう修正"]},
                   {ver:"v472.35",date:"2026/06/21",items:["対戦相手登録で交代出場した全選手を取得するよう修正","対戦相手データをFirebaseに確実に保存するよう修正"]},
@@ -9333,7 +9344,21 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
     setAssignments(a=>{
       const cur=a[slotIdx];
       if(!cur) return a;
-      return {...a, [slotIdx]:{...(typeof cur==="object"?cur:{name:cur}), pos}};
+      const next = {...a};
+      // 同じポジションを持つ別スロットを探してスワップ
+      const curPos = typeof cur==="object" ? cur.pos : "";
+      const swapKey = Object.keys(next).find(k=>
+        Number(k)!==slotIdx &&
+        next[k] &&
+        (typeof next[k]==="object" ? next[k].pos : "") === pos
+      );
+      if(swapKey !== undefined && curPos) {
+        // 相手スロットのポジションをこちらの元ポジションに変更
+        const swapCur = next[swapKey];
+        next[swapKey] = {...(typeof swapCur==="object"?swapCur:{name:swapCur}), pos:curPos};
+      }
+      next[slotIdx] = {...(typeof cur==="object"?cur:{name:cur}), pos};
+      return next;
     });
     setActiveSlot(null);
   };

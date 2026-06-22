@@ -97,6 +97,10 @@ const { useState, useEffect, useCallback } = React;
 const INNINGS = [1,2,3,4,5,6,7,8,9];
 const DEFAULT_PLAYERS = 9;
 
+// 左列固定用スタイル（テーブル全体で共通使用）
+const stickyTh = {position:"sticky", left:0, zIndex:3, background:"#0c160e", whiteSpace:"nowrap"};
+const stickyTd = {position:"sticky", left:0, zIndex:2, background:"inherit", whiteSpace:"nowrap"};
+
 const RESULTS = [
   // ヒット系
   { code:"H1",  label:"単打",    color:"#54e08c", short:"1B"  },
@@ -3948,7 +3952,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.46")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.47")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4032,7 +4036,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.46")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.47")
         )
 
         // ===== 新規チーム作成 =====
@@ -4264,8 +4268,8 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.46",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.46",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
+                  {ver:"v472.47",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
+                  {ver:"v472.47",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
                   {ver:"v472.41",date:"2026/06/22",items:["打席モーダルで0番表示になるバグを修正"]},
                   {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記が違う選手になるバグを修正"]},
@@ -5598,8 +5602,8 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.46",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.46",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
+                  {ver:"v472.47",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
+                  {ver:"v472.47",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
                   {ver:"v472.41",date:"2026/06/22",items:["打席モーダルで0番表示になるバグを修正"]},
                   {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記が違う選手になるバグを修正"]},
@@ -10186,10 +10190,6 @@ function SubstituteModal({ player, team, game, pidx, teams, onConfirm, onCancel 
     )
   );
 }
-// 左列固定用スタイル（テーブル全体で共通使用）
-const stickyTh = {position:"sticky", left:0, zIndex:3, background:"#0c160e", whiteSpace:"nowrap"};
-const stickyTd = {position:"sticky", left:0, zIndex:2, background:"inherit", whiteSpace:"nowrap"};
-
 const sBt = (color, outline=false) => ({
   background:outline?"transparent":color,
   border:`1.5px solid ${color}`,

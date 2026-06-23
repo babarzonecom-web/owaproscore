@@ -2023,6 +2023,7 @@ function App() {
     if(!s.teams)       s.teams=[];   
     if(!s.myTeam)      s.myTeam=null;
     if(!s.opponents)   s.opponents=[];
+    if(!s.tournaments) s.tournaments=[];
     return s;
   });
   const [gameInfoOpen, setGameInfoOpen] = React.useState(false);
@@ -2212,12 +2213,9 @@ function App() {
     window.__teamAdminPushing = false;
     if(window.__teamShareRef){ try{ window.__teamShareRef.off(); }catch(e){} window.__teamShareRef=null; }
 
-    // ローカルストレージを全消去（セキュリティ強化）
+    // ログイン情報のみ消去（ゲームデータ・チームデータは保持）
     localStorage.removeItem("tsCode");
     localStorage.removeItem("tsRole");
-    localStorage.removeItem("bb_v7");
-    localStorage.removeItem("statOverrides");
-    localStorage.removeItem("pitchOverrides");
 
     // React stateをリセット
     setTeamShareCode("");
@@ -2227,14 +2225,14 @@ function App() {
     setNewTeamPw("");
     setNewAdminPw("");
 
-    // ゲームデータをリセット（チームデータは保持する）
+    // ゲームデータをリセット（チームデータ・大会データは保持する）
     const freshGame = newGame();
     setStorage(s=>({
       ...s,
       currentGame: freshGame,
       history: [],
       undoStack: [],
-      // teams/myTeam/opponentsは保持(メンバー登録データが消えないように)
+      // teams/myTeam/opponents/tournamentsは保持
     }));
 
     setTab("login");
@@ -2444,7 +2442,7 @@ function App() {
   const awayHitsTotal = sumLineupH(game.awayLineup||[]);
   const homeHitsTotal = sumLineupH(game.homeLineup||[]);
 
-  const RBI_CODES = new Set(["H1","H2","H3","HR","BB","HBP","IBB","SAC","SF","FC","E","GO","DP","TP","FO","LO","FF","OI"]); // 凡打でも点が入れば打点
+  const RBI_CODES = new Set(["H1","H2","H3","HR","BB","HBP","IBB","SAC","SF","FC","E","GO","FO","LO","FF","OI"]); // DP/TPは打点なし（野球規則）
   const commitAtBat = useCallback((team, pidx, inning, code, dir, scoredNames, newBases, newOuts, errorPos, skipPitchAdd)=>{
     const runs = (scoredNames||[]).length;
     const batterName = (() => { try { return _optionalChain([game, 'access', _4 => _4[team+"Lineup"], 'access', _5 => _5[pidx], 'optionalAccess', _6 => _6.name])||""; } catch(e){return "";} })();
@@ -3948,7 +3946,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.50")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.53")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4032,7 +4030,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.50")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.53")
         )
 
         // ===== 新規チーム作成 =====
@@ -4264,8 +4262,8 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.50",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.50",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
+                  {ver:"v472.53",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
+                  {ver:"v472.53",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
                   {ver:"v472.41",date:"2026/06/22",items:["打席モーダルで0番表示になるバグを修正"]},
                   {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記が違う選手になるバグを修正"]},
@@ -5593,8 +5591,8 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.50",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.50",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
+                  {ver:"v472.53",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
+                  {ver:"v472.53",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
                   {ver:"v472.41",date:"2026/06/22",items:["打席モーダルで0番表示になるバグを修正"]},
                   {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記が違う選手になるバグを修正"]},
@@ -7777,7 +7775,22 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   // 全試合データ（現在の試合 + 履歴）
   // 成績集計は試合終了（finished）した試合のみ対象
   // エイリアスを適用したゲームリスト
-  const allGames = (history||[]).filter(g=>g&&g.awayLineup&&g.homeLineup&&g.finished).map(g=>({
+  // currentGameが試合終了済みで、historyに未反映の場合も含める
+  const _histWithCurrent = (()=>{
+    const hist = history||[];
+    if(game && game.finished && game.id && !hist.some(h=>h.id===game.id)){
+      return [game, ...hist];
+    }
+    // historyに同IDがあるが古いバージョンの場合はcurrentGameで上書き
+    if(game && game.finished && game.id){
+      const inHist = hist.find(h=>h.id===game.id);
+      if(inHist && (game._ts||0) > (inHist._ts||0)){
+        return [game, ...hist.filter(h=>h.id!==game.id)];
+      }
+    }
+    return hist;
+  })();
+  const allGames = _histWithCurrent.filter(g=>g&&g.awayLineup&&g.homeLineup&&g.finished).map(g=>({
     ...g,
     awayTeam: normalizeTeamName(g.awayTeam),
     homeTeam: normalizeTeamName(g.homeTeam),
@@ -8191,8 +8204,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
               , React.createElement('td', {style:{...tdS,color:"#a78bfa"}}, players.reduce((s,p)=>s+(p._hbp||0),0))
               , React.createElement('td', {style:{...tdS,color:"#54e08c"}}, players.reduce((s,p)=>s+(p.h2||0),0))
               , React.createElement('td', {style:{...tdS,color:"#54e08c"}}, players.reduce((s,p)=>s+(p.h3||0),0))
-              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+(p._sac||0),0))
-              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+(p._sf||0),0))
+              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+(p.sac||0),0))
+              , React.createElement('td', {style:tdS}, players.reduce((s,p)=>s+(p.sf||0),0))
               , React.createElement('td', {style:{...tdS,color:"#9fb3a5"}}, players.reduce((s,p)=>s+p.k,0))
               , React.createElement('td', {style:{...tdS,color:"#ff7d72"}}, players.reduce((s,p)=>s+(p.e||0),0))
             )

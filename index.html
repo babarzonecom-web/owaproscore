@@ -2919,10 +2919,10 @@ function App() {
   };
 
   const changeInning=()=>{
-    const g = storage.currentGame;
-    if(g && g.half==="bottom" && g.inning>=(g.innings||7) && !g.finished){
-      setModal({step:"inningEnd", inning:g.inning});
-      mutGame(gg=>({...gg,outs:0,bases:[null,null,null]}));
+    // 現在のgameを直接参照して判定
+    const curG = storage.currentGame || game;
+    if(curG.half==="bottom" && curG.inning>=(curG.innings||7) && !curG.finished){
+      setModal({step:"inningEnd", inning:curG.inning});
       return;
     }
     mutGame(g=>{

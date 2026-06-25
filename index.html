@@ -2917,12 +2917,50 @@ function App() {
   };
 
   const changeInning=()=>{
+    // 規定イニング終了時（裏終了）→試合終了/延長/タイブレーク選択
+    const g = storage.currentGame;
+    if(g && g.half==="bottom" && g.inning>==(g.innings||7) && !g.finished){
+      setModal({step:"inningEnd", inning:g.inning});
+      // とりあえずチェンジだけしておく
+      mutGame(gg=>({...gg,half:"top",inning:gg.inning,outs:0,bases:[null,null,null]}));
+      return;
+    }
     mutGame(g=>{
       // 残塁はアウトではないので投球回に補完しない
       if(g.half==="top") return{...g,half:"bottom",outs:0,bases:[null,null,null]};
       return{...g,inning:Math.min(g.inning+1,15),half:"top",outs:0,bases:[null,null,null]};
     });
     showToast("チェンジ！");
+  };
+  // タイブレーク開始
+  const startTiebreak = (awayRunner, homeRunner) => {
+    const nextInn = (storage.currentGame.innings||7) + 1;
+    mutGame(g=>{
+      const newInnings = nextInn;
+      const awayBases = [awayRunner?{name:awayRunner,tb:true}:null, null, null];
+      const homeBases = [homeRunner?{name:homeRunner,tb:true}:null, null, null];
+      const newAwayScore = {...(g.awayScore||{})};
+      const newHomeScore = {...(g.homeScore||{})};
+      if(newAwayScore[newInnings]===undefined) newAwayScore[newInnings]="";
+      if(newHomeScore[newInnings]===undefined) newHomeScore[newInnings]="";
+      const tbRunnerNames = [awayRunner, homeRunner].filter(Boolean);
+      const tbLog = {ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+        msg:`【タイブレーク】${newInnings}回より開始 先攻:${awayRunner||"なし"} 後攻:${homeRunner||"なし"}`,
+        runs:0,logType:"tb"};
+      return {...g,
+        innings:newInnings,
+        inning:newInnings,
+        half:"top",
+        outs:0,
+        bases:awayBases,
+        awayScore:newAwayScore,
+        homeScore:newHomeScore,
+        endReason:"tiebreak",
+        tbRunnerNames:[...(g.tbRunnerNames||[]),...tbRunnerNames],
+        log:[tbLog,...(g.log||[]).slice(0,99)],
+      };
+    });
+    showToast(`タイブレーク ${nextInn}回より開始！`);
   };
   const addOut=()=>mutGame(g=>{
     const outs=(g.outs+1)%4;
@@ -2933,6 +2971,9 @@ function App() {
     b[i]=b[i]?null:"ランナー"; 
     return{...g,bases:b};
   });
+  // bases要素から選手名を取得するヘルパー
+  const getRunnerName=(b)=>{ if(!b) return null; if(typeof b==="string") return b; return b.name||"ランナー"; };
+  const isRunnertb=(b)=>{ if(!b) return false; if(typeof b==="object") return !!b.tb; return false; };
 
   
   const makeTeamId = () => Date.now().toString(36);
@@ -4092,7 +4133,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.88")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.89")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4176,7 +4217,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.88")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.89")
         )
 
         // ===== 新規チーム作成 =====
@@ -4414,35 +4455,36 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.88",date:"2026/06/25",items:["代打・代走後の打点（RBI）が交代前選手から引き継がれるバグを修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["代走時にスコアボードのランナー表示も新選手名に更新するよう修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["打席結果記録時にクラッシュするバグを修正（lineup[pidx]未定義エラー）"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["運営からのお知らせを最新5件に整理","速報フィールドをMLBスタジアム風カラーに変更","📸 投手カードのIP・K/9表示修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["スコアボード：9イニング・延長対応のデフォルト値を修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["スコアボード改善：最終回裏不要時に×表示・サヨナラに×付加・速報中は攻撃終了まで0を表示しない"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 ライト系：スタメン選手名・成績数字・スタンプを見やすく修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["🔒 ログアウト時に他チームのデータが残るバグを修正（完全クリア）","📸 ライトデザインのスコア・選手名が見えにくい問題を修正","📸 写真ドラッグ動作を改善"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["規定イニング終了時に試合終了/延長/タイブレークを選択できるようになりました","タイブレーク機能追加（ランナー設定・自責点除外表示・プレイログ・速報対応）"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["代打・代走後の打点（RBI）が交代前選手から引き継がれるバグを修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["代走時にスコアボードのランナー表示も新選手名に更新するよう修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["打席結果記録時にクラッシュするバグを修正（lineup[pidx]未定義エラー）"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["運営からのお知らせを最新5件に整理","速報フィールドをMLBスタジアム風カラーに変更","📸 投手カードのIP・K/9表示修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["スコアボード：9イニング・延長対応のデフォルト値を修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["スコアボード改善：最終回裏不要時に×表示・サヨナラに×付加・速報中は攻撃終了まで0を表示しない"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 ライト系：スタメン選手名・成績数字・スタンプを見やすく修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["🔒 ログアウト時に他チームのデータが残るバグを修正（完全クリア）","📸 ライトデザインのスコア・選手名が見えにくい問題を修正","📸 写真ドラッグ動作を改善"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -4567,7 +4609,7 @@ function App() {
             // スコアボード（コンパクト1行）
             const inningBadge = g.finished
               ? (g.endReason==="cold"?`C(${g.endInning||g.inning}回)`:g.endReason==="weather"?"降雨C":g.endReason==="dark"?"日没C":"終了")
-              : (g.inning||1)+"回"+(g.half==="top"?"表":"裏");
+              : (g.endReason==="tiebreak"?"TB":"")+((g.inning||1)+"回")+(g.half==="top"?"表":"裏");
 
             const _innings = Array.from({length:g.innings||9},(_,i)=>i+1);
 
@@ -5064,7 +5106,7 @@ function App() {
               , React.createElement('div', { style: {flex:1},}
                 , React.createElement('div', { style: {fontWeight:700,fontSize:15,color:"#fff"},}
                   , game.endReason==="cold"?`コールドゲーム — ${game.endInning}回終了`:
-                   game.endReason==="mercy"?"コールドゲーム成立":"試合終了"
+                   game.endReason==="mercy"?"コールドゲーム成立":game.endReason==="tiebreak"?"タイブレーク終了":"試合終了"
                   , game.endNote?` — ${game.endNote}`:""
                 )
                 , React.createElement('div', { style: {fontSize:12,color:"#fca5a5",marginTop:2},}
@@ -5389,7 +5431,7 @@ function App() {
                   , React.createElement('span', { style: {
                       fontSize:13,
                       fontWeight:(e.runs>0||e.logType==="score"||e.logType==="sub")?700:400,
-                      color:(e.runs>0||e.logType==="score")?"#fde047":e.logType==="sub"?"#86efac":"#e9f0ea"
+                      color:(e.runs>0||e.logType==="score")?"#fde047":e.logType==="sub"?"#86efac":e.logType==="tb"?"#fbbf24":"#e9f0ea"
                     },}, e.msg)
                   , (e.runs&&e.runs>0)&&React.createElement('span', {style:{
                       fontSize:12, color:"#fff", fontWeight:900, marginLeft:"auto", flexShrink:0,
@@ -5825,35 +5867,36 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.88",date:"2026/06/25",items:["代打・代走後の打点（RBI）が交代前選手から引き継がれるバグを修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["代走時にスコアボードのランナー表示も新選手名に更新するよう修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["打席結果記録時にクラッシュするバグを修正（lineup[pidx]未定義エラー）"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["運営からのお知らせを最新5件に整理","速報フィールドをMLBスタジアム風カラーに変更","📸 投手カードのIP・K/9表示修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["スコアボード：9イニング・延長対応のデフォルト値を修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["スコアボード改善：最終回裏不要時に×表示・サヨナラに×付加・速報中は攻撃終了まで0を表示しない"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 ライト系：スタメン選手名・成績数字・スタンプを見やすく修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["🔒 ログアウト時に他チームのデータが残るバグを修正（完全クリア）","📸 ライトデザインのスコア・選手名が見えにくい問題を修正","📸 写真ドラッグ動作を改善"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
-                  {ver:"v472.88",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.88",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["規定イニング終了時に試合終了/延長/タイブレークを選択できるようになりました","タイブレーク機能追加（ランナー設定・自責点除外表示・プレイログ・速報対応）"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["代打・代走後の打点（RBI）が交代前選手から引き継がれるバグを修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["代走時にスコアボードのランナー表示も新選手名に更新するよう修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["打席結果記録時にクラッシュするバグを修正（lineup[pidx]未定義エラー）"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["運営からのお知らせを最新5件に整理","速報フィールドをMLBスタジアム風カラーに変更","📸 投手カードのIP・K/9表示修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["スコアボード：9イニング・延長対応のデフォルト値を修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["スコアボード改善：最終回裏不要時に×表示・サヨナラに×付加・速報中は攻撃終了まで0を表示しない"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 ライト系：スタメン選手名・成績数字・スタンプを見やすく修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["🔒 ログアウト時に他チームのデータが残るバグを修正（完全クリア）","📸 ライトデザインのスコア・選手名が見えにくい問題を修正","📸 写真ドラッグ動作を改善"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
+                  {ver:"v472.89",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.89",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -6378,6 +6421,74 @@ function App() {
 
       , modal&&(()=>{
         
+        // ===== 規定イニング終了モーダル =====
+        if(modal.step==="inningEnd") {
+          return ModalWrap(
+            React.createElement("div",{style:{padding:"16px 0"}}
+              ,React.createElement("div",{style:{fontSize:15,fontWeight:900,color:"#e9f0ea",marginBottom:6}},modal.inning+"回終了")
+              ,React.createElement("div",{style:{fontSize:12,color:"#74897b",marginBottom:20}},"試合をどうしますか？")
+              ,React.createElement("button",{onClick:function(){
+                  // 試合終了
+                  endGame("normal");
+                  setModal(null);
+                },
+                style:{...sBt("#18b257"),width:"100%",marginBottom:10,fontSize:14,padding:"12px"}},"✅ 試合終了")
+              ,React.createElement("button",{onClick:function(){
+                  // 延長（通常）
+                  const next = (storage.currentGame.innings||7)+1;
+                  mutGame(g=>{const ns={...g.awayScore,[next]:""};const nh={...g.homeScore,[next]:""};return{...g,innings:next,inning:next,half:"top",outs:0,bases:[null,null,null],awayScore:ns,homeScore:nh};});
+                  showToast("延長"+next+"回！");
+                  setModal(null);
+                },
+                style:{...sBt("#1a56a0"),width:"100%",marginBottom:10,fontSize:14,padding:"12px"}},"⏰ 延長")
+              ,React.createElement("button",{onClick:function(){
+                  // タイブレーク → ランナー設定へ
+                  setModal({step:"tbSetup",inning:modal.inning});
+                },
+                style:{...sBt("#c8a400"),width:"100%",marginBottom:10,fontSize:14,padding:"12px"}},"🔄 タイブレーク")
+              ,React.createElement("button",{onClick:function(){setModal(null);},
+                style:{...sBt("#4b6052",true),width:"100%",fontSize:13,padding:"10px"}},"キャンセル")
+            )
+          );
+        }
+
+        // ===== タイブレーク設定モーダル =====
+        if(modal.step==="tbSetup") {
+          const awayMembers = (game.awayLineup||[]).map(function(p){return p&&p.name?p.name:null;}).filter(Boolean);
+          const homeMembers = (game.homeLineup||[]).map(function(p){return p&&p.name?p.name:null;}).filter(Boolean);
+          const [tbAwayRunner, setTbAwayRunner] = React.useState("");
+          const [tbHomeRunner, setTbHomeRunner] = React.useState("");
+          return ModalWrap(
+            React.createElement("div",{style:{padding:"16px 0"}}
+              ,React.createElement("div",{style:{fontSize:15,fontWeight:900,color:"#ffd700",marginBottom:4}},"🔄 タイブレーク設定")
+              ,React.createElement("div",{style:{fontSize:11,color:"#74897b",marginBottom:16}},"各チームの2塁出塁ランナーを選んでください")
+              ,React.createElement("div",{style:{marginBottom:14}}
+                ,React.createElement("div",{style:{fontSize:11,color:"#ffb52e",fontWeight:700,marginBottom:6}},game.awayTeam+"（先攻）")
+                ,React.createElement("select",{value:tbAwayRunner,onChange:function(e){setTbAwayRunner(e.target.value);},
+                  style:{...S.inp,width:"100%",fontSize:13}}
+                  ,React.createElement("option",{value:""},"ランナーなし")
+                  ,awayMembers.map(function(n){return React.createElement("option",{key:n,value:n},n);})
+                )
+              )
+              ,React.createElement("div",{style:{marginBottom:20}}
+                ,React.createElement("div",{style:{fontSize:11,color:"#7dd3fc",fontWeight:700,marginBottom:6}},game.homeTeam+"（後攻）")
+                ,React.createElement("select",{value:tbHomeRunner,onChange:function(e){setTbHomeRunner(e.target.value);},
+                  style:{...S.inp,width:"100%",fontSize:13}}
+                  ,React.createElement("option",{value:""},"ランナーなし")
+                  ,homeMembers.map(function(n){return React.createElement("option",{key:n,value:n},n);})
+                )
+              )
+              ,React.createElement("button",{onClick:function(){
+                  startTiebreak(tbAwayRunner||null, tbHomeRunner||null);
+                  setModal(null);
+                },
+                style:{...sBt("#c8a400"),width:"100%",marginBottom:10,fontSize:14,padding:"12px"}},"🔄 タイブレーク開始")
+              ,React.createElement("button",{onClick:function(){setModal({step:"inningEnd",inning:modal.inning});},
+                style:{...sBt("#4b6052",true),width:"100%",fontSize:13,padding:"10px"}},"◀ 戻る")
+            )
+          );
+        }
+
         if(modal.step==="special") {
           const teamLabel = modal.team==="home"?game.homeTeam:game.awayTeam;
           return (
@@ -6544,6 +6655,10 @@ function App() {
           const curRunner = scored[erIndex] || "走者";
           const totalRunners = scored.length;
           const defaultPit = game[defSide+"PitcherIdx"]||0; // デフォルトは現投手
+          // タイブレークランナー判定（basesに{tb:true}フラグがある選手）
+          const tbRunners = new Set();
+          (game.tbRunnerNames||[]).forEach(function(n){tbRunners.add(n);});
+          const isTbRunner = tbRunners.has(curRunner);
 
           // 1人分の自責点を記録して次へ進む関数(案1: 自責点のみ記録、失点は自動計算)
           const recordOne = (pitIdx)=>{ // pitIdx=null なら自責なし
@@ -6584,6 +6699,9 @@ function App() {
                   (erIndex+1)+" / "+totalRunners+"人目")
               , React.createElement('div',{style:{fontSize:15,fontWeight:700,color:"#ffb52e",marginBottom:6}},
                   "🏃 "+curRunner+" が生還")
+              , isTbRunner && React.createElement('div',{style:{fontSize:12,fontWeight:700,color:"#fbbf24",
+                  background:"rgba(251,191,36,0.1)",borderRadius:8,padding:"6px 10px",marginBottom:8}},
+                  "🔄 タイブレークランナーのため通常は自責点なし")
               , React.createElement('div',{style:{fontSize:13,color:"#9fb3a5",marginBottom:16}},
                   "この得点は誰の自責点ですか？")
               // 投手が複数いる場合は投手ボタン、1人なら自責あり/なしの2択

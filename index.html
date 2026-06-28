@@ -2043,6 +2043,8 @@ function App() {
   const [statsTabTeamData, setStatsTabTeamData] = useState(null);
   const [statsTabLoading, setStatsTabLoading] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);
+  var themeArr = useState("light");
+  var appTheme = themeArr[0]; var setAppTheme = themeArr[1];
   const [tbAwayRunner, setTbAwayRunner] = useState("");
   const [tbHomeRunner, setTbHomeRunner] = useState("");
   const isViewer = syncMode==="member";
@@ -3815,7 +3817,7 @@ function App() {
           alignItems:"center", justifyContent:"center", padding:"24px", color:"white", fontFamily:"sans-serif"
         }}
         , React.createElement('div', {style:{fontSize:48, marginBottom:12}}, "⚾")
-        , React.createElement('div', {style:{fontSize:22, fontWeight:900, color:"#ffb52e", marginBottom:4}}, "草野球スコアブック")
+        
         , React.createElement('div', {style:{fontSize:12, color:"#4b6052", marginBottom:32}}, "チームコードを入力して開始してください")
 
         , React.createElement('div', {style:{width:"100%", maxWidth:360}}
@@ -3962,7 +3964,7 @@ function App() {
   }
 
   return (
-    React.createElement('div', { style: S.root,}
+    React.createElement('div', { style: Object.assign({},S.root,appTheme==="light"?{background:"#e8eef8",color:"#1a1a2e"}:{background:"#000510",color:"#e8f0f8"}),}
       , React.createElement('style', null, `
         @import url('https:
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -3975,7 +3977,7 @@ function App() {
       `)
 
       
-      , !isReadOnly && React.createElement('header', { style: S.header,}
+      , !isReadOnly && tab!=="login" && tab!=="login_new" && game && game.started && React.createElement('header', { style: Object.assign({},S.header,appTheme==="light"?{background:"linear-gradient(135deg,#001a4d,#003087)",borderBottom:"1px solid #002070"}:{}),}
         , React.createElement('div', { style: S.hRow,}
           , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0},}
             , React.createElement('span', { style: {fontSize:24,flexShrink:0},}, "⚾")
@@ -4088,7 +4090,6 @@ function App() {
                   style:{...sBt("#7c3aed"),fontSize:12}
                 }, "🔄 選手交代")
               , React.createElement('button', { onClick: ()=>{ if(window.__teamShareRole==="member"){showToast("👁 閲覧モードでは操作できません");return;} changeInning(); }, style: {...sBt("#18b257"),opacity:window.__teamShareRole==="member"?0.4:1},}, "チェンジ ▶" )
-              , React.createElement('button', { onClick: ()=>{ if(window.__teamShareRole==="member"){showToast("👁 閲覧モードでは操作できません");return;} saveGame(); }, style: {...sBt("#1d4ed8"),opacity:window.__teamShareRole==="member"?0.4:1},}, "💾 保存" )
               
             , React.createElement('button', { onClick: ()=>setModal({step:"endgame"}), style: sBt("#e02d24"),}, "⚾ 試合終了" )
             )) : (React.createElement(React.Fragment, null
@@ -4099,36 +4100,37 @@ function App() {
               )
               , React.createElement('button', { onClick: resumeGame, style: sBt("#4b6052",true),}, "再開")
             ))
-            , React.createElement('button', { onClick: startNew, style: sBt("#4b6052",true),}, "＋ 新試合" )
+
           )
         )
       )
 
       
-      , React.createElement('nav', { style: {...S.nav, position:"relative", padding:"0 4px", paddingTop: isReadOnly ? "calc(env(safe-area-inset-top, 0px) + 40px)" : undefined},}
+      , React.createElement('nav', { style: Object.assign({},S.nav,{background:appTheme==="light"?"#003087":"#07100a",borderBottom:appTheme==="light"?"2px solid #002070":"1px solid #24402b"}),}
         , React.createElement('div',{style:{display:"flex",overflowX:"auto",flex:1,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}
         , tab!=="login" && (isReadOnly
           ? [["top","🏠 トップ"],["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["share","📸 シェア"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
-                background:tab===id?"#1a2a45":"transparent",border:"none",borderRadius:"8px 8px 0 0",
-                borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
-                color:tab===id?"#fb923c":"#7db8e8",
-                padding:"12px 10px",cursor:"pointer",fontSize:13,whiteSpace:"nowrap",
-                fontWeight:tab===id?800:500,
+                background:"transparent",border:"none",
+                borderBottom:tab===id?"2px solid "+(appTheme==="light"?"#c8102e":"#ef3e42"):"2px solid transparent",
+                color:tab===id?(appTheme==="light"?"#fff":"#5ab4ff"):(appTheme==="light"?"rgba(255,255,255,0.5)":"#1e3a5a"),
+                padding:"10px 8px",cursor:"pointer",fontSize:11,whiteSpace:"nowrap",
+                fontWeight:tab===id?700:400,
               },}, l)
             ))
           : [["top","🏠 トップ"],["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"],["share","📸 シェア"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
                 background:"transparent",border:"none",
-                borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
-                color:tab===id?"#7dd3fc":"#7db8e8",
-                padding:"10px 12px",cursor:"pointer",fontSize:12,whiteSpace:"nowrap",
+                borderBottom:tab===id?"2px solid "+(appTheme==="light"?"#c8102e":"#ef3e42"):"2px solid transparent",
+                color:tab===id?(appTheme==="light"?"#fff":"#5ab4ff"):(appTheme==="light"?"rgba(255,255,255,0.5)":"#1e3a5a"),
+                padding:"10px 8px",cursor:"pointer",fontSize:11,whiteSpace:"nowrap",
                 fontWeight:tab===id?700:400,
               },}, l)
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v473.02")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.32")
+        
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4147,11 +4149,9 @@ function App() {
             minHeight:"80vh",display:"flex",flexDirection:"column",
             alignItems:"center",justifyContent:"center",padding:"24px 20px"}}
 
-          // タイトル
-          , React.createElement('div', {style:{textAlign:"center",marginBottom:36}}
-            , React.createElement('div', {style:{fontSize:52,marginBottom:10}}, "⚾")
-            , React.createElement('div', {style:{fontSize:24,fontWeight:900,color:"#e9f0ea",letterSpacing:1,marginBottom:4}}, "おわプロスコア")
-            , React.createElement('div', {style:{fontSize:12,color:"#4b6052"}}, "草野球・少年野球スコアブック")
+          , React.createElement('div', {style:{textAlign:"center",marginBottom:28}}
+            , React.createElement('div', {style:{fontSize:14,fontWeight:700,color:"#e9f0ea",letterSpacing:2,marginBottom:2}}, "簡単！みんなの野球記録")
+            , React.createElement('div', {style:{fontSize:11,color:"#4b6052"}}, "草野球・少年野球スコアブック")
           )
 
           // 3つのモードボタン
@@ -4212,7 +4212,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.02")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.32")
         )
 
         // ===== 新規チーム作成 =====
@@ -4406,7 +4406,7 @@ function App() {
             // ロゴ・接続情報
             , React.createElement('div', {style:{textAlign:"center",marginBottom:28}}
               , React.createElement('div', {style:{fontSize:44,marginBottom:8}}, "⚾")
-              , React.createElement('div', {style:{fontSize:22,fontWeight:900,color:"#e9f0ea",marginBottom:8}}, "おわプロスコア")
+
               , React.createElement('div', {style:{display:"inline-flex",alignItems:"center",gap:6,
                   background:"#0c2a0c",border:"1px solid #18b257",borderRadius:20,padding:"4px 14px"}}
                 , React.createElement('div', {style:{width:7,height:7,borderRadius:"50%",background:"#18b257"}} )
@@ -4450,48 +4450,14 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v473.02",date:"2026/06/25",items:["📸 打者成績カードのRBIが空になるバグを修正"]},
-                  {ver:"v473.01",date:"2026/06/25",items:["連続打席入力時「打者0」が出るバグを修正","ランナー表記順をホーム寄り（3→2→1塁）に変更"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["バージョン473へアップデート","規定イニング終了時に試合終了/延長/タイブレーク選択ダイアログを追加","タイブレーク機能追加（ランナー設定・自責点表示・プレイログ・速報対応）","📸 シェアタブに説明文追加・打者成績にRBI追加・試合終了にTB/延長表記"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["代打・代走後の打点（RBI）が交代前選手から引き継がれるバグを修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["代走時にスコアボードのランナー表示も新選手名に更新するよう修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["打席結果記録時にクラッシュするバグを修正（lineup[pidx]未定義エラー）"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["運営からのお知らせを最新5件に整理","速報フィールドをMLBスタジアム風カラーに変更","📸 投手カードのIP・K/9表示修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["スコアボード：9イニング・延長対応のデフォルト値を修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["スコアボード改善：最終回裏不要時に×表示・サヨナラに×付加・速報中は攻撃終了まで0を表示しない"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 ライト系：スタメン選手名・成績数字・スタンプを見やすく修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["🔒 ログアウト時に他チームのデータが残るバグを修正（完全クリア）","📸 ライトデザインのスコア・選手名が見えにくい問題を修正","📸 写真ドラッグ動作を改善"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
-                  {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
-                  {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
-                  {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
-                  {ver:"v472.52",date:"2026/06/23",items:["ゲッツー（DP）で打点がつくバグを修正","犠打・犠飛のチーム合計が0になるバグを修正"]},
-                  {ver:"v472.51",date:"2026/06/23",items:["大会・対戦相手データがアップデートで消えるバグを修正"]},
-                  {ver:"v472.49",date:"2026/06/23",items:["オーダータブの打順と名前を1列に統合"]},
-                  {ver:"v472.45",date:"2026/06/22",items:["オーダー・投手・成績タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
-                  {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記バグを修正"]},
-                  {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設"]},
+                  {ver:"v473",date:"2026/06/26",items:[
+                    "📸 シェアモード搭載！SNS用スコアボードカードが作成できます！",
+                    "UIを全面リニューアル・タブを画面上部に固定・ホーム画面のボタンを整理",
+                    "LA Lightカラーテーマ（ダーク切り替え可能）",
+                    "打者0バグ修正・ランナー表記順修正"
+                  ]},
+                  {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
+                  {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
                 ].slice(0,5).map((n,ni)=>
                   React.createElement('div', {key:ni, style:{
                     borderTop:ni===0?"none":"1px solid #1a2d1e",
@@ -4962,9 +4928,7 @@ function App() {
           // 未開始状態: ステップ式の直感的な動線（started===falseのみ。finished試合はスコアボード表示）
           , (game.started === false) ? (
             React.createElement('div', {style:{padding:"24px 8px", textAlign:"center"}}
-              , React.createElement('div', {style:{fontSize:48, marginBottom:12}}, "⚾")
-              , React.createElement('div', {style:{fontSize:20,fontWeight:900,color:"#e9f0ea",marginBottom:24}},
-                  "おわプロスコア")
+
               // メインCTA
               , React.createElement('button', {
                   onClick:()=>setModal({step:"confirm_new", fromWelcome:true}),
@@ -4989,7 +4953,7 @@ function App() {
           ) : (
           React.createElement(React.Fragment, null
 
-          , !isReadOnly && React.createElement('div', { style: S.card,}
+          , !isReadOnly && React.createElement('div', { style: appTheme==="light"?S.cardLight:S.card,}
             , React.createElement('div', {
                 style: {...S.ct, cursor:"pointer", userSelect:"none", display:"flex", justifyContent:"space-between", alignItems:"center", gap:10},
                 onClick: ()=>setGameInfoOpen(o=>!o)
@@ -5023,16 +4987,16 @@ function App() {
             )
           )
 
-          , React.createElement('div', { style: S.card,}
+          , React.createElement('div', { style: appTheme==="light"?S.cardLight:S.card,}
             , React.createElement('div', { style: {overflowX:"auto"},}
               , React.createElement('table', { style: S.table,}
                 , React.createElement('thead', null
                   , React.createElement('tr', null
-                    , React.createElement('th', { style: {...S.th,width:110,textAlign:"left",paddingLeft:10},}, "チーム")
-                    , gameInnings.map(i=>React.createElement('th', { key: i, style: S.th,}, i))
-                    , React.createElement('th', { style: {...S.th,color:"#ffb52e"},}, "計")
-                    , React.createElement('th', { style: S.th,}, "H")
-                    , React.createElement('th', { style: S.th,}, "E")
+                    , React.createElement('th', { style: {...(appTheme==="light"?S.thL:S.th),width:110,textAlign:"left",paddingLeft:10},}, "チーム")
+                    , gameInnings.map(i=>React.createElement('th', { key: i, style: appTheme==="light"?S.thL:S.th,}, i))
+                    , React.createElement('th', { style: {...(appTheme==="light"?S.thL:S.th),color:"#ffb52e"},}, "計")
+                    , React.createElement('th', { style: appTheme==="light"?S.thL:S.th,}, "H")
+                    , React.createElement('th', { style: appTheme==="light"?S.thL:S.th,}, "E")
                   )
                 )
                 , React.createElement('tbody', null
@@ -5052,7 +5016,7 @@ function App() {
                       {team:"home",label:game.homeTeam,score:game.homeScore,total:homeTotal,hits:homeHitsTotal,errs:homeErrsTotal,color:"#7dd3fc"},
                     ].map(function(row){
                       return React.createElement('tr', { key: row.team, style: {background:"#122016"},}
-                        , React.createElement('td', { style: {...S.td,color:row.color,fontWeight:700,paddingLeft:10,fontSize:13},}, row.label)
+                        , React.createElement('td', { style: {...(appTheme==="light"?S.tdL:S.td),color:row.color,fontWeight:700,paddingLeft:10,fontSize:13},}, row.label)
                         , gameInnings.map(function(i){
                           var raw=row.score[i];
                           var scoreStr="";
@@ -5077,15 +5041,15 @@ function App() {
                           }
                           // サヨナラ：後攻の最終回に×を付加
                           var showSayonara=sayonara&&row.team==="home"&&i===inn&&scoreStr!==""&&scoreStr!=="×";
-                          return React.createElement('td', { key: i, style: {...S.td,padding:2,textAlign:"center"},}
+                          return React.createElement('td', { key: i, style: {...(appTheme==="light"?S.tdL:S.td),padding:2,textAlign:"center"},}
                             , React.createElement('span', { style: {fontSize:scoreStr==="×"?13:16,fontWeight:700,color:scoreStr==="×"?"#74897b":"#fff",display:"block",padding:"4px 0"},}
                               , showSayonara?(scoreStr+"×"):scoreStr
                             )
                           );
                         })
-                        , React.createElement('td', { style: {...S.td,textAlign:"center",fontWeight:900,fontSize:20,color:"#ffb52e"},}, row.total)
-                        , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#54e08c"},}, row.hits)
-                        , React.createElement('td', { style: {...S.td,textAlign:"center",color:"#ff7d72"},}, row.errs)
+                        , React.createElement('td', { style: {...(appTheme==="light"?S.tdL:S.td),textAlign:"center",fontWeight:900,fontSize:20,color:"#ffb52e"},}, row.total)
+                        , React.createElement('td', { style: {...(appTheme==="light"?S.tdL:S.td),textAlign:"center",color:"#54e08c"},}, row.hits)
+                        , React.createElement('td', { style: {...(appTheme==="light"?S.tdL:S.td),textAlign:"center",color:"#ff7d72"},}, row.errs)
                       );
                     });
                   })()
@@ -5116,7 +5080,7 @@ function App() {
           )
 
           
-          , !isReadOnly && React.createElement('div', { style: {...S.card, opacity:game.finished?0.5:1, pointerEvents:game.finished?"none":"auto"},}
+          , !isReadOnly && React.createElement('div', { style: {...(appTheme==="light"?S.cardLight:S.card), opacity:game.finished?0.5:1, pointerEvents:game.finished?"none":"auto"},}
             , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"},}
               , React.createElement('div', { style: S.ct,}, "⚡ 打席記録 — "   , game.inning, "回", game.half==="top"?"表":"裏", "（", curLabel, "）")
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:6,marginLeft:"auto"},}
@@ -5405,7 +5369,7 @@ function App() {
             )
           )
 
-          , !isReadOnly && React.createElement('div', { style: S.card,}
+          , !isReadOnly && React.createElement('div', { style: appTheme==="light"?S.cardLight:S.card,}
             , React.createElement('div', { style: {display:"flex",alignItems:"center",marginBottom:12,gap:10},}
               , React.createElement('div', { style: S.ct,}, "📝 プレーログ" )
               , undoStack.length>0&&(
@@ -5428,7 +5392,7 @@ function App() {
                   , React.createElement('span', { style: {
                       fontSize:13,
                       fontWeight:(e.runs>0||e.logType==="score"||e.logType==="sub")?700:400,
-                      color:(e.runs>0||e.logType==="score")?"#fde047":e.logType==="sub"?"#86efac":e.logType==="tb"?"#fbbf24":"#e9f0ea"
+                      color:(e.runs>0||e.logType==="score")?(appTheme==="light"?"#b45309":"#fde047"):e.logType==="sub"?(appTheme==="light"?"#15803d":"#86efac"):e.logType==="tb"?(appTheme==="light"?"#92400e":"#fbbf24"):(appTheme==="light"?"#1e3a5a":"#e9f0ea")
                     },}, e.msg)
                   , (e.runs&&e.runs>0)&&React.createElement('span', {style:{
                       fontSize:12, color:"#fff", fontWeight:900, marginLeft:"auto", flexShrink:0,
@@ -5445,7 +5409,7 @@ function App() {
         ))
 
         , !isReadOnly && tab==="score"&&(game.defenseLog||[]).length>0&&(
-          React.createElement('div', { style: S.card,}
+          React.createElement('div', { style: appTheme==="light"?S.cardLight:S.card,}
             , React.createElement('div', { style: {...S.ct,marginBottom:8},}, "🔄 守備交代記録" )
             , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:4},}
               , [...(game.defenseLog||[])].reverse().map((d,i)=>(
@@ -5477,7 +5441,7 @@ function App() {
         , tab==="lineup"&&(
           [{team:"away",label:game.awayTeam,lineup:game.awayLineup,color:"#ffb52e"},
            {team:"home",label:game.homeTeam,lineup:game.homeLineup,color:"#7dd3fc"}].map(({team,label,lineup,color})=>(
-            React.createElement('div', { key: team, style: S.card,}
+            React.createElement('div', { key: team, style: appTheme==="light"?S.cardLight:S.card,}
               , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"},}
                 , React.createElement('div', { style: {...S.ct,borderLeft:`4px solid ${color}`,paddingLeft:10,marginBottom:0},}, label)
                 , React.createElement('div', { style: {marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"},}
@@ -5498,11 +5462,11 @@ function App() {
                 , React.createElement('table', { style: S.table,}
                   , React.createElement('thead', null
                     , React.createElement('tr', null
-                      , React.createElement('th', { style: {...S.th,width:110,textAlign:"left",paddingLeft:8,position:"sticky",left:0,zIndex:3,background:"#0c160e"},}, "# 名前")
-                      , React.createElement('th', { style: {...S.th,width:32},}, "守")
-                      , React.createElement('th', { style: {...S.th,width:34},}, "盗/刺")
-                      , React.createElement('th', { style: {...S.th,width:32},})
-                      , gameInnings.map(i=>React.createElement('th', { key: i, style: {...S.th,width:54},}, i, "回"))
+                      , React.createElement('th', { style: {...(appTheme==="light"?S.thL:S.th),width:110,textAlign:"left",paddingLeft:8,position:"sticky",left:0,zIndex:3,background:"#0c160e"},}, "# 名前")
+                      , React.createElement('th', { style: {...(appTheme==="light"?S.thL:S.th),width:32},}, "守")
+                      , React.createElement('th', { style: {...(appTheme==="light"?S.thL:S.th),width:34},}, "盗/刺")
+                      , React.createElement('th', { style: {...(appTheme==="light"?S.thL:S.th),width:32},})
+                      , gameInnings.map(i=>React.createElement('th', { key: i, style: {...(appTheme==="light"?S.thL:S.th),width:54},}, i, "回"))
                     )
                   )
                   , React.createElement('tbody', null
@@ -5574,7 +5538,7 @@ function App() {
                           ? (idx%2===0?"#0c160e":"#122016")
                           : (idx%2===0?"#0c160e":"#122016"),
                           borderTop: subOuts.length>0 ? "1px solid #2dd06833" : "none"},}
-                        , React.createElement('td', { style: {...S.td, minWidth:110,
+                        , React.createElement('td', { style: {...(appTheme==="light"?S.tdL:S.td), minWidth:110,
                           position:"sticky",left:0,zIndex:2,background:idx%2===0?"#0c160e":"#122016"},}
                           , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:6},}
                             , React.createElement('span', {style:{fontSize:11,color:idx<DEFAULT_PLAYERS?"#7db8e8":"#74897b",flexShrink:0,minWidth:16,textAlign:"right"}}, idx+1)
@@ -5595,7 +5559,7 @@ function App() {
                                 padding:"0 3px",flexShrink:0}}, "代")
                           )
                         )
-                        , React.createElement('td', { style: {...S.td,position:"relative"},}
+                        , React.createElement('td', { style: {...(appTheme==="light"?S.tdL:S.td),position:"relative"},}
                           , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:1}}
                             , React.createElement(PosSelector, { value: p.pos, onChange: isReadOnly ? ()=>{} : v=>editPlayer(team,idx,"pos",v),})
                             , posHistory.length>1&&React.createElement('div',{style:{fontSize:8,color:"#74897b",
@@ -5603,19 +5567,19 @@ function App() {
                                 whiteSpace:"nowrap"}},posLabel)
                           )
                         )
-                        , React.createElement('td', { style: {...S.td,textAlign:"center",fontSize:11},}
+                        , React.createElement('td', { style: {...(appTheme==="light"?S.tdL:S.td),textAlign:"center",fontSize:11},}
                           , React.createElement('span', { style: {color:"#54e08c"},}, p.sb||0)
                           , React.createElement('span', { style: {color:"#4b6052"},}, "/")
                           , React.createElement('span', { style: {color:"#ff7d72"},}, p.cs||0)
                         )
-                        , React.createElement('td', { style: {...S.td,padding:2,textAlign:"center"},})
+                        , React.createElement('td', { style: {...(appTheme==="light"?S.tdL:S.td),padding:2,textAlign:"center"},})
                         , gameInnings.map(inn=>{
                           const list=toList(p.atBats,inn);
                           const runs=eRuns(list);
                           const last=list.length?norm(list[list.length-1]):null;
                           const lc=last?_optionalChain([rOf, 'call', _25 => _25(last.code), 'optionalAccess', _26 => _26.color])||"#aaa":"#24402b";
                           return (
-                            React.createElement('td', { key: inn, style: {...S.td,padding:2},}
+                            React.createElement('td', { key: inn, style: {...(appTheme==="light"?S.tdL:S.td),padding:2},}
                               , React.createElement('button', {
                                 onClick: ()=>{ if(isReadOnly){showToast("👁 閲覧モードでは操作できません");return;} list.length>0?openEdit(team,idx,inn):openNew(team,idx,inn); },
                                 style: {width:"100%",minWidth:50,padding:"3px 2px",
@@ -5817,45 +5781,58 @@ function App() {
         ))
 
 
-        , tab==="top"&&(React.createElement(React.Fragment, null
+        , tab==="top"&&!isReadOnly&&(React.createElement(React.Fragment, null
 
-          // ===== トップタブ =====
-          , React.createElement('div', {style:{maxWidth:400,margin:"0 auto",padding:"16px 0"}}
-
-            // ロゴ・タイトル
-            , React.createElement('div', {style:{textAlign:"center",marginBottom:28}}
-              , React.createElement('div', {style:{fontSize:44,marginBottom:8}}, "⚾")
-              , React.createElement('div', {style:{fontSize:22,fontWeight:900,color:"#e9f0ea",marginBottom:4}}, "おわプロスコア")
-              , React.createElement('div', {style:{fontSize:11,color:"#4b6052"}}, "簡単！みんなの野球記録")
+          , React.createElement('div', {style:{maxWidth:400,margin:"0 auto",padding:"20px 0 0"}}
+            ,React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginBottom:20}}
+              ,React.createElement('div', {style:{display:"inline-flex",alignItems:"center",gap:6,
+                  background:"rgba(0,60,30,0.4)",border:"1px solid #18b257",borderRadius:20,
+                  padding:"5px 14px"}}
+                ,React.createElement('div', {style:{width:7,height:7,borderRadius:"50%",background:"#18b257",boxShadow:"0 0 6px #18b257"}})
+                ,React.createElement('div', {style:{fontSize:11,color:"#18b257",fontWeight:700}},
+                  myTeam?myTeam.name+" 接続中":"チーム未接続")
+              )
+              ,React.createElement('button', {
+                  onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
+                  style:{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,
+                    background:appTheme==="light"?"#003087":"#1a1a2e",
+                    border:appTheme==="light"?"1px solid #c8102e":"1px solid #334",
+                    borderRadius:20,padding:"5px 14px",cursor:"pointer",
+                    fontSize:11,fontWeight:700,
+                    color:appTheme==="light"?"#fff":"#aaa"}}
+                ,React.createElement('span',{style:{fontSize:13}},appTheme==="dark"?"☀":"🌙")
+                ,appTheme==="dark"?"ライト":"ダーク"
+              )
             )
-
-            // メインCTA
-            , React.createElement('button', {
-                onClick:()=>setModal({step:"confirm_new", fromWelcome:true}),
-                style:{...sBt("#18b257"), width:"100%", fontSize:17, padding:"16px",
-                  borderRadius:14, fontWeight:900, marginBottom:12,
-                  boxShadow:"0 4px 20px rgba(24,178,87,0.3)"}
-              }, "⚾ 試合を開始する")
-
-            // サブリンク
-            , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:12}}
-              , React.createElement('button', {
-                  onClick:()=>setTab("history"),
-                  style:{flex:1,background:"#0c160e",border:"1px solid #24402b",borderRadius:10,
-                    color:"#7db8e8",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700}
-                }, "📋 試合履歴")
-              , React.createElement('button', {
-                  onClick:()=>setTab("stats"),
-                  style:{flex:1,background:"#0c160e",border:"1px solid #24402b",borderRadius:10,
-                    color:"#7db8e8",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700}
-                }, "📈 成績を見る")
+            ,React.createElement('button', {
+                onClick:function(){setModal({step:"confirm_new", fromWelcome:true});},
+                style:{background:"linear-gradient(135deg,#003087,#005a9c)",color:"#fff",
+                  width:"100%",fontSize:18,padding:"17px",borderRadius:14,fontWeight:900,
+                  marginBottom:10,border:"none",cursor:"pointer",
+                  boxShadow:"0 4px 24px rgba(0,90,156,0.5)",letterSpacing:1}}
+              ,"⚾ スコアをつける")
+            ,React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}
+              ,React.createElement('button', {onClick:function(){setTab("stats");},
+                  style:{background:"#0c160e",border:"1px solid #24402b",borderRadius:12,
+                    padding:"14px 10px",cursor:"pointer",display:"flex",flexDirection:"column",
+                    alignItems:"center",gap:6,color:"#7db8e8",fontWeight:700,fontSize:12}}
+                ,React.createElement('span',{style:{fontSize:22}},"📈"),"成績をみる")
+              ,React.createElement('button', {onClick:function(){setTab("history");},
+                  style:{background:"#0c160e",border:"1px solid #24402b",borderRadius:12,
+                    padding:"14px 10px",cursor:"pointer",display:"flex",flexDirection:"column",
+                    alignItems:"center",gap:6,color:"#7db8e8",fontWeight:700,fontSize:12}}
+                ,React.createElement('span',{style:{fontSize:22}},"📋"),"試合履歴をみる")
+              ,React.createElement('button', {onClick:function(){setTab("teams");},
+                  style:{background:"#0c160e",border:"1px solid #24402b",borderRadius:12,
+                    padding:"14px 10px",cursor:"pointer",display:"flex",flexDirection:"column",
+                    alignItems:"center",gap:6,color:"#7db8e8",fontWeight:700,fontSize:12}}
+                ,React.createElement('span',{style:{fontSize:22}},"🏟"),"チームを登録する")
+              ,React.createElement('button', {onClick:function(){setTab("share");},
+                  style:{background:"#0c160e",border:"1px solid #c8a400",borderRadius:12,
+                    padding:"14px 10px",cursor:"pointer",display:"flex",flexDirection:"column",
+                    alignItems:"center",gap:6,color:"#ffd700",fontWeight:700,fontSize:12}}
+                ,React.createElement('span',{style:{fontSize:22}},"📸"),"結果をシェアする")
             )
-            , React.createElement('button', {
-                onClick:function(){setTab("share");},
-                style:{width:"100%",background:"#0c160e",border:"1px solid #c8a400",borderRadius:10,
-                  color:"#ffd700",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700,
-                  marginBottom:16}
-              }, "📸 シェアカードを作る")
 
             // 運営からのお知らせ
             , React.createElement('div', {style:{...S.card,borderLeft:"4px solid #f97316"}}
@@ -5864,48 +5841,14 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v473.02",date:"2026/06/25",items:["📸 打者成績カードのRBIが空になるバグを修正"]},
-                  {ver:"v473.01",date:"2026/06/25",items:["連続打席入力時「打者0」が出るバグを修正","ランナー表記順をホーム寄り（3→2→1塁）に変更"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["バージョン473へアップデート","規定イニング終了時に試合終了/延長/タイブレーク選択ダイアログを追加","タイブレーク機能追加（ランナー設定・自責点表示・プレイログ・速報対応）","📸 シェアタブに説明文追加・打者成績にRBI追加・試合終了にTB/延長表記"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["代打・代走後の打点（RBI）が交代前選手から引き継がれるバグを修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["代走時にスコアボードのランナー表示も新選手名に更新するよう修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["打席結果記録時にクラッシュするバグを修正（lineup[pidx]未定義エラー）"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["運営からのお知らせを最新5件に整理","速報フィールドをMLBスタジアム風カラーに変更","📸 投手カードのIP・K/9表示修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["スコアボード：9イニング・延長対応のデフォルト値を修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["スコアボード改善：最終回裏不要時に×表示・サヨナラに×付加・速報中は攻撃終了まで0を表示しない"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 ライト系：スタメン選手名・成績数字・スタンプを見やすく修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["🔒 ログアウト時に他チームのデータが残るバグを修正（完全クリア）","📸 ライトデザインのスコア・選手名が見えにくい問題を修正","📸 写真ドラッグ動作を改善"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
-                  {ver:"v473.00",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v473.00",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
-                  {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
-                  {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
-                  {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
-                  {ver:"v472.52",date:"2026/06/23",items:["ゲッツー（DP）で打点がつくバグを修正","犠打・犠飛のチーム合計が0になるバグを修正"]},
-                  {ver:"v472.51",date:"2026/06/23",items:["大会・対戦相手データがアップデートで消えるバグを修正"]},
-                  {ver:"v472.49",date:"2026/06/23",items:["オーダータブの打順と名前を1列に統合"]},
-                  {ver:"v472.45",date:"2026/06/22",items:["オーダー・投手・成績タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
-                  {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記バグを修正"]},
-                  {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設"]},
+                  {ver:"v473",date:"2026/06/26",items:[
+                    "📸 シェアモード搭載！SNS用スコアボードカードが作成できます！",
+                    "UIを全面リニューアル・タブを画面上部に固定・ホーム画面のボタンを整理",
+                    "LA Lightカラーテーマ（ダーク切り替え可能）",
+                    "打者0バグ修正・ランナー表記順修正"
+                  ]},
+                  {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
+                  {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
                 ].slice(0,5).map((n,ni)=>
                   React.createElement('div', {key:ni, style:{
                     borderTop: ni===0?"none":"1px solid #1a2d1e",
@@ -6184,7 +6127,8 @@ function App() {
               sharePitcherMap:sharePitcherMap,
               shareBattingMap:shareBattingMap,
               onClose:function(){setTab("top");},
-              asTab:true
+              asTab:true,
+              appTheme:appTheme
             })
         )
 
@@ -8068,6 +8012,7 @@ function ShareCardModal(props) {
   var asTab = props.asTab || false;
   var sharePitcherMap = props.sharePitcherMap || {};
   var shareBattingMap = props.shareBattingMap || {};
+  var appTheme = props.appTheme || "light";
 
   var modeState = useState("game");
   var mode = modeState[0]; var setMode = modeState[1];
@@ -8726,7 +8671,7 @@ function ShareCardModal(props) {
             return React.createElement("button",{key:i,onClick:function(){setSelPlayer(p);},
               style:{padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
                 background:(selPlayer&&selPlayer.name===p.name)?"#c8a400":"#0c160e",
-                color:(selPlayer&&selPlayer.name===p.name)?"#000":"#9fb3a5"}},p.name);
+                color:(selPlayer&&selPlayer.name===p.name)?"#000":(appTheme==="light"?"#334":"#9fb3a5")}},p.name);
           })
         )
       )
@@ -10822,7 +10767,7 @@ function TeamEditorModal({ team, teamType, onSave, onCancel }) {
             style: {...S.si,width:"100%",padding:"8px 10px",fontSize:15,fontWeight:700},})
         )
 
-        , React.createElement('div', {style:{marginBottom:14}}
+        , isMyTeam && React.createElement('div', {style:{marginBottom:14}}
           , React.createElement('div', {style:{color:"#ffb52e",fontSize:12,fontWeight:700,marginBottom:4}}, "🔑 管理者コード")
           , isNew
             ? React.createElement('div', {style:{fontSize:11,color:"#74897b"}}, "保存時に自動生成されます。このコードを知っている人が管理者になれます")
@@ -11413,8 +11358,7 @@ const S = {
   header:{
     background:"linear-gradient(180deg,#0f2040,#0c160e)",
     borderBottom:"1px solid #24402b",
-    padding:"calc(env(safe-area-inset-top, 0px) + 14px) 16px 10px",
-    position:"sticky", top:0, zIndex:90,
+    padding:"12px 16px 10px",
   },
   hRow:{
     maxWidth:860, margin:"0 auto",
@@ -11427,24 +11371,38 @@ const S = {
   nav:{
     background:"#07100a", borderBottom:"1px solid #24402b",
     display:"flex", maxWidth:860, margin:"0 auto",
-    overflowX:"auto", padding:"0 12px",
+    overflowX:"auto",
+    padding:"calc(env(safe-area-inset-top,0px) + 4px) 4px 0",
+    position:"sticky", top:0, zIndex:100,
   },
   card:{
     background:"linear-gradient(135deg,#122016,#0a1828)",
     border:"1px solid #24402b", borderRadius:12,
     padding:16, marginBottom:14,
+    overflowX:"auto", WebkitOverflowScrolling:"touch",
+  },
+  cardLight:{
+    background:"#fff",
+    border:"1px solid #b8c8e0", borderRadius:12,
+    padding:16, marginBottom:14,
+    overflowX:"auto", WebkitOverflowScrolling:"touch",
   },
   ct:{ fontSize:14, fontWeight:700, color:"#7dd3fc", marginBottom:12 },
   si:{
     background:"#24402b", border:"1px solid #33573c", borderRadius:6,
     color:"#e9f0ea", padding:"5px 8px", fontSize:13, outline:"none",
   },
-  table:{ width:"100%", borderCollapse:"collapse", minWidth:440 },
+  table:{ width:"100%", borderCollapse:"collapse" },
   th:{
     padding:"7px 4px", textAlign:"center", fontSize:11, color:"#74897b",
     fontWeight:700, borderBottom:"1px solid #24402b", whiteSpace:"nowrap",
   },
-  td:{ padding:"6px 4px", fontSize:13, borderBottom:"1px solid #0f2040" },
+  thL:{
+    padding:"7px 4px", textAlign:"center", fontSize:11, color:"#555",
+    fontWeight:700, borderBottom:"1px solid #b8c8e0", whiteSpace:"nowrap",
+  },
+  td:{ padding:"6px 4px", fontSize:13, borderBottom:"1px solid #0f2040", color:"#e9f0ea" },
+  tdL:{ padding:"6px 4px", fontSize:13, borderBottom:"1px solid #dce6f5", color:"#111" },
   overlay:{
     position:"fixed", inset:0, background:"rgba(0,0,0,.88)",
     display:"flex", alignItems:"center", justifyContent:"center",

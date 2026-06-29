@@ -1643,7 +1643,7 @@ const computePitcherStats = (g) => { // 🔒 LOCKED - v447/v468仕様 変更禁�
 
 const newGame = (innings=7, pitchMode="result", season=null, tournament=null) => ({
   id:Date.now(),
-  date:new Date().toISOString().split("T")[0],
+  date:(function(){var d=new Date();d.setTime(d.getTime()+9*60*60*1000);return d.toISOString().split("T")[0];})(),
   season: season || new Date().getFullYear(),
   tournament: tournament || null,
   innings: innings,
@@ -4129,7 +4129,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.32")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.34")
         
       )
 
@@ -4212,7 +4212,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.32")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.34")
         )
 
         // ===== 新規チーム作成 =====
@@ -5010,7 +5010,7 @@ function App() {
                     // サヨナラ判定：後攻が勝ち、最終回裏で決着
                     var sayonara=finished&&homeTotal2>awayTotal2&&(game.homeScore[inn]!==""&&game.homeScore[inn]!==undefined)&&game.awayScore[inn]!==undefined;
                     // 最終回裏不要判定：先攻リード or 同点以上で試合終了し、homeScore[inn]が空
-                    var lastUraUnneeded=finished&&awayTotal2>homeTotal2&&(game.homeScore[inn]===""||game.homeScore[inn]===undefined);
+                    var lastUraUnneeded=finished&&(game.homeScore[inn]===""||game.homeScore[inn]===undefined)&&awayTotal2!==homeTotal2;
                     return [
                       {team:"away",label:game.awayTeam,score:game.awayScore,total:awayTotal,hits:awayHitsTotal,errs:awayErrsTotal,color:"#ffb52e"},
                       {team:"home",label:game.homeTeam,score:game.homeScore,total:homeTotal,hits:homeHitsTotal,errs:homeErrsTotal,color:"#7dd3fc"},
@@ -5476,7 +5476,12 @@ function App() {
                       const subOuts = [...legacySubOut, ...(p._subOuts||[])];
 
                       // ポジション推移を文字列に（_posLogも含める）
-                      const posLogHistory = (p._posLog||[]).map(l=>l.pos).filter(Boolean);
+                      // 同一イニング・ハーフ内の中間ポジション変更は除外（玉突き変更対策）
+                      const posLogDeduped = (p._posLog||[]).filter((l,i,arr)=>{
+                        // 同じinning+halfの中では最初のエントリだけ残す
+                        return i===0||arr[i-1].inning!==l.inning||arr[i-1].half!==l.half;
+                      });
+                      const posLogHistory = posLogDeduped.map(l=>l.pos).filter(Boolean);
                       const allPosHistory = [...subOuts.map(s=>s.pos||"—"), ...posLogHistory, p.pos||""].filter((_,i,a)=>i===0||a[i]!==a[i-1]);
                       const posHistory = allPosHistory;
                       const posLabel = posHistory.length > 1
@@ -6610,7 +6615,15 @@ function App() {
               const nb = modal._nextBatter;
               const pm = document.body.getAttribute("data-pitch-mode") || "result";
               if(nb && pm==="result"){
-                setModal({team:nb.team, pidx:nb.pidx, inning:nb.inning, step:"result"});
+                // game stateから最新のBatterIdxを再取得（自責点モーダル中に変わっている可能性あり）
+                const latestPidx = game[nb.team+"BatterIdx"];
+                const _lu = game[nb.team+"Lineup"]||[];
+                const safePidx = (Number.isFinite(latestPidx)&&latestPidx>=0&&latestPidx<_lu.length) ? latestPidx : 0;
+                if(_lu[safePidx]&&_lu[safePidx].name){
+                  setModal({team:nb.team, pidx:safePidx, inning:nb.inning, step:"result"});
+                } else {
+                  setModal(null);
+                }
               } else {
                 setModal(null);
               }
@@ -11358,7 +11371,7 @@ const S = {
   header:{
     background:"linear-gradient(180deg,#0f2040,#0c160e)",
     borderBottom:"1px solid #24402b",
-    padding:"12px 16px 10px",
+    padding:"calc(env(safe-area-inset-top,0px) + 12px) 16px 10px",
   },
   hRow:{
     maxWidth:860, margin:"0 auto",
@@ -11372,7 +11385,7 @@ const S = {
     background:"#07100a", borderBottom:"1px solid #24402b",
     display:"flex", maxWidth:860, margin:"0 auto",
     overflowX:"auto",
-    padding:"calc(env(safe-area-inset-top,0px) + 4px) 4px 0",
+    padding:"calc(env(safe-area-inset-top,0px) + 8px) 4px 0",
     position:"sticky", top:0, zIndex:100,
   },
   card:{

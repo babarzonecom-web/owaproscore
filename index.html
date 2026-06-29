@@ -4129,7 +4129,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.35")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.36")
         
       )
 
@@ -4212,7 +4212,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.35")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.36")
         )
 
         // ===== 新規チーム作成 =====
@@ -8376,7 +8376,7 @@ function ShareCardModal(props) {
             var _fin=!!(game&&game.finished);
             var _inn=game?(game.innings||9):9;
             var _aT=awayScore; var _hT=homeScore;
-            var _lastX=_fin&&_aT>_hT&&(game.homeScore[_inn]===""||game.homeScore[_inn]===undefined||game.homeScore[_inn]===null);
+            var _lastX=_fin&&_aT!==_hT&&(game.homeScore[_inn]===""||game.homeScore[_inn]===undefined||game.homeScore[_inn]===null);
             var _say=_fin&&_hT>_aT&&(game.homeScore[_inn]!==""&&game.homeScore[_inn]!==undefined&&game.homeScore[_inn]!==null);
             var raw=(game&&game.homeScore)?game.homeScore[i]:"";
             var s="";

@@ -4129,7 +4129,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.34")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.35")
         
       )
 
@@ -4212,7 +4212,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.34")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.35")
         )
 
         // ===== 新規チーム作成 =====
@@ -4684,7 +4684,7 @@ function App() {
                           var _cHalf=g.half||"top";
                           var _aT=_aTotal, _hT=_hTotal;
                           var _sayonara=_fin&&_hT>_aT&&(g.homeScore[_inn]!==""&&g.homeScore[_inn]!==undefined);
-                          var _lastX=_fin&&_aT>_hT&&(g.homeScore[_inn]===""||g.homeScore[_inn]===undefined);
+                          var _lastX=_fin&&_aT!==_hT&&(g.homeScore[_inn]===""||g.homeScore[_inn]===undefined);
                           return [
                             {label:g.awayTeam||"Away",score:g.awayScore||{},total:_aTotal,color:"#ffb52e",team:"away"},
                             {label:g.homeTeam||"Home",score:g.homeScore||{},total:_hTotal,color:"#7dd3fc",team:"home"},
@@ -4705,12 +4705,14 @@ function App() {
                                   s=(raw!==""&&raw!==undefined&&raw!==null)?String(raw):"";
                                 }
                                 var _sy=_sayonara&&row.team==="home"&&i===_inn&&s!==""&&s!=="×";
+                                var _isCold=_fin&&(g.endReason==="cold"||g.endReason==="weather"||g.endReason==="dark");
+                                var _coldEnd=_isCold&&i===(g.endInning||_inn)&&s!==""&&s!==undefined;
                                 return React.createElement('td',{key:i,style:{
                                   textAlign:"center",padding:"3px 4px",
                                   fontSize:s==="×"?10:13,fontWeight:700,
                                   color:s==="×"?"#74897b":(parseInt(s)>0)?"#fff":"#2e4234",
                                   background:i===g.inning?"rgba(255,255,255,0.05)":"transparent"
-                                }},_sy?(s+"×"):s||((!_fin&&i===_cInn)?"":(_fin?"":"")));
+                                }},_sy?(s+"×"):_coldEnd?(s+"×"):s||((!_fin&&i===_cInn)?"":(_fin?"":"")));
                               })
                               ,React.createElement('td',{style:{textAlign:"center",fontWeight:900,fontSize:16,color:row.color,padding:"3px 6px"}},row.total)
                             );
@@ -5011,6 +5013,9 @@ function App() {
                     var sayonara=finished&&homeTotal2>awayTotal2&&(game.homeScore[inn]!==""&&game.homeScore[inn]!==undefined)&&game.awayScore[inn]!==undefined;
                     // 最終回裏不要判定：先攻リード or 同点以上で試合終了し、homeScore[inn]が空
                     var lastUraUnneeded=finished&&(game.homeScore[inn]===""||game.homeScore[inn]===undefined)&&awayTotal2!==homeTotal2;
+                    // コールド判定
+                    var isCold=finished&&(game.endReason==="cold"||game.endReason==="weather"||game.endReason==="dark");
+                    var coldInning=isCold?(game.endInning||inn):null;
                     return [
                       {team:"away",label:game.awayTeam,score:game.awayScore,total:awayTotal,hits:awayHitsTotal,errs:awayErrsTotal,color:"#ffb52e"},
                       {team:"home",label:game.homeTeam,score:game.homeScore,total:homeTotal,hits:homeHitsTotal,errs:homeErrsTotal,color:"#7dd3fc"},
@@ -5041,9 +5046,10 @@ function App() {
                           }
                           // サヨナラ：後攻の最終回に×を付加
                           var showSayonara=sayonara&&row.team==="home"&&i===inn&&scoreStr!==""&&scoreStr!=="×";
+                          var isColdEnd=isCold&&i===coldInning&&scoreStr!==""&&scoreStr!==undefined;
                           return React.createElement('td', { key: i, style: {...(appTheme==="light"?S.tdL:S.td),padding:2,textAlign:"center"},}
                             , React.createElement('span', { style: {fontSize:scoreStr==="×"?13:16,fontWeight:700,color:scoreStr==="×"?"#74897b":"#fff",display:"block",padding:"4px 0"},}
-                              , showSayonara?(scoreStr+"×"):scoreStr
+                              , showSayonara?(scoreStr+"×"):isColdEnd?(scoreStr+"×"):scoreStr
                             )
                           );
                         })
@@ -8357,7 +8363,7 @@ function ShareCardModal(props) {
             var _fin=!!(game&&game.finished);
             var _inn=game?(game.innings||9):9;
             var _aT=awayScore; var _hT=homeScore;
-            var _lastX=_fin&&_aT>_hT&&(game.homeScore[_inn]===""||game.homeScore[_inn]===undefined||game.homeScore[_inn]===null);
+            var _lastX=_fin&&_aT!==_hT&&(game.homeScore[_inn]===""||game.homeScore[_inn]===undefined||game.homeScore[_inn]===null);
             var _say=_fin&&_hT>_aT&&(game.homeScore[_inn]!==""&&game.homeScore[_inn]!==undefined&&game.homeScore[_inn]!==null);
             var raw=(game&&game.awayScore)?game.awayScore[i]:"";
             var s=(raw!==""&&raw!==undefined&&raw!==null)?String(raw):"";
@@ -8377,7 +8383,9 @@ function ShareCardModal(props) {
             if(i===_inn&&_lastX) s="×";
             else s=(raw!==""&&raw!==undefined&&raw!==null)?String(raw):"";
             var showSay=_say&&i===_inn&&s!==""&&s!=="×";
-            return React.createElement("div",{key:i,style:{flex:1,textAlign:"center",padding:"3px 1px",fontFamily:"'Bebas Neue',sans-serif",fontSize:s==="×"?9:12,color:s==="×"?"#888":(T.txt==="#111"?"#888":"#ccc")}},showSay?(s+"×"):s);})
+            var _isColdS=_fin&&(game.endReason==="cold"||game.endReason==="weather"||game.endReason==="dark");
+            var _coldEndS=_isColdS&&i===(game.endInning||_inn)&&s!==""&&s!==undefined&&s!=="×";
+            return React.createElement("div",{key:i,style:{flex:1,textAlign:"center",padding:"3px 1px",fontFamily:"'Bebas Neue',sans-serif",fontSize:s==="×"?9:12,color:s==="×"?"#888":(T.txt==="#111"?"#888":"#ccc")}},showSay?(s+"×"):_coldEndS?(s+"×"):s);})
           ,React.createElement("div",{style:{flex:1.3,textAlign:"center",padding:"3px 1px",borderLeft:"1px solid #181818",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:T.txt==="#111"?"#333":T.hCol}},homeScore)
         )
       )

@@ -3542,9 +3542,10 @@ function App() {
   };
 
   const endGame = useCallback((reason, endInning, endNote, pitcherResults)=>{
-    mutGame(g=>{
+    // mutGameとsetStorageを1つのsetStorage呼び出しにまとめる（state競合防止）
+    setStorage(s=>{
       const pr = pitcherResults||{};
-      const applyRunsToSide = (side) => {
+      const applyRunsToSide = (g, side) => {
         const ps = [...(g[side+"Pitchers"]||[])];
         ps.forEach((p,i)=>{
           const r = pr[p.name]||{};
@@ -3553,37 +3554,40 @@ function App() {
         });
         return ps;
       };
-      return {...g, finished:true, endReason:reason, endInning, endNote:endNote||"",
+      const snap = JSON.parse(JSON.stringify(s.currentGame));
+      const finishedGame = {...s.currentGame, finished:true, endReason:reason, endInning, endNote:endNote||"",
         pitcherResults:pr,
-        awayPitchers: applyRunsToSide("away"),
-        homePitchers: applyRunsToSide("home"),
-        finalOuts: g.outs, finalInning: g.inning, finalHalf: g.half,
-        awayPitcherIdx: -1, homePitcherIdx: -1};
-    });
-    
-    setStorage(s=>{
-      const finished = {...s.currentGame, finished:true, endReason:reason, endInning, endNote:endNote||"",
-        pitcherResults: pitcherResults||{},
+        awayPitchers: applyRunsToSide(s.currentGame, "away"),
+        homePitchers: applyRunsToSide(s.currentGame, "home"),
+        finalOuts: s.currentGame.outs, finalInning: s.currentGame.inning, finalHalf: s.currentGame.half,
+        awayPitcherIdx: -1, homePitcherIdx: -1,
         savedAt:new Date().toLocaleString("ja-JP")};
+      const newUndoStack = [snap, ...(s.undoStack||[])];
 
-      // チームコード管理者なら team_rooms に保存（メインの共有ストレージ）
-      const g = finished;
+      // Firebase保存
       if(window.__teamShareRole==="admin" && window.__teamShareCode){
-        fbSaveGameToCode(window.__teamShareCode, g);
-        fbSaveHistory(window.__teamShareCode, g);
+        try {
+          window.__teamAdminPushing = true;
+          fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json",{
+            method:"PUT",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(Object.assign({},finishedGame,{_ts:Date.now()}))
+          }).then(function(){ setTimeout(function(){ window.__teamAdminPushing=false; },2000); })
+          .catch(function(e){ console.error("[TEAM] push error",e); window.__teamAdminPushing=false; });
+        } catch(e) {}
+        fbSaveGameToCode(window.__teamShareCode, finishedGame);
+        fbSaveHistory(window.__teamShareCode, finishedGame);
       }
-      // 旧来の shared_teams への保存も維持（後方互換）
       const allTeams = [...(s.teams||[]), ...(s.myTeam?[s.myTeam]:[]), ...(s.opponents||[])];
-      const matchedTeam = allTeams.find(t=>t.name===g.awayTeam||t.name===g.homeTeam);
-      if(matchedTeam) fbSaveTeamGame(matchedTeam.id, g);
+      const matchedTeam = allTeams.find(t=>t.name===finishedGame.awayTeam||t.name===finishedGame.homeTeam);
+      if(matchedTeam) fbSaveTeamGame(matchedTeam.id, finishedGame);
 
-      const hist = [finished, ...(s.history||[]).filter(h=>h.id!==finished.id)]
+      const hist = [finishedGame, ...(s.history||[]).filter(h=>h.id!==finishedGame.id)]
         .sort((a,b)=>{ const ta=a.date||a.savedAt||""; const tb=b.date||b.savedAt||""; return tb.localeCompare(ta)||(b._ts||0)-(a._ts||0); })
         .slice(0,100);
-      return {...s, history:hist};
+      return {...s, currentGame: finishedGame, undoStack: newUndoStack, history:hist};
     });
     showToast(reason==="cold"?`コールドゲーム（${endInning}回）`:reason==="mercy"?"コールド成立":"⚾ 試合終了");
-  },[mutGame]);
+  },[]);
 
   const resumeGame = useCallback(()=>{
     mutGame(g=>({...g, finished:false, endReason:"", endInning:null, endNote:""}));
@@ -4129,7 +4133,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.36")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.37")
         
       )
 
@@ -4212,7 +4216,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.36")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.37")
         )
 
         // ===== 新規チーム作成 =====
